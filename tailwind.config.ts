@@ -10,10 +10,10 @@ const config: Config = {
     extend: {
       colors: {
         bg: {
-          primary: '#080C18',
-          secondary: '#0D1321',
-          card: '#111827',
-          hover: '#1a2236',
+          primary:   'rgb(var(--bg-primary)   / <alpha-value>)',
+          secondary: 'rgb(var(--bg-secondary) / <alpha-value>)',
+          card:      'rgb(var(--bg-card)      / <alpha-value>)',
+          hover:     'rgb(var(--bg-hover)     / <alpha-value>)',
         },
         accent: {
           blue: '#3B82F6',
@@ -29,9 +29,9 @@ const config: Config = {
           active: 'rgba(59,130,246,0.5)',
         },
         text: {
-          primary: '#F1F5F9',
-          secondary: '#94A3B8',
-          muted: '#475569',
+          primary:   'rgb(var(--text-primary)   / <alpha-value>)',
+          secondary: 'rgb(var(--text-secondary) / <alpha-value>)',
+          muted:     'rgb(var(--text-muted)     / <alpha-value>)',
         },
       },
       backgroundImage: {

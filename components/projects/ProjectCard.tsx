@@ -3,7 +3,7 @@
 import { Project } from '@/lib/types'
 import { formatDate, getDaysLeft } from '@/lib/utils'
 import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
-import { Calendar, User, Edit2, Trash2, ArrowRight } from 'lucide-react'
+import { Calendar, User, Edit2, Trash2, CheckSquare } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 
@@ -59,14 +59,16 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
       <div>
         <div className="flex justify-between items-center mb-1.5">
           <span className="text-text-muted text-xs">İrəliləyiş</span>
-          <span className={cn('text-xs font-semibold', progress >= 100 ? 'text-accent-green' : 'text-text-primary')}>{progress}%</span>
+          <span className={cn('text-xs font-semibold', progress >= 100 ? 'text-accent-green' : 'text-text-primary')}>
+            {progress}%
+          </span>
         </div>
         <div className="progress-bar">
           <div
             className="progress-fill"
             style={{
               width: `${progress}%`,
-              background: progress >= 100 ? '#10B981' : project.color || '#3B82F6'
+              background: progress >= 100 ? '#10B981' : project.color || '#3B82F6',
             }}
           />
         </div>
@@ -76,23 +78,22 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
       <div className="flex items-center justify-between text-xs text-text-muted pt-1 border-t border-white/[0.04]">
         <div className="flex items-center gap-1">
           <User size={11} />
-          <span>{project.owner || '—'}</span>
+          <span className="truncate max-w-[100px]">{project.owner || '—'}</span>
         </div>
         <div className="flex items-center gap-1">
           <Calendar size={11} />
           <span className={cn(daysLeft < 0 && project.status !== 'Tamamlandı' ? 'text-accent-red' : '')}>
             {project.endDate
               ? daysLeft < 0
-                ? `${Math.abs(daysLeft)} gün gecikdi`
-                : `${daysLeft} gün qaldı`
-              : '—'
-            }
+                ? `${Math.abs(daysLeft)}g gecikdi`
+                : `${daysLeft}g qaldı`
+              : '—'}
           </span>
         </div>
       </div>
 
-      {/* Footer */}
-      <div className="flex items-center justify-between">
+      {/* Footer: budget + View Tasks */}
+      <div className="flex items-center gap-2">
         {project.budget && (
           <span className="text-xs text-text-muted">
             ₼{Number(project.budget).toLocaleString()}
@@ -100,9 +101,10 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
         )}
         <Link
           href={`/projects/${project.id}`}
-          className="ml-auto flex items-center gap-1 text-xs text-accent-blue hover:text-blue-400 transition-colors"
+          className="ml-auto flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all text-accent-blue hover:bg-accent-blue/10 border border-accent-blue/20"
         >
-          Ətraflı <ArrowRight size={12} />
+          <CheckSquare size={12} />
+          Tapşırıqlar
         </Link>
       </div>
     </div>

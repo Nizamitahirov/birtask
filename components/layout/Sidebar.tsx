@@ -6,9 +6,10 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
   Users, Settings, ChevronLeft, ChevronRight,
-  Zap, ExternalLink
+  Zap, ExternalLink, Sun, Moon
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTheme } from '@/hooks/useTheme'
 
 const navItems = [
   { href: '/',         label: 'İdarə Paneli', icon: LayoutDashboard },
@@ -21,19 +22,24 @@ const navItems = [
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
+  const { theme, toggle } = useTheme()
 
   return (
     <aside
       className={cn(
-        'relative flex flex-col h-full bg-bg-secondary border-r border-white/[0.06] transition-all duration-300 ease-in-out z-50',
+        'relative flex flex-col h-full border-r transition-all duration-300 ease-in-out z-50',
         collapsed ? 'w-[68px]' : 'w-[240px]'
       )}
+      style={{ background: 'rgb(var(--bg-secondary))', borderColor: 'var(--border)' }}
     >
       {/* Logo */}
-      <div className={cn(
-        'flex items-center gap-3 px-4 py-5 border-b border-white/[0.06]',
-        collapsed && 'justify-center px-0'
-      )}>
+      <div
+        className={cn(
+          'flex items-center gap-3 px-4 py-5',
+          collapsed && 'justify-center px-0'
+        )}
+        style={{ borderBottom: '1px solid var(--border)' }}
+      >
         <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center flex-shrink-0 shadow-glow-blue">
           <Zap size={16} className="text-white" />
         </div>
@@ -61,9 +67,10 @@ export function Sidebar() {
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative',
                 active
                   ? 'bg-accent-blue/10 text-accent-blue border border-accent-blue/20'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-white/[0.04]',
+                  : 'text-text-secondary hover:text-text-primary',
                 collapsed && 'justify-center px-0 mx-auto w-10 h-10'
               )}
+              style={!active ? { ':hover': { background: 'var(--surface-2)' } } as React.CSSProperties : undefined}
             >
               <Icon size={18} className="flex-shrink-0" />
               {!collapsed && <span className="text-sm font-medium">{label}</span>}
@@ -71,7 +78,10 @@ export function Sidebar() {
                 <div className="ml-auto w-1.5 h-1.5 rounded-full bg-accent-blue" />
               )}
               {collapsed && (
-                <div className="absolute left-full ml-3 px-2 py-1 bg-bg-card border border-white/10 rounded-lg text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50">
+                <div
+                  className="absolute left-full ml-3 px-2 py-1 rounded-lg text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50"
+                  style={{ background: 'rgb(var(--bg-card))', border: '1px solid var(--border)' }}
+                >
                   {label}
                 </div>
               )}
@@ -80,6 +90,28 @@ export function Sidebar() {
         })}
       </nav>
 
+      {/* Theme toggle */}
+      <div className="px-2 pb-2">
+        <button
+          onClick={toggle}
+          title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+          className={cn(
+            'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-text-secondary hover:text-text-primary w-full',
+            collapsed && 'justify-center px-0 mx-auto w-10 h-10'
+          )}
+          style={{ background: 'var(--surface-1)' }}
+        >
+          {theme === 'dark'
+            ? <Sun size={18} className="flex-shrink-0 text-accent-yellow" />
+            : <Moon size={18} className="flex-shrink-0 text-accent-blue" />}
+          {!collapsed && (
+            <span className="text-sm font-medium">
+              {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+            </span>
+          )}
+        </button>
+      </div>
+
       {/* Google Sheets link */}
       {process.env.NEXT_PUBLIC_SHEET_URL && !collapsed && (
         <div className="p-3">
@@ -87,7 +119,8 @@ export function Sidebar() {
             href={process.env.NEXT_PUBLIC_SHEET_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/[0.06] text-text-secondary hover:text-text-primary transition-all text-xs group"
+            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-text-secondary hover:text-text-primary transition-all text-xs group"
+            style={{ background: 'var(--surface-1)', border: '1px solid var(--border)' }}
           >
             <div className="w-4 h-4 bg-green-500 rounded flex items-center justify-center flex-shrink-0">
               <span className="text-white text-[8px] font-bold">G</span>
@@ -101,7 +134,8 @@ export function Sidebar() {
       {/* Collapse btn */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-6 w-6 h-6 rounded-full bg-bg-card border border-white/[0.1] flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-bg-hover transition-all duration-200 shadow-card z-10"
+        className="absolute -right-3 top-6 w-6 h-6 rounded-full flex items-center justify-center text-text-secondary hover:text-text-primary transition-all duration-200 z-10"
+        style={{ background: 'rgb(var(--bg-card))', border: '1px solid var(--border)' }}
       >
         {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
       </button>

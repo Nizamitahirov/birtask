@@ -3,108 +3,216 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Theme variables ─────────────────────────────────────────── */
 :root {
-  --bg-primary: #080C18;
-  --bg-secondary: #0D1321;
-  --bg-card: #111827;
-  --accent-blue: #3B82F6;
-  --accent-cyan: #06B6D4;
-  --accent-purple: #8B5CF6;
+  /* Dark (default) — RGB channel values for Tailwind opacity support */
+  --bg-primary:    8  12  24;
+  --bg-secondary:  13 19  33;
+  --bg-card:       17 24  39;
+  --bg-hover:      26 34  54;
+  --text-primary:  241 245 249;
+  --text-secondary:148 163 184;
+  --text-muted:    71  85 105;
+
+  /* Semantic surface tokens */
+  --border:        rgba(255,255,255,0.07);
+  --border-hover:  rgba(255,255,255,0.13);
+  --surface-1:     rgba(255,255,255,0.03);
+  --surface-2:     rgba(255,255,255,0.04);
+  --surface-3:     rgba(255,255,255,0.06);
+  --surface-active:rgba(255,255,255,0.10);
+
+  /* Scrollbar */
+  --scrollbar-thumb: rgba(255,255,255,0.10);
+  --scrollbar-hover:  rgba(255,255,255,0.20);
+
+  /* Skeleton shimmer */
+  --skeleton-from: rgba(255,255,255,0.04);
+  --skeleton-mid:  rgba(255,255,255,0.08);
+
+  /* Progress track */
+  --progress-track: rgba(255,255,255,0.05);
+
+  /* Mesh bg colors */
+  --mesh-accent1: rgba(59,130,246,0.08);
+  --mesh-accent2: rgba(139,92,246,0.06);
 }
 
-* {
-  box-sizing: border-box;
-  padding: 0;
-  margin: 0;
+[data-theme="light"] {
+  --bg-primary:    248 250 252;
+  --bg-secondary:  241 245 249;
+  --bg-card:       255 255 255;
+  --bg-hover:      226 232 240;
+  --text-primary:  15  23  42;
+  --text-secondary:71  85 105;
+  --text-muted:    148 163 184;
+
+  --border:        rgba(0,0,0,0.08);
+  --border-hover:  rgba(0,0,0,0.15);
+  --surface-1:     rgba(0,0,0,0.02);
+  --surface-2:     rgba(0,0,0,0.03);
+  --surface-3:     rgba(0,0,0,0.05);
+  --surface-active:rgba(0,0,0,0.07);
+
+  --scrollbar-thumb: rgba(0,0,0,0.12);
+  --scrollbar-hover:  rgba(0,0,0,0.22);
+
+  --skeleton-from: rgba(0,0,0,0.04);
+  --skeleton-mid:  rgba(0,0,0,0.08);
+
+  --progress-track: rgba(0,0,0,0.06);
+
+  --mesh-accent1: rgba(59,130,246,0.04);
+  --mesh-accent2: rgba(139,92,246,0.03);
 }
+
+/* ── Base resets ─────────────────────────────────────────────── */
+* { box-sizing: border-box; padding: 0; margin: 0; }
 
 html, body {
   max-width: 100vw;
   overflow-x: hidden;
-  background: var(--bg-primary);
-  color: #F1F5F9;
+  background: rgb(var(--bg-primary));
+  color: rgb(var(--text-primary));
   font-family: 'Inter', system-ui, sans-serif;
+  transition: background 0.2s, color 0.2s;
 }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-hover); }
 
+/* ── Component classes ───────────────────────────────────────── */
 @layer components {
   .glass {
-    @apply bg-white/[0.03] backdrop-blur-md border border-white/[0.07];
+    background: var(--surface-1);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
   }
   .glass-hover {
-    @apply hover:bg-white/[0.06] hover:border-white/[0.12] transition-all duration-200;
+    @apply transition-all duration-200;
+  }
+  .glass-hover:hover {
+    background: var(--surface-3);
+    border-color: var(--border-hover);
   }
   .card {
-    @apply bg-bg-card border border-white/[0.07] rounded-2xl;
+    background: rgb(var(--bg-card));
+    border: 1px solid var(--border);
+    border-radius: 1rem;
+    transition: border-color 0.2s;
   }
   .btn-primary {
     @apply bg-accent-blue hover:bg-blue-500 text-white font-medium px-4 py-2 rounded-xl
            transition-all duration-200 flex items-center gap-2 text-sm;
   }
   .btn-secondary {
-    @apply bg-white/[0.06] hover:bg-white/[0.1] text-text-primary border border-white/[0.07]
-           font-medium px-4 py-2 rounded-xl transition-all duration-200 flex items-center gap-2 text-sm;
+    background: var(--surface-3);
+    color: rgb(var(--text-primary));
+    border: 1px solid var(--border);
+    @apply font-medium px-4 py-2 rounded-xl transition-all duration-200 flex items-center gap-2 text-sm;
+  }
+  .btn-secondary:hover {
+    background: var(--surface-active);
   }
   .btn-danger {
     @apply bg-accent-red/10 hover:bg-accent-red/20 text-accent-red border border-accent-red/20
            font-medium px-4 py-2 rounded-xl transition-all duration-200 flex items-center gap-2 text-sm;
   }
   .input {
-    @apply bg-white/[0.04] border border-white/[0.1] rounded-xl px-4 py-2.5 text-text-primary
-           placeholder:text-text-muted focus:outline-none focus:border-accent-blue/50 focus:bg-white/[0.06]
-           transition-all duration-200 w-full text-sm;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: rgb(var(--text-primary));
+    @apply rounded-xl px-4 py-2.5 focus:outline-none transition-all duration-200 w-full text-sm;
+  }
+  .input::placeholder { color: rgb(var(--text-muted)); }
+  .input:focus {
+    border-color: rgba(59,130,246,0.5);
+    background: var(--surface-3);
   }
   .select {
-    @apply bg-white/[0.04] border border-white/[0.1] rounded-xl px-4 py-2.5 text-text-primary
-           focus:outline-none focus:border-accent-blue/50 transition-all duration-200 w-full text-sm
-           cursor-pointer;
+    background: var(--surface-2);
+    border: 1px solid var(--border);
+    color: rgb(var(--text-primary));
+    @apply rounded-xl px-4 py-2.5 focus:outline-none transition-all duration-200 w-full text-sm cursor-pointer;
   }
+  .select:focus { border-color: rgba(59,130,246,0.5); }
   .badge {
     @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border;
   }
   .page-title {
-    @apply text-2xl font-bold text-text-primary;
+    @apply text-2xl font-bold;
+    color: rgb(var(--text-primary));
   }
   .section-label {
-    @apply text-xs font-semibold text-text-muted uppercase tracking-widest;
+    @apply text-xs font-semibold uppercase tracking-widest;
+    color: rgb(var(--text-muted));
   }
 }
 
-/* Gradient mesh background */
+/* ── Mesh background ─────────────────────────────────────────── */
 .mesh-bg {
   background:
-    radial-gradient(ellipse at 20% 20%, rgba(59,130,246,0.08) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(139,92,246,0.06) 0%, transparent 50%),
-    #080C18;
+    radial-gradient(ellipse at 20% 20%, var(--mesh-accent1) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, var(--mesh-accent2) 0%, transparent 50%),
+    rgb(var(--bg-primary));
 }
 
-/* Shimmer skeleton */
+/* ── Skeleton shimmer ────────────────────────────────────────── */
 .skeleton {
-  background: linear-gradient(90deg, rgba(255,255,255,0.04) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.04) 75%);
+  background: linear-gradient(90deg,
+    var(--skeleton-from) 25%,
+    var(--skeleton-mid)  50%,
+    var(--skeleton-from) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s linear infinite;
 }
 
-/* Progress bar */
+/* ── Progress bar ────────────────────────────────────────────── */
 .progress-bar {
-  @apply h-1.5 rounded-full bg-white/5 overflow-hidden;
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--progress-track);
+  overflow: hidden;
 }
 .progress-fill {
   @apply h-full rounded-full transition-all duration-700;
 }
 
-/* Custom select option */
+/* ── Select option ───────────────────────────────────────────── */
 select option {
-  background: #0D1321;
-  color: #F1F5F9;
+  background: rgb(var(--bg-secondary));
+  color: rgb(var(--text-primary));
 }
 
-/* Kanban drag */
-.dragging {
-  opacity: 0.5;
-  transform: scale(0.98);
+/* ── Kanban drag ─────────────────────────────────────────────── */
+.dragging { opacity: 0.5; transform: scale(0.98); }
+
+/* ── Light mode: override inline Tailwind white-alpha utils ─── */
+[data-theme="light"] .bg-white\/\[0\.03\] { background: var(--surface-1) !important; }
+[data-theme="light"] .bg-white\/\[0\.04\] { background: var(--surface-2) !important; }
+[data-theme="light"] .bg-white\/\[0\.05\] { background: var(--progress-track) !important; }
+[data-theme="light"] .bg-white\/\[0\.06\] { background: var(--surface-3) !important; }
+[data-theme="light"] .bg-white\/\[0\.08\] { background: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] .bg-white\/\[0\.1\]  { background: var(--surface-active) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.04\]:hover { background: var(--surface-2) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.05\]:hover { background: var(--surface-3) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.06\]:hover { background: var(--surface-3) !important; }
+[data-theme="light"] .hover\:bg-white\/\[0\.08\]:hover { background: rgba(0,0,0,0.06) !important; }
+[data-theme="light"] .border-white\/\[0\.04\] { border-color: var(--border) !important; }
+[data-theme="light"] .border-white\/\[0\.06\] { border-color: var(--border) !important; }
+[data-theme="light"] .border-white\/\[0\.07\] { border-color: var(--border) !important; }
+[data-theme="light"] .border-white\/\[0\.08\] { border-color: var(--border) !important; }
+[data-theme="light"] .border-white\/\[0\.1\]  { border-color: var(--border-hover) !important; }
+[data-theme="light"] .border-white\/\[0\.12\] { border-color: var(--border-hover) !important; }
+[data-theme="light"] .border-white\/\[0\.15\] { border-color: var(--border-hover) !important; }
+[data-theme="light"] .border-white\/\[0\.2\]  { border-color: rgba(0,0,0,0.18) !important; }
+[data-theme="light"] .border-white\/\[0\.25\] { border-color: rgba(0,0,0,0.22) !important; }
+
+/* Light mode sidebar & nav active state */
+[data-theme="light"] aside {
+  background: rgb(var(--bg-secondary));
+  border-right-color: var(--border);
+  box-shadow: 1px 0 0 0 var(--border);
 }

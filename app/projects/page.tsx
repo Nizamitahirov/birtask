@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
 import { Plus, Search, FolderKanban, LayoutGrid, List, RefreshCw, CheckSquare, Edit2, Trash2 } from 'lucide-react'
+import Link from 'next/link'
 import { cn, formatDateShort } from '@/lib/utils'
 
 const STATUS_FILTERS = ['Hamısı', 'Planlaşdırılır', 'Davam edir', 'Tamamlandı', 'Dayandırıldı']
@@ -199,19 +200,27 @@ export default function ProjectsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <button
-                          onClick={() => { setSelected(p); setModal('edit') }}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all"
+                      <div className="flex items-center gap-1">
+                        <Link
+                          href={`/projects/${p.id}`}
+                          className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-lg text-accent-blue hover:bg-accent-blue/10 border border-accent-blue/20 transition-all whitespace-nowrap"
                         >
-                          <Edit2 size={13} />
-                        </button>
-                        <button
-                          onClick={() => setConfirmDelete(p)}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-all"
-                        >
-                          <Trash2 size={13} />
-                        </button>
+                          <CheckSquare size={11} /> Tapşırıqlar
+                        </Link>
+                        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
+                          <button
+                            onClick={() => { setSelected(p); setModal('edit') }}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all"
+                          >
+                            <Edit2 size={13} />
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete(p)}
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-all"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
                       </div>
                     </td>
                   </tr>
