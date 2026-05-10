@@ -1,5 +1,6 @@
 'use client'
 
+import { useState, useEffect } from 'react'
 import { useDashboard } from '@/hooks/useSheets'
 import { StatsCard } from '@/components/dashboard/StatsCard'
 import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
@@ -12,6 +13,10 @@ import Link from 'next/link'
 
 export default function DashboardPage() {
   const { stats, activities, loading } = useDashboard()
+  const [dateStr, setDateStr] = useState('')
+  useEffect(() => {
+    setDateStr(new Date().toLocaleDateString('az-AZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))
+  }, [])
 
   const completionRate = stats
     ? stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0
@@ -23,9 +28,7 @@ export default function DashboardPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="page-title">İdarə Paneli</h1>
-          <p className="text-text-secondary text-sm mt-1">
-            {new Date().toLocaleDateString('az-AZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-          </p>
+          <p className="text-text-secondary text-sm mt-1">{dateStr}</p>
         </div>
         <div className="hidden sm:flex items-center gap-2">
           <div className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />

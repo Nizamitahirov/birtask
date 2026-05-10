@@ -5,12 +5,11 @@ const API_BASE = '/api/sheets'
 async function callApi<T>(action: string, method: string = 'GET', data?: object): Promise<ApiResponse<T>> {
   try {
     if (method === 'GET') {
-      const url = new URL(API_BASE, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')
-      url.searchParams.set('action', action)
+      const params = new URLSearchParams({ action })
       if (data) {
-        Object.entries(data).forEach(([k, v]) => url.searchParams.set(k, String(v)))
+        Object.entries(data).forEach(([k, v]) => params.set(k, String(v)))
       }
-      const res = await fetch(url.toString(), { cache: 'no-store' })
+      const res = await fetch(`${API_BASE}?${params.toString()}`, { cache: 'no-store' })
       const json = await res.json()
       return json
     } else {
