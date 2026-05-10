@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { sheetsApi } from '@/lib/sheets'
+import { useTeamNames } from '@/hooks/useSheets'
 import { Project, Task } from '@/lib/types'
 import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
@@ -32,6 +33,7 @@ export default function ProjectDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState<Task | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const teamNames = useTeamNames()
 
   const fetch = async () => {
     setLoading(true)
@@ -230,6 +232,7 @@ export default function ProjectDetailPage() {
       <Modal open={modal === 'create'} onClose={() => setModal(null)} title="Yeni Tapşırıq">
         <TaskForm
           initial={{ projectId: id, projectName: project?.name }}
+          teamNames={teamNames}
           onSubmit={handleCreateTask}
           onCancel={() => setModal(null)}
           loading={saving}
@@ -241,6 +244,7 @@ export default function ProjectDetailPage() {
         {selectedTask && (
           <TaskForm
             initial={selectedTask}
+            teamNames={teamNames}
             onSubmit={handleEditTask}
             onCancel={() => { setModal(null); setSelectedTask(null) }}
             loading={saving}

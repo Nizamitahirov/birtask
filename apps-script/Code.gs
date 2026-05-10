@@ -31,6 +31,7 @@ function doGet(e) {
       case 'getTeam':      result = getTeam();                 break;
       case 'getActivity':  result = getActivity();             break;
       case 'getDashboard': result = getDashboard();            break;
+      case 'getBatch':     result = getBatch();                break;
       default:             result = { success: false, error: 'Naməlum action: ' + action };
     }
   } catch (err) {
@@ -48,7 +49,8 @@ function doPost(e) {
   var result;
   try {
     switch (action) {
-      case 'initSheet':     result = initSheet();           break;
+      case 'initSheet':        result = initSheet();           break;
+      case 'importExcelData':  result = importExcelData();    break;
       case 'createProject': result = createProject(body);   break;
       case 'updateProject': result = updateProject(body);   break;
       case 'deleteProject': result = deleteProject(body.id); break;
@@ -391,4 +393,152 @@ function getDashboard() {
       teamSize: team.length,
     }
   };
+}
+
+// ─── Batch (performance) ──────────────────────────────────────────────────────
+function getBatch() {
+  var projects = sheetToObjects(getSheet(SHEETS.PROJECTS), PROJECT_HEADERS);
+  var tasks    = sheetToObjects(getSheet(SHEETS.TASKS),    TASK_HEADERS);
+  var team     = sheetToObjects(getSheet(SHEETS.TEAM),     TEAM_HEADERS);
+  var activity = sheetToObjects(getSheet(SHEETS.ACTIVITY), ACTIVITY_HEADERS);
+  activity.reverse();
+  return {
+    success: true,
+    data: {
+      projects: projects,
+      tasks: tasks,
+      team: team,
+      activity: activity.slice(0, 20)
+    }
+  };
+}
+
+// ─── Import Excel Data ────────────────────────────────────────────────────────
+function importExcelData() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+
+  // Ensure sheets exist first
+  initSheet();
+
+  var pSheet = ss.getSheetByName(SHEETS.PROJECTS);
+  var tSheet = ss.getSheetByName(SHEETS.TASKS);
+  var mSheet = ss.getSheetByName(SHEETS.TEAM);
+
+  // Clear existing data (keep headers)
+  if (pSheet.getLastRow() > 1) pSheet.deleteRows(2, pSheet.getLastRow() - 1);
+  if (tSheet.getLastRow() > 1) tSheet.deleteRows(2, tSheet.getLastRow() - 1);
+  if (mSheet.getLastRow() > 1) mSheet.deleteRows(2, mSheet.getLastRow() - 1);
+
+  var now = new Date().toISOString();
+
+  // ── Team Members ─────────────────────────────────────────────────────────────
+  var teamData = [
+    ['tm1','Nizami Tahirov',  'nizami@birtask.az',  'IT Developer',    'Texnologiya', '+994501234567', 'NT', now],
+    ['tm2','Ağaəli',          'agaeli@birtask.az',  'HR Specialist',   'HR Ops',      '',              'AG', now],
+    ['tm3','Ülvi',            'ulvi@birtask.az',    'HR Specialist',   'HR Ops',      '',              'UL', now],
+    ['tm4','Nərgiz',          'nergiz@birtask.az',  'HR Specialist',   'HR Ops',      '',              'NE', now],
+    ['tm5','Aytən',           'ayten@birtask.az',   'HR Specialist',   'HR Ops',      '',              'AY', now],
+    ['tm6','Farida',          'farida@birtask.az',  'HR Specialist',   'HR Ops',      '',              'FA', now],
+    ['tm7','Hüseyn',          'huseyn@birtask.az',  'HR Specialist',   'HR Ops',      '',              'HU', now],
+    ['tm8','İlaha',           'ilaha@birtask.az',   'HR Specialist',   'HR Ops',      '',              'IL', now],
+    ['tm9','Ümid',            'umid@birtask.az',    'Legal',           'Hüquq',       '',              'UM', now],
+    ['tm10','Aida',           'aida@birtask.az',    'HR BP',           'HR BP',       '',              'AI', now],
+  ];
+  mSheet.getRange(2, 1, teamData.length, TEAM_HEADERS.length).setValues(teamData);
+
+  // ── Projects ──────────────────────────────────────────────────────────────────
+  var projects = [
+    ['p01','Məzuniyyət Planlama - Birbank',           'Birbank üzrə məzuniyyət planlama sistemi',           'Davam edir',      'Yüksək', '2026-04-01','2026-04-23','','Ağaəli',           '#3B82F6','84',now],
+    ['p02','Məzuniyyət Planlama - Pashapay',          'Pashapay üzrə məzuniyyət planlama sistemi',          'Davam edir',      'Yüksək', '2026-04-07','2026-04-23','','Nərgiz',           '#8B5CF6','84',now],
+    ['p03','Məzuniyyət Planlama - Birmarket',         'Birmarket üzrə məzuniyyət planlama sistemi',         'Davam edir',      'Yüksək', '2026-04-07','2026-04-23','','Aytən',            '#06B6D4','84',now],
+    ['p04','Prosedurlar - Pashapay və Birmarket',     'HR prosedurlarının hazırlanması',                    'Davam edir',      'Orta',   '2026-04-28','2026-05-15','','Ülvi, İlaha',      '#10B981','30',now],
+    ['p05','Əmək müqaviləsi - Pashapay',             'Pashapay üçün əmək müqavilələrinin hazırlanması',    'Davam edir',      'Yüksək', '2026-04-16','2026-05-16','','Ülvi, İlaha, Aytən','#F59E0B','28',now],
+    ['p06','Əmək müqaviləsi - Birmarket',            'Birmarket üçün əmək müqavilələrinin hazırlanması',   'Davam edir',      'Yüksək', '2026-04-16','2026-05-16','','Ülvi, İlaha, Aytən','#EC4899','28',now],
+    ['p07','Müstəqil Həmkarlar İttifaqı - Pashapay', 'Pashapay Həmkarlar İttifaqının təsis edilməsi',      'Davam edir',      'Kritik', '2026-04-16','2026-05-11','','Nizami Tahirov',   '#EF4444','56',now],
+    ['p08','Müstəqil Həmkarlar İttifaqı - Birmarket','Birmarket Həmkarlar İttifaqının təsis edilməsi',     'Planlaşdırılır',  'Kritik', '','',        '','Nizami Tahirov',   '#F97316','0', now],
+    ['p09','Birmarket Analiz',                        'Birmarket HR analizi',                               'Planlaşdırılır',  'Orta',   '2026-04-21','2026-05-31','','Nizami Tahirov, Ağaəli','#3B82F6','0',now],
+    ['p10','Birmarket Məzuniyyət qeydiyyatı sistemi', 'Birmarket məzuniyyət qeydiyyat sisteminin qurulması','Davam edir',      'Yüksək', '2026-04-20','2026-05-20','','Nizami Tahirov',   '#8B5CF6','64',now],
+    ['p11','Gündəlik yenilənən işçi siyahısı',       'Dinamik işçi siyahısı sisteminin qurulması',         'Davam edir',      'Orta',   '2026-04-20','2026-05-08','','Nizami Tahirov',   '#06B6D4','92',now],
+    ['p12','Struktur Dəyişiklikləri',                 'Şirkət strukturunun yenilənməsi',                    'Davam edir',      'Yüksək', '2026-04-20','2026-05-20','','Aida',             '#10B981','30',now],
+    ['p13','Pashapay HR Diaqnostika',                 'Pashapay HR proseslərinin diaqnostikası',            'Tamamlandı',      'Orta',   '2026-04-20','2026-04-21','','Nizami Tahirov',   '#94A3B8','100',now],
+  ];
+  pSheet.getRange(2, 1, projects.length, PROJECT_HEADERS.length).setValues(projects);
+
+  // ── Tasks ─────────────────────────────────────────────────────────────────────
+  var tasks = [
+    // p01 - Məzuniyyət Planlama - Birbank
+    ['t001','p01','Məzuniyyət Planlama - Birbank',   'Balans datası',       '31 Dekabra qədər olan',  'Tamamlandı','Yüksək','Ağaəli',                '2026-04-04','','2026-04-01T00:00:00Z',now],
+    ['t002','p01','Məzuniyyət Planlama - Birbank',   'Planlama faylları',   'Macros - VBA kod',       'Tamamlandı','Yüksək','Nizami Tahirov',         '2026-04-04','','2026-04-01T00:00:00Z',now],
+    ['t003','p01','Məzuniyyət Planlama - Birbank',   'Access Management',   'Sharepoint',             'Tamamlandı','Orta',  'Ağaəli, Ülvi',          '2026-04-07','','2026-04-01T00:00:00Z',now],
+    ['t004','p01','Məzuniyyət Planlama - Birbank',   'Kommunikasiya',       'Intcom',                 'Tamamlandı','Orta',  'Ağaəli, Ülvi',          '2026-04-08','','2026-04-01T00:00:00Z',now],
+    ['t005','p01','Məzuniyyət Planlama - Birbank',   'Reporting',           'Plan vs earned vs used', 'Davam edir','Yüksək','Nizami Tahirov',         '2026-04-23','','2026-04-14T00:00:00Z',now],
+    // p02 - Məzuniyyət Planlama - Pashapay
+    ['t006','p02','Məzuniyyət Planlama - Pashapay',  'Balans datası',       '31 Dekabra qədər olan',  'Tamamlandı','Yüksək','Nərgiz',                '2026-04-09','','2026-04-07T00:00:00Z',now],
+    ['t007','p02','Məzuniyyət Planlama - Pashapay',  'Planlama faylları',   'Macros - VBA kod',       'Tamamlandı','Yüksək','Nizami Tahirov',         '2026-04-10','','2026-04-09T00:00:00Z',now],
+    ['t008','p02','Məzuniyyət Planlama - Pashapay',  'Access Management',   'Sharepoint',             'Tamamlandı','Orta',  'Nizami Tahirov',         '2026-04-10','','2026-04-10T00:00:00Z',now],
+    ['t009','p02','Məzuniyyət Planlama - Pashapay',  'Kommunikasiya',       'Intcom',                 'Tamamlandı','Orta',  'Nərgiz',                '2026-04-13','','2026-04-10T00:00:00Z',now],
+    ['t010','p02','Məzuniyyət Planlama - Pashapay',  'Reporting',           'Plan vs earned vs used', 'Davam edir','Yüksək','Nizami Tahirov, Farida', '2026-04-23','','2026-04-15T00:00:00Z',now],
+    // p03 - Məzuniyyət Planlama - Birmarket
+    ['t011','p03','Məzuniyyət Planlama - Birmarket', 'Balans datası',       '31 Dekabra qədər olan',  'Tamamlandı','Yüksək','Aytən',                 '2026-04-09','','2026-04-07T00:00:00Z',now],
+    ['t012','p03','Məzuniyyət Planlama - Birmarket', 'Planlama faylları',   'Macros - VBA kod',       'Tamamlandı','Yüksək','Nizami Tahirov',         '2026-04-10','','2026-04-09T00:00:00Z',now],
+    ['t013','p03','Məzuniyyət Planlama - Birmarket', 'Access Management',   'Sharepoint',             'Tamamlandı','Orta',  'Nizami Tahirov',         '2026-04-10','','2026-04-10T00:00:00Z',now],
+    ['t014','p03','Məzuniyyət Planlama - Birmarket', 'Kommunikasiya',       'Intcom',                 'Tamamlandı','Orta',  'Nərgiz',                '2026-04-13','','2026-04-10T00:00:00Z',now],
+    ['t015','p03','Məzuniyyət Planlama - Birmarket', 'Reporting',           'Plan vs earned vs used', 'Davam edir','Yüksək','Nizami Tahirov, Aytən',  '2026-04-23','','2026-04-15T00:00:00Z',now],
+    // p04 - Prosedurlar
+    ['t016','p04','Prosedurlar - Pashapay və Birmarket','Məzuniyyət',       'Prosedur hazırlığı',     'Davam edir','Orta',  'Ülvi, İlaha, Aytən',    '2026-05-15','','2026-04-28T00:00:00Z',now],
+    ['t017','p04','Prosedurlar - Pashapay və Birmarket','Ezamiyyət',        'Cost saving yoxlamaq',   'Davam edir','Orta',  'Hüseyn, İlaha, Aytən',  '2026-05-15','','2026-04-28T00:00:00Z',now],
+    ['t018','p04','Prosedurlar - Pashapay və Birmarket','Xitam qaydaları',  '',                       'Davam edir','Orta',  'Ülvi, İlaha, Aytən',    '2026-05-15','','2026-04-28T00:00:00Z',now],
+    ['t019','p04','Prosedurlar - Pashapay və Birmarket','Daxili intizam qaydaları','',                'Gözləyir',  'Aşağı', '',                      '','',        '2026-04-28T00:00:00Z',now],
+    ['t020','p04','Prosedurlar - Pashapay və Birmarket','Miqrasiya',        'Cost Saving yoxlamaq',   'Gözləyir',  'Orta',  'Hüseyn',                '','',        '2026-04-28T00:00:00Z',now],
+    // p05 - Əmək müqaviləsi - Pashapay
+    ['t021','p05','Əmək müqaviləsi - Pashapay',     '5 günlük',            'Vahid Ekosistem - Legal','Davam edir','Yüksək','Ülvi, İlaha, Aytən',    '2026-05-16','','2026-04-16T00:00:00Z',now],
+    ['t022','p05','Əmək müqaviləsi - Pashapay',     '6 günlük',            'Vahid Ekosistem',        'Davam edir','Yüksək','Ülvi, İlaha, Aytən',    '2026-05-16','','2026-04-16T00:00:00Z',now],
+    ['t023','p05','Əmək müqaviləsi - Pashapay',     'Növbəli',             'Vahid Ekosistem',        'Gözləyir',  'Orta',  'Ülvi, İlaha',           '','',        '2026-04-16T00:00:00Z',now],
+    ['t024','p05','Əmək müqaviləsi - Pashapay',     'Əvəzçilik',           'Vahid Ekosistem',        'Gözləyir',  'Orta',  'Ülvi, İlaha',           '','',        '2026-04-16T00:00:00Z',now],
+    // p06 - Əmək müqaviləsi - Birmarket
+    ['t025','p06','Əmək müqaviləsi - Birmarket',    '5 günlük',            'Vahid Ekosistem - Legal','Davam edir','Yüksək','Ülvi, İlaha, Aytən',    '2026-05-16','','2026-04-16T00:00:00Z',now],
+    ['t026','p06','Əmək müqaviləsi - Birmarket',    '6 günlük',            'Vahid Ekosistem',        'Davam edir','Yüksək','Ülvi, İlaha, Aytən',    '2026-05-16','','2026-04-16T00:00:00Z',now],
+    ['t027','p06','Əmək müqaviləsi - Birmarket',    'Növbəli',             'Vahid Ekosistem',        'Davam edir','Orta',  'Ülvi, İlaha',           '2026-04-25','','2026-04-16T00:00:00Z',now],
+    ['t028','p06','Əmək müqaviləsi - Birmarket',    'Əvəzçilik',           'Vahid Ekosistem',        'Davam edir','Orta',  'Ülvi, İlaha',           '2026-04-25','','2026-04-16T00:00:00Z',now],
+    // p07 - Həmkarlar İttifaqı - Pashapay
+    ['t029','p07','Müstəqil Həmkarlar İttifaqı - Pashapay','Elektron təsdiq forması',  'MS Forms',  'Yoxlanılır','Yüksək','Nizami Tahirov',         '2026-04-23','','2026-04-20T00:00:00Z',now],
+    ['t030','p07','Müstəqil Həmkarlar İttifaqı - Pashapay','Kağız daşıyıcıda təsdiq', 'Mail Merge','Yoxlanılır','Yüksək','Nizami Tahirov',         '2026-04-19','','2026-04-16T00:00:00Z',now],
+    ['t031','p07','Müstəqil Həmkarlar İttifaqı - Pashapay','Nizamnamə hazırlığı',      'Legal',     'Tamamlandı','Kritik','Ümid',                   '2026-04-21','','2026-04-20T00:00:00Z',now],
+    ['t032','p07','Müstəqil Həmkarlar İttifaqı - Pashapay','Əməkdaşların razılıq ərizələri','HR OP','Gözləyir', 'Kritik','Nizami Tahirov',         '2026-05-11','','2026-04-21T00:00:00Z',now],
+    ['t033','p07','Müstəqil Həmkarlar İttifaqı - Pashapay','Təsis edilmə',             'Legal',     'Gözləyir', 'Kritik','Ümid',                   '2026-05-10','','2026-04-20T00:00:00Z',now],
+    // p08 - Həmkarlar İttifaqı - Birmarket
+    ['t034','p08','Müstəqil Həmkarlar İttifaqı - Birmarket','Elektron təsdiq forması', 'MS Forms',  'Gözləyir', 'Yüksək','Nizami Tahirov',         '','',        '2026-04-20T00:00:00Z',now],
+    ['t035','p08','Müstəqil Həmkarlar İttifaqı - Birmarket','Kağız daşıyıcıda təsdiq','Mail Merge', 'Gözləyir', 'Yüksək','Nizami Tahirov',         '','',        '2026-04-20T00:00:00Z',now],
+    ['t036','p08','Müstəqil Həmkarlar İttifaqı - Birmarket','Nizamnamə hazırlığı',     'Legal',     'Gözləyir', 'Kritik','Ümid',                   '','',        '2026-04-20T00:00:00Z',now],
+    ['t037','p08','Müstəqil Həmkarlar İttifaqı - Birmarket','Təsis edilmə',            'Legal',     'Gözləyir', 'Kritik','Ümid',                   '','',        '2026-04-20T00:00:00Z',now],
+    // p09 - Birmarket Analiz
+    ['t038','p09','Birmarket Analiz',               'Əmək münasibətləri',  '',                       'Gözləyir', 'Orta',  'Nizami Tahirov, Ağaəli', '2026-05-31','','2026-04-21T00:00:00Z',now],
+    ['t039','p09','Birmarket Analiz',               'Əmək haqqı və ödənişlər','',                   'Gözləyir', 'Orta',  'Nizami Tahirov, Ağaəli', '2026-05-31','','2026-04-21T00:00:00Z',now],
+    ['t040','p09','Birmarket Analiz',               'HR Data',             '',                       'Gözləyir', 'Orta',  'Nizami Tahirov, Ağaəli', '2026-05-31','','2026-04-21T00:00:00Z',now],
+    ['t041','p09','Birmarket Analiz',               'HRIS Sistem',         '',                       'Gözləyir', 'Orta',  'Nizami Tahirov, Ağaəli', '2026-05-31','','2026-04-21T00:00:00Z',now],
+    // p10 - Məzuniyyət qeydiyyat sistemi
+    ['t042','p10','Birmarket Məzuniyyət qeydiyyatı sistemi','Prosesin tanışlığı','',                  'Tamamlandı','Orta', 'Nizami Tahirov',         '2026-04-23','','2026-04-20T00:00:00Z',now],
+    ['t043','p10','Birmarket Məzuniyyət qeydiyyatı sistemi','IT İnfrastucture - MS 365','',           'Yoxlanılır','Yüksək','Nizami Tahirov',        '2026-04-23','','2026-04-20T00:00:00Z',now],
+    ['t044','p10','Birmarket Məzuniyyət qeydiyyatı sistemi','Data Source-ların təyini','',            'Tamamlandı','Yüksək','Nizami Tahirov',        '2026-04-30','','2026-04-23T00:00:00Z',now],
+    ['t045','p10','Birmarket Məzuniyyət qeydiyyatı sistemi','App Development','',                     'Davam edir','Kritik','Nizami Tahirov',        '2026-05-20','','2026-04-30T00:00:00Z',now],
+    ['t046','p10','Birmarket Məzuniyyət qeydiyyatı sistemi','Debug and Publish','',                   'Gözləyir', 'Kritik','Nizami Tahirov',         '','',        '2026-05-20T00:00:00Z',now],
+    // p11 - İşçi siyahısı
+    ['t047','p11','Gündəlik yenilənən işçi siyahısı','Birbank üzrə data toplanma','',               'Tamamlandı','Orta', 'Nizami Tahirov',         '2026-04-23','','2026-04-20T00:00:00Z',now],
+    ['t048','p11','Gündəlik yenilənən işçi siyahısı','Birmarket üzrə data toplanma','',             'Tamamlandı','Orta', 'Nizami Tahirov',         '2026-04-23','','2026-04-20T00:00:00Z',now],
+    ['t049','p11','Gündəlik yenilənən işçi siyahısı','Pashapay üzrə data toplanma','',              'Tamamlandı','Orta', 'Nizami Tahirov',         '2026-04-23','','2026-04-20T00:00:00Z',now],
+    ['t050','p11','Gündəlik yenilənən işçi siyahısı','Dynamic inteqrasiya','',                       'Tamamlandı','Yüksək','Nizami Tahirov',        '2026-04-23','','2026-04-20T00:00:00Z',now],
+    ['t051','p11','Gündəlik yenilənən işçi siyahısı','Line Manager data','',                          'Davam edir','Yüksək','Ülvi',                 '2026-05-08','','2026-05-04T00:00:00Z',now],
+    // p12 - Struktur Dəyişiklikləri
+    ['t052','p12','Struktur Dəyişiklikləri',         'Birbank',             '1500 icra, 300 növbədə', 'Davam edir','Yüksək','Aida',                 '2026-05-20','','2026-04-20T00:00:00Z',now],
+    ['t053','p12','Struktur Dəyişiklikləri',         'Pashapay',            'Qönçədən gözlənilir',    'Gözləyir', 'Yüksək','Nərgiz, İlaha',         '','',        '2026-04-20T00:00:00Z',now],
+    ['t054','p12','Struktur Dəyişiklikləri',         'Birmarket',           'BP-lər, OPCO',           'Gözləyir', 'Yüksək','Aytən',                 '','',        '2026-04-20T00:00:00Z',now],
+    // p13 - Pashapay HR Diaqnostika
+    ['t055','p13','Pashapay HR Diaqnostika',         'Əmək münasibətləri',  '',                       'Tamamlandı','Orta', 'Nizami Tahirov',         '2026-04-21','','2026-04-20T00:00:00Z',now],
+    ['t056','p13','Pashapay HR Diaqnostika',         'Əmək haqqı və ödənişlər','',                   'Tamamlandı','Orta', 'Nizami Tahirov',         '2026-04-21','','2026-04-20T00:00:00Z',now],
+    ['t057','p13','Pashapay HR Diaqnostika',         'HR Data',             '',                       'Tamamlandı','Orta', 'Nizami Tahirov',         '2026-04-21','','2026-04-20T00:00:00Z',now],
+    ['t058','p13','Pashapay HR Diaqnostika',         'HRIS Sistem',         '',                       'Tamamlandı','Orta', 'Nizami Tahirov',         '2026-04-21','','2026-04-20T00:00:00Z',now],
+  ];
+  tSheet.getRange(2, 1, tasks.length, TASK_HEADERS.length).setValues(tasks);
+
+  return { success: true, data: 'Excel datası uğurla idxal edildi: ' + projects.length + ' layihə, ' + tasks.length + ' tapşırıq, ' + teamData.length + ' komanda üzvü' };
 }

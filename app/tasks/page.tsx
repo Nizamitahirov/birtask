@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useTasks, useProjects } from '@/hooks/useSheets'
+import { useTasks, useProjects, useTeamNames } from '@/hooks/useSheets'
 import { Task } from '@/lib/types'
 import { TaskCard } from '@/components/tasks/TaskCard'
 import { TaskForm } from '@/components/tasks/TaskForm'
@@ -18,6 +18,7 @@ const PRIORITY_FILTERS = ['Hamısı', 'Kritik', 'Yüksək', 'Orta', 'Aşağı']
 export default function TasksPage() {
   const { tasks, loading, refresh, create, update, remove } = useTasks()
   const { projects } = useProjects()
+  const teamNames = useTeamNames()
   const [search, setSearch] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('Hamısı')
   const [projectFilter, setProjectFilter] = useState('Hamısı')
@@ -203,6 +204,8 @@ export default function TasksPage() {
 
       <Modal open={modal === 'create'} onClose={() => setModal(null)} title="Yeni Tapşırıq">
         <TaskForm
+          projects={projects}
+          teamNames={teamNames}
           onSubmit={handleCreate}
           onCancel={() => setModal(null)}
           loading={saving}
@@ -213,6 +216,8 @@ export default function TasksPage() {
         {selectedTask && (
           <TaskForm
             initial={selectedTask}
+            projects={projects}
+            teamNames={teamNames}
             onSubmit={handleEdit}
             onCancel={() => { setModal(null); setSelectedTask(null) }}
             loading={saving}

@@ -27,6 +27,13 @@ async function callApi<T>(action: string, method: string = 'GET', data?: object)
   }
 }
 
+interface BatchData {
+  projects: Project[]
+  tasks: Task[]
+  team: TeamMember[]
+  activity: Activity[]
+}
+
 export const sheetsApi = {
   projects: {
     getAll: () => callApi<Project[]>('getProjects'),
@@ -58,7 +65,12 @@ export const sheetsApi = {
   activity: {
     getAll: () => callApi<Activity[]>('getActivity'),
   },
+  batch: {
+    getAll: () => callApi<BatchData>('getBatch'),
+  },
   setup: {
     init: () => callApi<void>('initSheet', 'POST', {}),
+    importData: () => callApi<void>('importExcelData', 'POST', {}),
   },
 }
+

@@ -118,6 +118,7 @@ export function useTeam() {
   return { members, loading, refresh: fetch, create, update, remove }
 }
 
+// Batch load for dashboard - single API call
 export function useDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
@@ -126,32 +127,36 @@ export function useDashboard() {
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true)
-      const [statsRes, actRes] = await Promise.all([
-        sheetsApi.projects.getAll(),
-        sheetsApi.activity.getAll(),
-      ])
-      if (statsRes.success && statsRes.data) {
-        const projects = statsRes.data
-        const taskRes = await sheetsApi.tasks.getAll()
-        const tasks = taskRes.data || []
-        const teamRes = await sheetsApi.team.getAll()
-        const team = teamRes.data || []
+      const res = await sheetsApi.batch.getAll()
+      if (res.success && res.data) {
+        const { projects = [], tasks = [], team = [], activity = [] } = res.data
         const today = new Date()
         setStats({
           totalProjects: projects.length,
-          activeProjects: projects.filter(p => p.status === 'Davam edir').length,
-          completedProjects: projects.filter(p => p.status === 'Tamamlandı').length,
+          activeProjects: projects.filter((p: Project) => p.status === 'Davam edir').length,
+          completedProjects: projects.filter((p: Project) => p.status === 'Tamamlandı').length,
           totalTasks: tasks.length,
-          completedTasks: tasks.filter(t => t.status === 'Tamamlandı').length,
-          overdueTasks: tasks.filter(t => t.dueDate && new Date(t.dueDate) < today && t.status !== 'Tamamlandı').length,
+          completedTasks: tasks.filter((t: Task) => t.status === 'Tamamlandı').length,
+          overdueTasks: tasks.filter((t: Task) => t.dueDate && new Date(t.dueDate) < today && t.status !== 'Tamamlandı').length,
           teamSize: team.length,
         })
+        setActivities(activity.slice(0, 20))
       }
-      if (actRes.success && actRes.data) setActivities(actRes.data)
       setLoading(false)
     }
     fetchAll()
   }, [])
 
   return { stats, activities, loading }
+}
+
+// For forms - get team member names
+export function useTeamNames() {
+  const [names, setNames] = useState<string[]>([])
+  useEffect(() => {
+    sheetsApi.team.getAll().then(res => {
+      if (res.success && res.data) setNames(res.data.map(m => m.name))
+    })
+  }, [])
+  return names
 }

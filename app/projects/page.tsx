@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useProjects } from '@/hooks/useSheets'
+import { useProjects, useTeamNames } from '@/hooks/useSheets'
 import { Project } from '@/lib/types'
 import { ProjectCard } from '@/components/projects/ProjectCard'
 import { ProjectForm } from '@/components/projects/ProjectForm'
@@ -16,6 +16,7 @@ const STATUS_FILTERS = ['Hamısı', 'Planlaşdırılır', 'Davam edir', 'Tamamla
 
 export default function ProjectsPage() {
   const { projects, loading, refresh, create, update, remove } = useProjects()
+  const teamNames = useTeamNames()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('Hamısı')
   const [view, setView] = useState<'grid' | 'list'>('grid')
@@ -204,6 +205,7 @@ export default function ProjectsPage() {
       {/* Create Modal */}
       <Modal open={modal === 'create'} onClose={() => setModal(null)} title="Yeni Layihə" size="lg">
         <ProjectForm
+          teamNames={teamNames}
           onSubmit={handleCreate}
           onCancel={() => setModal(null)}
           loading={saving}
@@ -215,6 +217,7 @@ export default function ProjectsPage() {
         {selected && (
           <ProjectForm
             initial={selected}
+            teamNames={teamNames}
             onSubmit={handleEdit}
             onCancel={() => { setModal(null); setSelected(null) }}
             loading={saving}
