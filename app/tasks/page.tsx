@@ -2,18 +2,26 @@
 
 import { useState } from 'react'
 import { useTasks, useProjects, useTeamNames } from '@/hooks/useSheets'
-import { Task } from '@/lib/types'
+import { Task, TaskStatus } from '@/lib/types'
 import { TaskCard } from '@/components/tasks/TaskCard'
 import { TaskForm } from '@/components/tasks/TaskForm'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CardSkeleton } from '@/components/ui/Skeleton'
-import { Plus, Search, CheckSquare, RefreshCw, LayoutGrid, Columns } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
+import { Plus, Search, CheckSquare, RefreshCw, LayoutGrid, Columns, List, Edit2, Trash2, Calendar, User } from 'lucide-react'
+import { cn, formatDateShort, getDaysLeft } from '@/lib/utils'
 
-const STATUS_COLUMNS = ['Gözləyir', 'Davam edir', 'Yoxlanılır', 'Tamamlandı'] as const
+const STATUS_COLUMNS: TaskStatus[] = ['Gözləyir', 'Davam edir', 'Yoxlanılır', 'Tamamlandı']
 const PRIORITY_FILTERS = ['Hamısı', 'Kritik', 'Yüksək', 'Orta', 'Aşağı']
+
+const STATUS_COLORS: Record<TaskStatus, string> = {
+  'Gözləyir': '#94A3B8',
+  'Davam edir': '#3B82F6',
+  'Yoxlanılır': '#F59E0B',
+  'Tamamlandı': '#10B981',
+}
 
 export default function TasksPage() {
   const { tasks, loading, refresh, create, update, remove } = useTasks()
@@ -22,12 +30,13 @@ export default function TasksPage() {
   const [search, setSearch] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('Hamısı')
   const [projectFilter, setProjectFilter] = useState('Hamısı')
-  const [view, setView] = useState<'kanban' | 'grid'>('kanban')
+  const [view, setView] = useState<'kanban' | 'grid' | 'list'>('kanban')
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Task | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
 
   const filtered = tasks.filter(t => {
     const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -59,6 +68,16 @@ export default function TasksPage() {
     await remove(confirmDelete.id)
     setDeleting(false)
     setConfirmDelete(null)
+  }
+
+  const handleDrop = async (e: React.DragEvent, status: TaskStatus) => {
+    e.preventDefault()
+    const taskId = e.dataTransfer.getData('taskId')
+    const task = tasks.find(t => t.id === taskId)
+    if (task && task.status !== status) {
+      await update(taskId, { ...task, status })
+    }
+    setDragOverStatus(null)
   }
 
   return (
@@ -118,20 +137,17 @@ export default function TasksPage() {
         </div>
 
         <div className="flex gap-1 ml-auto">
-          <button
-            onClick={() => setView('kanban')}
-            className={cn('w-8 h-8 rounded-lg flex items-center justify-center transition-all',
-              view === 'kanban' ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
-          >
-            <Columns size={15} />
-          </button>
-          <button
-            onClick={() => setView('grid')}
-            className={cn('w-8 h-8 rounded-lg flex items-center justify-center transition-all',
-              view === 'grid' ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
-          >
-            <LayoutGrid size={15} />
-          </button>
+          {([['kanban', Columns], ['grid', LayoutGrid], ['list', List]] as const).map(([v, Icon]) => (
+            <button
+              key={v}
+              onClick={() => setView(v)}
+              title={v === 'kanban' ? 'Kanban' : v === 'grid' ? 'Grid' : 'Siyahı'}
+              className={cn('w-8 h-8 rounded-lg flex items-center justify-center transition-all',
+                view === v ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+            >
+              <Icon size={15} />
+            </button>
+          ))}
         </div>
       </div>
 
@@ -155,33 +171,42 @@ export default function TasksPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {STATUS_COLUMNS.map(status => {
             const col = filtered.filter(t => t.status === status)
-            const colors: Record<string, string> = {
-              'Gözləyir': '#94A3B8',
-              'Davam edir': '#3B82F6',
-              'Yoxlanılır': '#F59E0B',
-              'Tamamlandı': '#10B981',
-            }
+            const isOver = dragOverStatus === status
             return (
               <div key={status} className="space-y-3">
                 <div className="flex items-center gap-2 py-1">
-                  <div className="w-2 h-2 rounded-full" style={{ background: colors[status] }} />
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: STATUS_COLORS[status] }} />
                   <span className="text-text-primary text-sm font-semibold">{status}</span>
                   <span className="text-xs text-text-muted bg-white/[0.05] px-1.5 py-0.5 rounded-full ml-auto">
                     {col.length}
                   </span>
                 </div>
-                <div className="space-y-2 min-h-[100px]">
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status) }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverStatus(null)
+                  }}
+                  onDrop={(e) => handleDrop(e, status)}
+                  className={cn(
+                    'space-y-2 min-h-[120px] rounded-xl p-1.5 transition-all duration-150',
+                    isOver && 'bg-white/[0.04] ring-1 ring-dashed ring-white/[0.2]'
+                  )}
+                >
                   {col.map(task => (
                     <TaskCard
                       key={task.id}
                       task={task}
+                      draggable
                       onEdit={t => { setSelectedTask(t); setModal('edit') }}
                       onDelete={setConfirmDelete}
                     />
                   ))}
                   {col.length === 0 && (
-                    <div className="border border-dashed border-white/[0.06] rounded-xl p-6 text-center text-text-muted text-xs">
-                      Boş
+                    <div className={cn(
+                      'border border-dashed rounded-xl p-6 text-center text-xs transition-all',
+                      isOver ? 'border-white/[0.25] text-text-secondary' : 'border-white/[0.06] text-text-muted'
+                    )}>
+                      {isOver ? 'Buraya burax' : 'Boş'}
                     </div>
                   )}
                 </div>
@@ -189,7 +214,7 @@ export default function TasksPage() {
             )
           })}
         </div>
-      ) : (
+      ) : view === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map(task => (
             <TaskCard
@@ -199,6 +224,69 @@ export default function TasksPage() {
               onDelete={setConfirmDelete}
             />
           ))}
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.06]">
+                {['Tapşırıq', 'Layihə', 'Status', 'Prioritet', 'İcraçı', 'Son tarix', ''].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-text-muted text-xs font-medium">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(task => {
+                const daysLeft = getDaysLeft(task.dueDate)
+                const overdue = task.dueDate && daysLeft < 0 && task.status !== 'Tamamlandı'
+                return (
+                  <tr key={task.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
+                    <td className="px-4 py-3 max-w-[220px]">
+                      <div className="font-medium text-text-primary truncate">{task.title}</div>
+                      {task.description && (
+                        <div className="text-text-muted text-xs mt-0.5 truncate">{task.description}</div>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-text-secondary text-xs max-w-[140px] truncate">
+                      {task.projectName || '—'}
+                    </td>
+                    <td className="px-4 py-3"><StatusBadge status={task.status} /></td>
+                    <td className="px-4 py-3"><PriorityBadge priority={task.priority} /></td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5 text-text-secondary text-xs">
+                        <User size={11} className="text-text-muted flex-shrink-0" />
+                        <span className="truncate max-w-[100px]">{task.assignee || '—'}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className={cn('flex items-center gap-1.5 text-xs', overdue ? 'text-accent-red' : 'text-text-secondary')}>
+                        <Calendar size={11} className="flex-shrink-0" />
+                        {task.dueDate
+                          ? overdue ? `${Math.abs(daysLeft)}g gecikdi` : formatDateShort(task.dueDate)
+                          : '—'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => { setSelectedTask(task); setModal('edit') }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(task)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-all"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useProjects, useTeamNames } from '@/hooks/useSheets'
+import { useProjects, useTeamNames, useTasks } from '@/hooks/useSheets'
 import { Project } from '@/lib/types'
 import { ProjectCard } from '@/components/projects/ProjectCard'
 import { ProjectForm } from '@/components/projects/ProjectForm'
@@ -9,13 +9,15 @@ import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CardSkeleton } from '@/components/ui/Skeleton'
-import { Plus, Search, FolderKanban, LayoutGrid, List, RefreshCw } from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
+import { Plus, Search, FolderKanban, LayoutGrid, List, RefreshCw, CheckSquare, Edit2, Trash2 } from 'lucide-react'
+import { cn, formatDateShort } from '@/lib/utils'
 
 const STATUS_FILTERS = ['Hamısı', 'Planlaşdırılır', 'Davam edir', 'Tamamlandı', 'Dayandırıldı']
 
 export default function ProjectsPage() {
   const { projects, loading, refresh, create, update, remove } = useProjects()
+  const { tasks } = useTasks()
   const teamNames = useTeamNames()
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('Hamısı')
@@ -25,6 +27,9 @@ export default function ProjectsPage() {
   const [confirmDelete, setConfirmDelete] = useState<Project | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+
+  const taskCounts: Record<string, number> = {}
+  tasks.forEach(t => { taskCounts[t.projectId] = (taskCounts[t.projectId] || 0) + 1 })
 
   const filtered = projects.filter(p => {
     const matchSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -152,51 +157,66 @@ export default function ProjectsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-white/[0.06]">
-                {['Layihə', 'Status', 'Prioritet', 'Rəhbər', 'Son tarix', 'İrəliləyiş', ''].map(h => (
-                  <th key={h} className="text-left px-4 py-3 text-text-muted text-xs font-medium">{h}</th>
+                {['Layihə', 'Status', 'Prioritet', 'Məsul', 'Son tarix', 'Tapşırıq', 'İrəliləyiş', ''].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-text-muted text-xs font-medium whitespace-nowrap">{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.map(p => (
-                <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                        style={{ background: p.color }}>
-                        {p.name.charAt(0)}
+              {filtered.map(p => {
+                const count = taskCounts[p.id] || 0
+                return (
+                  <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
+                    <td className="px-4 py-3 max-w-[200px]">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                          style={{ background: p.color }}
+                        >
+                          {p.name.charAt(0)}
+                        </div>
+                        <span className="text-text-primary font-medium truncate">{p.name}</span>
                       </div>
-                      <span className="text-text-primary font-medium">{p.name}</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className="badge text-xs" style={{ color: '#94A3B8' }}>{p.status}</span>
-                  </td>
-                  <td className="px-4 py-3 text-text-secondary">{p.priority}</td>
-                  <td className="px-4 py-3 text-text-secondary">{p.owner || '—'}</td>
-                  <td className="px-4 py-3 text-text-secondary">{p.endDate || '—'}</td>
-                  <td className="px-4 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-16 progress-bar">
-                        <div className="progress-fill" style={{ width: `${p.progress}%`, background: p.color }} />
+                    </td>
+                    <td className="px-4 py-3"><StatusBadge status={p.status} /></td>
+                    <td className="px-4 py-3"><PriorityBadge priority={p.priority} /></td>
+                    <td className="px-4 py-3 text-text-secondary text-xs max-w-[120px] truncate">{p.owner || '—'}</td>
+                    <td className="px-4 py-3 text-text-secondary text-xs whitespace-nowrap">
+                      {formatDateShort(p.endDate)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5 text-xs text-text-secondary">
+                        <CheckSquare size={12} className="text-text-muted flex-shrink-0" />
+                        {count}
                       </div>
-                      <span className="text-text-secondary text-xs">{p.progress}%</span>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button onClick={() => { setSelected(p); setModal('edit') }}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all">
-                        ✏️
-                      </button>
-                      <button onClick={() => setConfirmDelete(p)}
-                        className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-all">
-                        🗑
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 min-w-[100px]">
+                        <div className="flex-1 progress-bar">
+                          <div className="progress-fill" style={{ width: `${p.progress}%`, background: p.color }} />
+                        </div>
+                        <span className="text-text-secondary text-xs w-8 text-right">{p.progress}%</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => { setSelected(p); setModal('edit') }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(p)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-all"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>

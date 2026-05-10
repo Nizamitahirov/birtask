@@ -9,17 +9,26 @@ interface TaskCardProps {
   task: Task
   onEdit: (t: Task) => void
   onDelete: (t: Task) => void
+  draggable?: boolean
 }
 
-export function TaskCard({ task, onEdit, onDelete }: TaskCardProps) {
+export function TaskCard({ task, onEdit, onDelete, draggable: isDraggable }: TaskCardProps) {
   const daysLeft = getDaysLeft(task.dueDate)
   const overdue = task.dueDate && daysLeft < 0 && task.status !== 'Tamamlandı'
 
   return (
-    <div className={cn(
-      'card p-4 hover:border-white/[0.12] transition-all duration-200 group flex flex-col gap-3',
-      overdue && 'border-accent-red/20'
-    )}>
+    <div
+      draggable={isDraggable}
+      onDragStart={isDraggable ? (e) => {
+        e.dataTransfer.setData('taskId', task.id)
+        e.dataTransfer.effectAllowed = 'move'
+      } : undefined}
+      className={cn(
+        'card p-4 hover:border-white/[0.12] transition-all duration-200 group flex flex-col gap-3',
+        overdue && 'border-accent-red/20',
+        isDraggable && 'cursor-grab active:cursor-grabbing active:opacity-60'
+      )}
+    >
       {/* Title + actions */}
       <div className="flex items-start justify-between gap-2">
         <h4 className="text-text-primary text-sm font-medium leading-snug flex-1">{task.title}</h4>

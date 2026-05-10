@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { sheetsApi } from '@/lib/sheets'
 import { useTeamNames } from '@/hooks/useSheets'
-import { Project, Task } from '@/lib/types'
+import { Project, Task, TaskStatus } from '@/lib/types'
 import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -16,11 +16,18 @@ import {
   ArrowLeft, Calendar, User, DollarSign, CheckSquare,
   Plus, RefreshCw
 } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 
-const TASK_STATUSES = ['Gözləyir', 'Davam edir', 'Yoxlanılır', 'Tamamlandı'] as const
+const TASK_STATUSES: TaskStatus[] = ['Gözləyir', 'Davam edir', 'Yoxlanılır', 'Tamamlandı']
+
+const STATUS_COLORS: Record<TaskStatus, string> = {
+  'Gözləyir': '#94A3B8',
+  'Davam edir': '#3B82F6',
+  'Yoxlanılır': '#F59E0B',
+  'Tamamlandı': '#10B981',
+}
 
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -33,9 +40,10 @@ export default function ProjectDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState<Task | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
   const teamNames = useTeamNames()
 
-  const fetch = async () => {
+  const fetchData = async () => {
     setLoading(true)
     const [pRes, tRes] = await Promise.all([
       sheetsApi.projects.getById(id),
@@ -48,12 +56,12 @@ export default function ProjectDetailPage() {
   }
 
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  useEffect(() => { fetch() }, [id])
+  useEffect(() => { fetchData() }, [id])
 
   const handleCreateTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     setSaving(true)
     const res = await sheetsApi.tasks.create({ ...data, projectId: id, projectName: project?.name || '' })
-    if (res.success) { toast.success('Tapşırıq yaradıldı'); await fetch() }
+    if (res.success) { toast.success('Tapşırıq yaradıldı'); await fetchData() }
     else toast.error(res.error || 'Xəta')
     setSaving(false)
     setModal(null)
@@ -63,7 +71,7 @@ export default function ProjectDetailPage() {
     if (!selectedTask) return
     setSaving(true)
     const res = await sheetsApi.tasks.update(selectedTask.id, data)
-    if (res.success) { toast.success('Tapşırıq yeniləndi'); await fetch() }
+    if (res.success) { toast.success('Tapşırıq yeniləndi'); await fetchData() }
     else toast.error(res.error || 'Xəta')
     setSaving(false)
     setModal(null)
@@ -74,10 +82,24 @@ export default function ProjectDetailPage() {
     if (!confirmDelete) return
     setDeleting(true)
     const res = await sheetsApi.tasks.delete(confirmDelete.id)
-    if (res.success) { toast.success('Tapşırıq silindi'); await fetch() }
+    if (res.success) { toast.success('Tapşırıq silindi'); await fetchData() }
     else toast.error(res.error || 'Xəta')
     setDeleting(false)
     setConfirmDelete(null)
+  }
+
+  const handleDrop = async (e: React.DragEvent, status: TaskStatus) => {
+    e.preventDefault()
+    const taskId = e.dataTransfer.getData('taskId')
+    const task = tasks.find(t => t.id === taskId)
+    if (task && task.status !== status) {
+      const res = await sheetsApi.tasks.update(taskId, { ...task, status })
+      if (res.success) {
+        setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status } : t))
+        toast.success(`"${task.title}" → ${status}`)
+      }
+    }
+    setDragOverStatus(null)
   }
 
   const progress = Number(project?.progress) || 0
@@ -167,11 +189,11 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {/* Tasks by Status (Kanban-like) */}
+      {/* Tasks Kanban */}
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-text-primary">Tapşırıqlar</h2>
         <div className="flex gap-2">
-          <button onClick={fetch} className="btn-secondary !py-1.5 !px-3">
+          <button onClick={fetchData} className="btn-secondary !py-1.5 !px-3">
             <RefreshCw size={13} />
           </button>
           <button onClick={() => setModal('create')} className="btn-primary !py-1.5">
@@ -199,26 +221,42 @@ export default function ProjectDetailPage() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {TASK_STATUSES.map(status => {
             const statusTasks = tasks.filter(t => t.status === status)
+            const isOver = dragOverStatus === status
             return (
               <div key={status} className="space-y-3">
                 <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: STATUS_COLORS[status] }} />
                   <span className="text-text-secondary text-sm font-medium">{status}</span>
-                  <span className="text-xs text-text-muted bg-white/[0.05] px-1.5 py-0.5 rounded-full">
+                  <span className="text-xs text-text-muted bg-white/[0.05] px-1.5 py-0.5 rounded-full ml-auto">
                     {statusTasks.length}
                   </span>
                 </div>
-                <div className="space-y-2">
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragOverStatus(status) }}
+                  onDragLeave={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOverStatus(null)
+                  }}
+                  onDrop={(e) => handleDrop(e, status)}
+                  className={cn(
+                    'space-y-2 min-h-[120px] rounded-xl p-1.5 transition-all duration-150',
+                    isOver && 'bg-white/[0.04] ring-1 ring-dashed ring-white/[0.2]'
+                  )}
+                >
                   {statusTasks.map(task => (
                     <TaskCard
                       key={task.id}
                       task={task}
+                      draggable
                       onEdit={t => { setSelectedTask(t); setModal('edit') }}
                       onDelete={setConfirmDelete}
                     />
                   ))}
                   {statusTasks.length === 0 && (
-                    <div className="border border-dashed border-white/[0.08] rounded-xl p-4 text-center text-text-muted text-xs">
-                      Boş
+                    <div className={cn(
+                      'border border-dashed rounded-xl p-4 text-center text-xs transition-all',
+                      isOver ? 'border-white/[0.25] text-text-secondary' : 'border-white/[0.08] text-text-muted'
+                    )}>
+                      {isOver ? 'Buraya burax' : 'Boş'}
                     </div>
                   )}
                 </div>
