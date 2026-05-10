@@ -18,14 +18,6 @@ var TASK_HEADERS    = ['id','projectId','projectName','title','description','sta
 var TEAM_HEADERS    = ['id','name','email','role','department','phone','avatar','createdAt'];
 var ACTIVITY_HEADERS= ['id','type','message','entityId','entityType','userId','createdAt'];
 
-// ─── CORS Headers ────────────────────────────────────────────────────────────
-function setCorsHeaders(output) {
-  return output
-    .setHeader('Access-Control-Allow-Origin', '*')
-    .setHeader('Access-Control-Allow-Methods', 'GET, POST')
-    .setHeader('Access-Control-Allow-Headers', 'Content-Type');
-}
-
 // ─── GET Handler ─────────────────────────────────────────────────────────────
 function doGet(e) {
   var action = e.parameter.action;
@@ -44,10 +36,9 @@ function doGet(e) {
   } catch (err) {
     result = { success: false, error: err.toString() };
   }
-  var output = ContentService
+  return ContentService
     .createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
-  return setCorsHeaders(output);
 }
 
 // ─── POST Handler ────────────────────────────────────────────────────────────
@@ -72,10 +63,9 @@ function doPost(e) {
   } catch (err) {
     result = { success: false, error: err.toString() };
   }
-  var output = ContentService
+  return ContentService
     .createTextOutput(JSON.stringify(result))
     .setMimeType(ContentService.MimeType.JSON);
-  return setCorsHeaders(output);
 }
 
 // ─── Init Sheet ──────────────────────────────────────────────────────────────
