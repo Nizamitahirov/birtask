@@ -1,15 +1,11 @@
 import { Project, Task, TeamMember, Activity, ApiResponse } from './types'
 
-const APPS_SCRIPT_URL = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || ''
+const API_BASE = '/api/sheets'
 
 async function callApi<T>(action: string, method: string = 'GET', data?: object): Promise<ApiResponse<T>> {
   try {
-    if (!APPS_SCRIPT_URL) {
-      throw new Error('Apps Script URL tapılmadı. .env.local faylında NEXT_PUBLIC_APPS_SCRIPT_URL təyin edin.')
-    }
-
     if (method === 'GET') {
-      const url = new URL(APPS_SCRIPT_URL)
+      const url = new URL(API_BASE, typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000')
       url.searchParams.set('action', action)
       if (data) {
         Object.entries(data).forEach(([k, v]) => url.searchParams.set(k, String(v)))
@@ -18,9 +14,9 @@ async function callApi<T>(action: string, method: string = 'GET', data?: object)
       const json = await res.json()
       return json
     } else {
-      const res = await fetch(APPS_SCRIPT_URL, {
+      const res = await fetch(API_BASE, {
         method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...data }),
       })
       const json = await res.json()
