@@ -147,6 +147,7 @@ function getSheet(name) {
 }
 
 function sheetToObjects(sheet, headers) {
+  if (!sheet) return [];
   var lastRow = sheet.getLastRow();
   if (lastRow < 2) return [];
   var data = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
