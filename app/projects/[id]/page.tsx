@@ -12,9 +12,11 @@ import { TaskForm } from '@/components/tasks/TaskForm'
 import { TaskCard } from '@/components/tasks/TaskCard'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton, CardSkeleton } from '@/components/ui/Skeleton'
+import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer'
 import {
   ArrowLeft, Calendar, User, DollarSign, CheckSquare,
-  Plus, RefreshCw, Zap, Columns, List, Edit2, Trash2
+  Plus, RefreshCw, Zap, Columns, List, Edit2, Trash2,
+  Sparkles, X, Copy, Check
 } from 'lucide-react'
 import { formatDate, formatDateShort, getDaysLeft, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -42,6 +44,10 @@ export default function ProjectDetailPage() {
   const [deleting, setDeleting] = useState(false)
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
   const [taskView, setTaskView] = useState<'kanban' | 'list'>('kanban')
+  const [summaryOpen, setSummaryOpen] = useState(false)
+  const [summary, setSummary] = useState('')
+  const [summaryLoading, setSummaryLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
   const teamNames = useTeamNames()
 
   const fetchData = async () => {
@@ -100,6 +106,32 @@ export default function ProjectDetailPage() {
     }
   }
 
+  const handleSummary = async () => {
+    if (!project) return
+    setSummaryOpen(true)
+    setSummaryLoading(true)
+    setSummary('')
+    try {
+      const res = await fetch('/api/ai/summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ project, tasks }),
+      })
+      const data = await res.json()
+      if (res.ok) setSummary(data.summary)
+      else setSummary(`❌ Xəta: ${data.error}`)
+    } catch {
+      setSummary('❌ Şəbəkə xətası. Zəhmət olmasa yenidən cəhd edin.')
+    }
+    setSummaryLoading(false)
+  }
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(summary)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
+
   const handleComplete = async (task: Task) => {
     const newStatus: TaskStatus = task.status === 'Tamamlandı' ? 'Gözləyir' : 'Tamamlandı'
     const res = await sheetsApi.tasks.update(task.id, { ...task, status: newStatus })
@@ -155,9 +187,16 @@ export default function ProjectDetailPage() {
               {project.description && (
                 <p className="text-text-secondary text-sm mt-1">{project.description}</p>
               )}
-              <div className="flex flex-wrap gap-2 mt-3">
+              <div className="flex flex-wrap items-center gap-2 mt-3">
                 <StatusBadge status={project.status} />
                 <PriorityBadge priority={project.priority} />
+                <button
+                  onClick={handleSummary}
+                  className="ml-auto flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg font-medium transition-all text-accent-purple hover:bg-accent-purple/10 border border-accent-purple/20"
+                >
+                  <Sparkles size={12} />
+                  AI Xülasə
+                </button>
               </div>
             </div>
           </div>
@@ -396,6 +435,88 @@ export default function ProjectDetailPage() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {/* AI Summary Panel */}
+      {summaryOpen && (
+        <div className="fixed inset-0 z-50 flex justify-end" onClick={() => setSummaryOpen(false)}>
+          <div
+            className="relative w-full max-w-lg h-full overflow-y-auto shadow-2xl flex flex-col"
+            style={{ background: 'rgb(var(--bg-card))', borderLeft: '1px solid var(--border)' }}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 z-10" style={{ borderColor: 'var(--border)', background: 'rgb(var(--bg-card))' }}>
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-accent-purple/10 border border-accent-purple/20 flex items-center justify-center">
+                  <Sparkles size={14} className="text-accent-purple" />
+                </div>
+                <div>
+                  <div className="text-text-primary text-sm font-semibold">AI Layihə Xülasəsi</div>
+                  <div className="text-text-muted text-xs">Groq · Llama 3.3 70B</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                {summary && !summaryLoading && (
+                  <button
+                    onClick={handleCopy}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.06] transition-all"
+                    title="Kopyala"
+                  >
+                    {copied ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
+                  </button>
+                )}
+                <button
+                  onClick={() => setSummaryOpen(false)}
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.06] transition-all"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 px-6 py-5">
+              {summaryLoading ? (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3 text-accent-purple text-sm">
+                    <div className="flex gap-1">
+                      {[0, 1, 2].map(i => (
+                        <div
+                          key={i}
+                          className="w-2 h-2 rounded-full bg-accent-purple animate-bounce"
+                          style={{ animationDelay: `${i * 0.15}s` }}
+                        />
+                      ))}
+                    </div>
+                    <span className="text-text-secondary text-xs">Xülasə hazırlanır...</span>
+                  </div>
+                  {[...Array(4)].map((_, i) => (
+                    <div key={i} className="space-y-2">
+                      <div className="h-3 rounded-full bg-white/[0.06] animate-pulse" style={{ width: `${70 + i * 8}%` }} />
+                      <div className="h-3 rounded-full bg-white/[0.04] animate-pulse" style={{ width: `${55 + i * 6}%` }} />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <MarkdownRenderer content={summary} />
+              )}
+            </div>
+
+            {/* Footer */}
+            {summary && !summaryLoading && (
+              <div className="px-6 py-3 border-t flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
+                <span className="text-text-muted text-xs">Groq API tərəfindən yaradılmışdır</span>
+                <button
+                  onClick={handleSummary}
+                  className="text-xs text-accent-purple hover:underline flex items-center gap-1"
+                >
+                  <RefreshCw size={11} /> Yenilə
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
