@@ -14,9 +14,9 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton, CardSkeleton } from '@/components/ui/Skeleton'
 import {
   ArrowLeft, Calendar, User, DollarSign, CheckSquare,
-  Plus, RefreshCw, Zap
+  Plus, RefreshCw, Zap, Columns, List, Edit2, Trash2
 } from 'lucide-react'
-import { formatDate, cn } from '@/lib/utils'
+import { formatDate, formatDateShort, getDaysLeft, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
 
@@ -41,6 +41,7 @@ export default function ProjectDetailPage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
+  const [taskView, setTaskView] = useState<'kanban' | 'list'>('kanban')
   const teamNames = useTeamNames()
 
   const fetchData = async () => {
@@ -219,10 +220,35 @@ export default function ProjectDetailPage() {
         </div>
       )}
 
-      {/* Tasks Kanban */}
+      {/* Tasks header */}
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-text-primary">Tapşırıqlar</h2>
-        <div className="flex gap-2">
+        <h2 className="font-semibold text-text-primary">
+          Tapşırıqlar
+          {tasks.length > 0 && (
+            <span className="ml-2 text-xs font-normal text-text-muted bg-white/[0.05] px-2 py-0.5 rounded-full">
+              {tasks.length}
+            </span>
+          )}
+        </h2>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1">
+            <button
+              onClick={() => setTaskView('kanban')}
+              title="Kanban"
+              className={cn('w-7 h-7 rounded-lg flex items-center justify-center transition-all',
+                taskView === 'kanban' ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+            >
+              <Columns size={13} />
+            </button>
+            <button
+              onClick={() => setTaskView('list')}
+              title="Siyahı"
+              className={cn('w-7 h-7 rounded-lg flex items-center justify-center transition-all',
+                taskView === 'list' ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+            >
+              <List size={13} />
+            </button>
+          </div>
           <button onClick={fetchData} className="btn-secondary !py-1.5 !px-3">
             <RefreshCw size={13} />
           </button>
@@ -247,7 +273,7 @@ export default function ProjectDetailPage() {
             </button>
           }
         />
-      ) : (
+      ) : taskView === 'kanban' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {TASK_STATUSES.map(status => {
             const statusTasks = tasks.filter(t => t.status === status)
@@ -294,6 +320,82 @@ export default function ProjectDetailPage() {
               </div>
             )
           })}
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.06]">
+                {['Tapşırıq', 'Status', 'Prioritet', 'İcraçı', 'Son tarix', ''].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-text-muted text-xs font-medium whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {tasks.map(task => {
+                const daysLeft = getDaysLeft(task.dueDate)
+                const overdue = task.dueDate && daysLeft < 0 && task.status !== 'Tamamlandı'
+                const isDone = task.status === 'Tamamlandı'
+                return (
+                  <tr key={task.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
+                    <td className="px-4 py-3 max-w-[260px]">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleComplete(task)}
+                          className={cn(
+                            'flex-shrink-0 transition-colors',
+                            isDone ? 'text-accent-green' : 'text-text-muted hover:text-accent-green'
+                          )}
+                        >
+                          <CheckSquare size={13} className={isDone ? 'fill-accent-green/20' : ''} />
+                        </button>
+                        <div className="min-w-0">
+                          <div className={cn('font-medium truncate', isDone ? 'line-through text-text-muted' : 'text-text-primary')}>
+                            {task.title}
+                          </div>
+                          {task.description && (
+                            <div className="text-text-muted text-xs mt-0.5 truncate">{task.description}</div>
+                          )}
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3"><StatusBadge status={task.status} /></td>
+                    <td className="px-4 py-3"><PriorityBadge priority={task.priority} /></td>
+                    <td className="px-4 py-3 text-text-secondary text-xs whitespace-nowrap">
+                      <div className="flex items-center gap-1.5">
+                        <User size={11} className="text-text-muted flex-shrink-0" />
+                        <span className="truncate max-w-[100px]">{task.assignee || '—'}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 whitespace-nowrap">
+                      <div className={cn('flex items-center gap-1.5 text-xs', overdue ? 'text-accent-red' : 'text-text-secondary')}>
+                        <Calendar size={11} className="flex-shrink-0" />
+                        {task.dueDate
+                          ? overdue ? `${Math.abs(daysLeft)}g gecikdi` : formatDateShort(task.dueDate)
+                          : '—'}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => { setSelectedTask(task); setModal('edit') }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button
+                          onClick={() => setConfirmDelete(task)}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-all"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       )}
 
