@@ -112,16 +112,66 @@ export default function ProjectDetailPage() {
     setSummaryLoading(true)
     setSummary('')
     try {
-      const res = await fetch('/api/ai/summary', {
+      const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY
+      if (!apiKey) { setSummary('❌ NEXT_PUBLIC_GROQ_API_KEY təyin edilməyib.'); setSummaryLoading(false); return }
+
+      const totalTasks = tasks.length
+      const doneTasks = tasks.filter(t => t.status === 'Tamamlandı').length
+      const inProgressTasks = tasks.filter(t => t.status === 'Davam edir').length
+      const waitingTasks = tasks.filter(t => t.status === 'Gözləyir').length
+      const reviewingTasks = tasks.filter(t => t.status === 'Yoxlanılır').length
+      const overdueTasks = tasks.filter(t => {
+        if (!t.dueDate || t.status === 'Tamamlandı') return false
+        return new Date(t.dueDate) < new Date()
+      }).length
+      const taskTitles = tasks.slice(0, 15).map(t => `- ${t.title} [${t.status}, ${t.priority}]`).join('\n') || 'Tapşırıq yoxdur'
+
+      const prompt = `Aşağıdakı layihə haqqında Azərbaycan dilində peşəkar, lakin oxunaqlı bir xülasə yaz.
+Xülasə 3-5 abzasdan ibarət olsun: ümumi vəziyyət, irəliləyiş, diqqət tələb edən sahələr, tövsiyələr.
+Markdown formatından istifadə et (## başlıqlar, **qalın**, - siyahılar).
+
+**Layihə məlumatları:**
+- Ad: ${project.name}
+- Təsvir: ${project.description || 'Yoxdur'}
+- Status: ${project.status}
+- Prioritet: ${project.priority}
+- Rəhbər: ${project.owner || 'Təyin edilməyib'}
+- Başlanğıc: ${project.startDate || 'Qeyd edilməyib'}
+- Son tarix: ${project.endDate || 'Qeyd edilməyib'}
+- Büdcə: ${project.budget ? `₼${Number(project.budget).toLocaleString()}` : 'Qeyd edilməyib'}
+- İrəliləyiş: ${project.progress}%
+
+**Tapşırıq statistikası:**
+- Ümumi: ${totalTasks}
+- Tamamlandı: ${doneTasks}
+- Davam edir: ${inProgressTasks}
+- Gözləyir: ${waitingTasks}
+- Yoxlanılır: ${reviewingTasks}
+- Gecikmiş: ${overdueTasks}
+
+**Tapşırıqlardan nümunələr:**
+${taskTitles}
+
+Xülasəni peşəkar, analitik və Azərbaycan dilinin rəsmi üslubunda yaz.`
+
+      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ project, tasks }),
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: [{ role: 'user', content: prompt }],
+          temperature: 0.7,
+          max_tokens: 1024,
+        }),
       })
       const data = await res.json()
-      if (res.ok) setSummary(data.summary)
-      else setSummary(`❌ Xəta: ${data.error}`)
-    } catch {
-      setSummary('❌ Şəbəkə xətası. Zəhmət olmasa yenidən cəhd edin.')
+      if (res.ok) setSummary(data.choices?.[0]?.message?.content || '')
+      else setSummary(`❌ Xəta: ${data.error?.message || JSON.stringify(data.error)}`)
+    } catch (err) {
+      setSummary(`❌ Şəbəkə xətası: ${err instanceof Error ? err.message : 'Bilinməyən xəta'}`)
     }
     setSummaryLoading(false)
   }
