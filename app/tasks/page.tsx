@@ -10,7 +10,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CardSkeleton } from '@/components/ui/Skeleton'
 import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
-import { Plus, Search, CheckSquare, RefreshCw, LayoutGrid, Columns, List, Edit2, Trash2, Calendar, User } from 'lucide-react'
+import { Plus, Search, CheckSquare, RefreshCw, LayoutGrid, Columns, List, Edit2, Trash2, Calendar, CalendarDays, User, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn, formatDateShort, getDaysLeft } from '@/lib/utils'
 
 const STATUS_COLUMNS: TaskStatus[] = ['Gözləyir', 'Davam edir', 'Yoxlanılır', 'Tamamlandı']
@@ -30,7 +30,11 @@ export default function TasksPage() {
   const [search, setSearch] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('Hamısı')
   const [projectFilter, setProjectFilter] = useState('Hamısı')
-  const [view, setView] = useState<'kanban' | 'grid' | 'list'>('kanban')
+  const [view, setView] = useState<'kanban' | 'grid' | 'list' | 'calendar'>('kanban')
+  const [calMonth, setCalMonth] = useState(() => {
+    const now = new Date()
+    return new Date(now.getFullYear(), now.getMonth(), 1)
+  })
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Task | null>(null)
@@ -78,6 +82,36 @@ export default function TasksPage() {
       await update(taskId, { ...task, status })
     }
     setDragOverStatus(null)
+  }
+
+  const handleComplete = async (task: Task) => {
+    const newStatus: TaskStatus = task.status === 'Tamamlandı' ? 'Gözləyir' : 'Tamamlandı'
+    await update(task.id, { ...task, status: newStatus })
+  }
+
+  // Calendar view data
+  const calYear = calMonth.getFullYear()
+  const calMonthIdx = calMonth.getMonth()
+  const calFirstDay = new Date(calYear, calMonthIdx, 1).getDay()
+  const calDaysInMonth = new Date(calYear, calMonthIdx + 1, 0).getDate()
+  const calStartOffset = (calFirstDay + 6) % 7
+  const calTotalCells = Math.ceil((calStartOffset + calDaysInMonth) / 7) * 7
+  const MONTH_NAMES_AZ = ['Yanvar','Fevral','Mart','Aprel','May','İyun','İyul','Avqust','Sentyabr','Oktyabr','Noyabr','Dekabr']
+  const DAY_NAMES_AZ = ['B.e','Ç.a','Ç','C.a','C','Ş','B']
+  const calToday = new Date()
+  const calTasksByDay: Record<number, Task[]> = {}
+  filtered.forEach(t => {
+    if (!t.dueDate) return
+    const d = new Date(t.dueDate)
+    if (d.getFullYear() === calYear && d.getMonth() === calMonthIdx) {
+      const day = d.getDate()
+      if (!calTasksByDay[day]) calTasksByDay[day] = []
+      calTasksByDay[day].push(t)
+    }
+  })
+  const TASK_STATUS_COLORS: Record<string, string> = {
+    'Gözləyir': '#94A3B8', 'Davam edir': '#3B82F6',
+    'Yoxlanılır': '#F59E0B', 'Tamamlandı': '#10B981',
   }
 
   return (
@@ -137,11 +171,11 @@ export default function TasksPage() {
         </div>
 
         <div className="flex gap-1 ml-auto">
-          {([['kanban', Columns], ['grid', LayoutGrid], ['list', List]] as const).map(([v, Icon]) => (
+          {([['kanban', Columns], ['grid', LayoutGrid], ['list', List], ['calendar', CalendarDays]] as const).map(([v, Icon]) => (
             <button
               key={v}
               onClick={() => setView(v)}
-              title={v === 'kanban' ? 'Kanban' : v === 'grid' ? 'Grid' : 'Siyahı'}
+              title={v === 'kanban' ? 'Kanban' : v === 'grid' ? 'Grid' : v === 'list' ? 'Siyahı' : 'Təqvim'}
               className={cn('w-8 h-8 rounded-lg flex items-center justify-center transition-all',
                 view === v ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
             >
@@ -199,6 +233,7 @@ export default function TasksPage() {
                       draggable
                       onEdit={t => { setSelectedTask(t); setModal('edit') }}
                       onDelete={setConfirmDelete}
+                      onComplete={handleComplete}
                     />
                   ))}
                   {col.length === 0 && (
@@ -222,10 +257,11 @@ export default function TasksPage() {
               task={task}
               onEdit={t => { setSelectedTask(t); setModal('edit') }}
               onDelete={setConfirmDelete}
+              onComplete={handleComplete}
             />
           ))}
         </div>
-      ) : (
+      ) : view === 'list' ? (
         <div className="card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -288,7 +324,76 @@ export default function TasksPage() {
             </tbody>
           </table>
         </div>
-      )}
+      ) : view === 'calendar' ? (
+        <div className="card overflow-hidden">
+          <div className="flex items-center justify-between p-4 border-b border-white/[0.06]">
+            <button
+              onClick={() => setCalMonth(new Date(calYear, calMonthIdx - 1, 1))}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.06] transition-all"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <span className="font-semibold text-text-primary text-sm">
+              {MONTH_NAMES_AZ[calMonthIdx]} {calYear}
+            </span>
+            <button
+              onClick={() => setCalMonth(new Date(calYear, calMonthIdx + 1, 1))}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.06] transition-all"
+            >
+              <ChevronRight size={15} />
+            </button>
+          </div>
+          <div className="grid grid-cols-7 border-b border-white/[0.06]">
+            {DAY_NAMES_AZ.map(d => (
+              <div key={d} className="py-2 text-center text-[11px] font-medium text-text-muted">{d}</div>
+            ))}
+          </div>
+          <div className="grid grid-cols-7">
+            {Array.from({ length: calTotalCells }).map((_, i) => {
+              const dayNum = i - calStartOffset + 1
+              const isCurrentMonth = dayNum >= 1 && dayNum <= calDaysInMonth
+              const isToday = isCurrentMonth && calToday.getDate() === dayNum &&
+                calToday.getMonth() === calMonthIdx && calToday.getFullYear() === calYear
+              const dayTasks = isCurrentMonth ? (calTasksByDay[dayNum] || []) : []
+              return (
+                <div
+                  key={i}
+                  className={cn(
+                    'min-h-[80px] p-1.5 border-r border-b border-white/[0.04] last:border-r-0',
+                    !isCurrentMonth && 'opacity-30'
+                  )}
+                >
+                  <div className={cn(
+                    'w-6 h-6 rounded-full flex items-center justify-center text-xs mb-1 font-medium',
+                    isToday ? 'bg-accent-blue text-white' : 'text-text-muted'
+                  )}>
+                    {isCurrentMonth ? dayNum : ''}
+                  </div>
+                  <div className="space-y-0.5">
+                    {dayTasks.slice(0, 3).map(t => (
+                      <button
+                        key={t.id}
+                        onClick={() => { setSelectedTask(t); setModal('edit') }}
+                        className="w-full text-left px-1.5 py-0.5 rounded text-[10px] leading-tight truncate hover:opacity-80 transition-opacity"
+                        style={{
+                          background: TASK_STATUS_COLORS[t.status] + '22',
+                          color: TASK_STATUS_COLORS[t.status],
+                          borderLeft: `2px solid ${TASK_STATUS_COLORS[t.status]}`
+                        }}
+                      >
+                        {t.title}
+                      </button>
+                    ))}
+                    {dayTasks.length > 3 && (
+                      <div className="text-[10px] text-text-muted pl-1">+{dayTasks.length - 3} daha</div>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <Modal open={modal === 'create'} onClose={() => setModal(null)} title="Yeni Tapşırıq">
         <TaskForm

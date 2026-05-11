@@ -14,7 +14,7 @@ import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton, CardSkeleton } from '@/components/ui/Skeleton'
 import {
   ArrowLeft, Calendar, User, DollarSign, CheckSquare,
-  Plus, RefreshCw
+  Plus, RefreshCw, Zap
 } from 'lucide-react'
 import { formatDate, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -86,6 +86,25 @@ export default function ProjectDetailPage() {
     else toast.error(res.error || 'Xəta')
     setDeleting(false)
     setConfirmDelete(null)
+  }
+
+  const handleAutoProgress = async () => {
+    if (!project || tasks.length === 0) return
+    const completed = tasks.filter(t => t.status === 'Tamamlandı').length
+    const newProgress = Math.round((completed / tasks.length) * 100)
+    const res = await sheetsApi.projects.update(project.id, { ...project, progress: newProgress })
+    if (res.success) {
+      setProject(prev => prev ? { ...prev, progress: newProgress } : prev)
+      toast.success(`İrəliləyiş ${newProgress}% olaraq yeniləndi`)
+    }
+  }
+
+  const handleComplete = async (task: Task) => {
+    const newStatus: TaskStatus = task.status === 'Tamamlandı' ? 'Gözləyir' : 'Tamamlandı'
+    const res = await sheetsApi.tasks.update(task.id, { ...task, status: newStatus })
+    if (res.success) {
+      setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
+    }
   }
 
   const handleDrop = async (e: React.DragEvent, status: TaskStatus) => {
@@ -180,7 +199,18 @@ export default function ProjectDetailPage() {
           <div className="mt-4">
             <div className="flex justify-between mb-1.5">
               <span className="text-text-muted text-xs">İrəliləyiş</span>
-              <span className="text-text-primary text-xs font-semibold">{progress}%</span>
+              <div className="flex items-center gap-2">
+                <span className="text-text-primary text-xs font-semibold">{progress}%</span>
+                {tasks.length > 0 && (
+                  <button
+                    onClick={handleAutoProgress}
+                    className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-md text-accent-blue hover:bg-accent-blue/10 border border-accent-blue/20 transition-all"
+                    title="Tapşırıqlar əsasında hesabla"
+                  >
+                    <Zap size={10} /> Hesabla
+                  </button>
+                )}
+              </div>
             </div>
             <div className="progress-bar">
               <div className="progress-fill" style={{ width: `${progress}%`, background: project.color }} />
@@ -249,6 +279,7 @@ export default function ProjectDetailPage() {
                       draggable
                       onEdit={t => { setSelectedTask(t); setModal('edit') }}
                       onDelete={setConfirmDelete}
+                      onComplete={handleComplete}
                     />
                   ))}
                   {statusTasks.length === 0 && (

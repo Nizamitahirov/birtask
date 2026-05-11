@@ -3,18 +3,20 @@
 import { Task } from '@/lib/types'
 import { formatDate, getDaysLeft, cn } from '@/lib/utils'
 import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
-import { Calendar, User, Edit2, Trash2, Tag } from 'lucide-react'
+import { Calendar, User, Edit2, Trash2, Tag, CheckCircle2, Circle } from 'lucide-react'
 
 interface TaskCardProps {
   task: Task
   onEdit: (t: Task) => void
   onDelete: (t: Task) => void
+  onComplete?: (t: Task) => void
   draggable?: boolean
 }
 
-export function TaskCard({ task, onEdit, onDelete, draggable: isDraggable }: TaskCardProps) {
+export function TaskCard({ task, onEdit, onDelete, onComplete, draggable: isDraggable }: TaskCardProps) {
   const daysLeft = getDaysLeft(task.dueDate)
   const overdue = task.dueDate && daysLeft < 0 && task.status !== 'Tamamlandı'
+  const isDone = task.status === 'Tamamlandı'
 
   return (
     <div
@@ -26,12 +28,29 @@ export function TaskCard({ task, onEdit, onDelete, draggable: isDraggable }: Tas
       className={cn(
         'card p-4 hover:border-white/[0.12] transition-all duration-200 group flex flex-col gap-3',
         overdue && 'border-accent-red/20',
+        isDone && 'opacity-70',
         isDraggable && 'cursor-grab active:cursor-grabbing active:opacity-60'
       )}
     >
       {/* Title + actions */}
       <div className="flex items-start justify-between gap-2">
-        <h4 className="text-text-primary text-sm font-medium leading-snug flex-1">{task.title}</h4>
+        <div className="flex items-start gap-2 flex-1 min-w-0">
+          {onComplete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); onComplete(task) }}
+              className={cn(
+                'flex-shrink-0 mt-0.5 transition-colors',
+                isDone ? 'text-accent-green' : 'text-text-muted hover:text-accent-green'
+              )}
+              title={isDone ? 'Geri al' : 'Tamamlandı kimi işarələ'}
+            >
+              {isDone ? <CheckCircle2 size={15} /> : <Circle size={15} />}
+            </button>
+          )}
+          <h4 className={cn('text-text-primary text-sm font-medium leading-snug', isDone && 'line-through text-text-muted')}>
+            {task.title}
+          </h4>
+        </div>
         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
           <button
             onClick={() => onEdit(task)}

@@ -1,14 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { useTeam } from '@/hooks/useSheets'
-import { TeamMember } from '@/lib/types'
+import { useTeam, useTasks } from '@/hooks/useSheets'
+import { TeamMember, Task } from '@/lib/types'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { CardSkeleton } from '@/components/ui/Skeleton'
-import { Plus, Search, Users, Edit2, Trash2, RefreshCw, Mail, Phone, Building2 } from 'lucide-react'
-import { getInitials } from '@/lib/utils'
+import { Plus, Search, Users, Edit2, Trash2, RefreshCw, Mail, Phone, Building2, BarChart3, LayoutGrid, AlertTriangle } from 'lucide-react'
+import { getInitials, getDaysLeft, cn } from '@/lib/utils'
 
 const AVATAR_COLORS = [
   'from-accent-blue to-accent-purple',
@@ -130,9 +130,84 @@ function MemberForm({ initial, onSubmit, onCancel, loading }: {
   )
 }
 
+function WorkloadView({ members, tasks }: { members: TeamMember[]; tasks: Task[] }) {
+  const today = new Date()
+
+  const memberStats = members.map((m, idx) => {
+    const myTasks = tasks.filter(t => t.assignee === m.name)
+    const waiting = myTasks.filter(t => t.status === 'Gözləyir').length
+    const inProgress = myTasks.filter(t => t.status === 'Davam edir').length
+    const reviewing = myTasks.filter(t => t.status === 'Yoxlanılır').length
+    const done = myTasks.filter(t => t.status === 'Tamamlandı').length
+    const overdue = myTasks.filter(t => {
+      if (!t.dueDate || t.status === 'Tamamlandı') return false
+      return getDaysLeft(t.dueDate) < 0
+    }).length
+    const total = myTasks.length
+    const donePercent = total > 0 ? Math.round((done / total) * 100) : 0
+    const gradient = ['from-accent-blue to-accent-purple','from-accent-cyan to-accent-blue','from-accent-purple to-accent-pink','from-accent-green to-accent-cyan','from-accent-yellow to-accent-green'][idx % 5]
+    return { member: m, waiting, inProgress, reviewing, done, overdue, total, donePercent, gradient }
+  }).sort((a, b) => b.total - a.total)
+
+  const maxTasks = Math.max(...memberStats.map(s => s.total), 1)
+
+  return (
+    <div className="space-y-3">
+      {memberStats.map(({ member, waiting, inProgress, reviewing, done, overdue, total, donePercent, gradient }) => (
+        <div key={member.id} className="card p-4">
+          <div className="flex items-center gap-3 mb-3">
+            <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold text-xs flex-shrink-0`}>
+              {getInitials(member.name)}
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-text-primary text-sm font-medium">{member.name}</span>
+                <span className="text-text-muted text-xs">{member.role}</span>
+                {overdue > 0 && (
+                  <span className="flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded-full bg-accent-red/10 text-accent-red border border-accent-red/20">
+                    <AlertTriangle size={9} /> {overdue} gecikmiş
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="flex-1 h-1.5 rounded-full bg-white/[0.06] overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${(total / maxTasks) * 100}%`, background: done > 0 ? '#10B981' : '#3B82F6' }}
+                  />
+                </div>
+                <span className="text-text-muted text-xs whitespace-nowrap">{total} tapşırıq</span>
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-2">
+            {[
+              { label: 'Gözləyir', count: waiting, color: '#94A3B8' },
+              { label: 'Davam edir', count: inProgress, color: '#3B82F6' },
+              { label: 'Yoxlanılır', count: reviewing, color: '#F59E0B' },
+              { label: 'Tamamlandı', count: done, color: '#10B981' },
+            ].map(({ label, count, color }) => (
+              <div
+                key={label}
+                className="rounded-lg px-2 py-1.5 text-center"
+                style={{ background: `${color}11`, border: `1px solid ${color}22` }}
+              >
+                <div className="text-sm font-bold" style={{ color }}>{count}</div>
+                <div className="text-[10px] text-text-muted leading-tight mt-0.5">{label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function TeamPage() {
   const { members, loading, refresh, create, update, remove } = useTeam()
+  const { tasks } = useTasks()
   const [search, setSearch] = useState('')
+  const [view, setView] = useState<'grid' | 'workload'>('grid')
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [selected, setSelected] = useState<TeamMember | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<TeamMember | null>(null)
@@ -186,14 +261,34 @@ export default function TeamPage() {
         </div>
       </div>
 
-      <div className="relative max-w-xs">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="input pl-9"
-          placeholder="Üzv axtar..."
-        />
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative max-w-xs w-full">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="input pl-9"
+            placeholder="Üzv axtar..."
+          />
+        </div>
+        <div className="flex gap-1 ml-auto">
+          <button
+            onClick={() => setView('grid')}
+            title="Kartlar"
+            className={cn('w-8 h-8 rounded-lg flex items-center justify-center transition-all',
+              view === 'grid' ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+          >
+            <LayoutGrid size={15} />
+          </button>
+          <button
+            onClick={() => setView('workload')}
+            title="İş yükü"
+            className={cn('w-8 h-8 rounded-lg flex items-center justify-center transition-all',
+              view === 'workload' ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+          >
+            <BarChart3 size={15} />
+          </button>
+        </div>
       </div>
 
       {loading ? (
@@ -211,6 +306,8 @@ export default function TeamPage() {
             </button>
           }
         />
+      ) : view === 'workload' ? (
+        <WorkloadView members={filtered} tasks={tasks} />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {filtered.map((m, i) => (
