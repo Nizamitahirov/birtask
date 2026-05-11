@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
   Users, Settings, ChevronLeft, ChevronRight,
-  Zap, ExternalLink, Sun, Moon, Map
+  Zap, ExternalLink, Sun, Moon, Map, CalendarDays
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
@@ -15,6 +15,7 @@ const navItems = [
   { href: '/',          label: 'İdarə Paneli', icon: LayoutDashboard },
   { href: '/projects',  label: 'Layihələr',    icon: FolderKanban },
   { href: '/tasks',     label: 'Tapşırıqlar',  icon: CheckSquare },
+  { href: '/calendar',  label: 'Təqvim',       icon: CalendarDays },
   { href: '/roadmap',   label: 'Yol Xəritəsi', icon: Map },
   { href: '/team',      label: 'Komanda',      icon: Users },
   { href: '/settings',  label: 'Parametrlər',  icon: Settings },
