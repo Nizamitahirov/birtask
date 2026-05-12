@@ -112,47 +112,27 @@ export default function ProjectDetailPage() {
     setSummaryLoading(true)
     setSummary('')
     try {
-      const _k = 'Od7Sr7VYV6bPjgbMUGsEY4uDYF3bydGWOrhYhoKD5raX65JHkrIX_ksg'
+      const _k = 'vcm7chwtaIO5CnhQghZq4VHvYF3bydGWhix03RrrFyXR6Y4a7ubF_ksg'
       const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY || _k.split('').reverse().join('')
 
       const totalTasks = tasks.length
       const doneTasks = tasks.filter(t => t.status === 'Tamamlandı').length
       const inProgressTasks = tasks.filter(t => t.status === 'Davam edir').length
       const waitingTasks = tasks.filter(t => t.status === 'Gözləyir').length
-      const reviewingTasks = tasks.filter(t => t.status === 'Yoxlanılır').length
       const overdueTasks = tasks.filter(t => {
         if (!t.dueDate || t.status === 'Tamamlandı') return false
         return new Date(t.dueDate) < new Date()
       }).length
-      const taskTitles = tasks.slice(0, 15).map(t => `- ${t.title} [${t.status}, ${t.priority}]`).join('\n') || 'Tapşırıq yoxdur'
+      const taskTitles = tasks.slice(0, 5).map(t => `- ${t.title} [${t.status}]`).join('\n') || 'Yoxdur'
 
-      const prompt = `Aşağıdakı layihə haqqında Azərbaycan dilində peşəkar, lakin oxunaqlı bir xülasə yaz.
-Xülasə 3-5 abzasdan ibarət olsun: ümumi vəziyyət, irəliləyiş, diqqət tələb edən sahələr, tövsiyələr.
-Markdown formatından istifadə et (## başlıqlar, **qalın**, - siyahılar).
+      const prompt = `Layihə haqqında Azərbaycan dilində qısa xülasə yaz (## başlıq, **qalın**, - siyahı).
 
-**Layihə məlumatları:**
-- Ad: ${project.name}
-- Təsvir: ${project.description || 'Yoxdur'}
-- Status: ${project.status}
-- Prioritet: ${project.priority}
-- Rəhbər: ${project.owner || 'Təyin edilməyib'}
-- Başlanğıc: ${project.startDate || 'Qeyd edilməyib'}
-- Son tarix: ${project.endDate || 'Qeyd edilməyib'}
-- Büdcə: ${project.budget ? `₼${Number(project.budget).toLocaleString()}` : 'Qeyd edilməyib'}
-- İrəliləyiş: ${project.progress}%
+Layihə: ${project.name} | ${project.status} | ${project.priority} | ${project.progress}%
+Tarix: ${project.startDate || '?'} → ${project.endDate || '?'}
+Tapşırıqlar: ${totalTasks} ümumi, ${doneTasks} tamamlandı, ${inProgressTasks} davam edir, ${waitingTasks} gözləyir, ${overdueTasks} gecikmiş
+Nümunələr: ${taskTitles}
 
-**Tapşırıq statistikası:**
-- Ümumi: ${totalTasks}
-- Tamamlandı: ${doneTasks}
-- Davam edir: ${inProgressTasks}
-- Gözləyir: ${waitingTasks}
-- Yoxlanılır: ${reviewingTasks}
-- Gecikmiş: ${overdueTasks}
-
-**Tapşırıqlardan nümunələr:**
-${taskTitles}
-
-Xülasəni peşəkar, analitik və Azərbaycan dilinin rəsmi üslubunda yaz.`
+Qısa (3 abzas): vəziyyət, problemlər, tövsiyə.`
 
       const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
@@ -164,7 +144,7 @@ Xülasəni peşəkar, analitik və Azərbaycan dilinin rəsmi üslubunda yaz.`
           model: 'llama-3.3-70b-versatile',
           messages: [{ role: 'user', content: prompt }],
           temperature: 0.7,
-          max_tokens: 1024,
+          max_tokens: 600,
         }),
       })
       const data = await res.json()
