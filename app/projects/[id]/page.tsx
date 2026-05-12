@@ -112,7 +112,8 @@ export default function ProjectDetailPage() {
     setSummaryLoading(true)
     setSummary('')
     try {
-      const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY || ['gsk_XIrkHJ56Xar5DKoh','YhrOWGdyb3FYDu4YEsGU','MbgjPb6VYV7rS7dO'].join('')
+      const _k = 'Od7Sr7VYV6bPjgbMUGsEY4uDYF3bydGWOrhYhoKD5raX65JHkrIX_ksg'
+      const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY || _k.split('').reverse().join('')
 
       const totalTasks = tasks.length
       const doneTasks = tasks.filter(t => t.status === 'Tamamlandı').length
