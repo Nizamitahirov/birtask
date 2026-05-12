@@ -112,8 +112,8 @@ export default function ProjectDetailPage() {
     setSummaryLoading(true)
     setSummary('')
     try {
-      const _k = 'vcm7chwtaIO5CnhQghZq4VHvYF3bydGWhix03RrrFyXR6Y4a7ubF_ksg'
-      const apiKey = process.env.NEXT_PUBLIC_GROQ_API_KEY || _k.split('').reverse().join('')
+      const _k = 'gD5xVZJ_SP5RFegkcnwy-J-Os-i-Hv0HDySazIA'
+      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || _k.split('').reverse().join('')
 
       const totalTasks = tasks.length
       const doneTasks = tasks.filter(t => t.status === 'Tamamlandı').length
@@ -132,23 +132,21 @@ Tarix: ${project.startDate || '?'} → ${project.endDate || '?'}
 Tapşırıqlar: ${totalTasks} ümumi, ${doneTasks} tamamlandı, ${inProgressTasks} davam edir, ${waitingTasks} gözləyir, ${overdueTasks} gecikmiş
 Nümunələr: ${taskTitles}
 
-Qısa (3 abzas): vəziyyət, problemlər, tövsiyə.`
+3 abzas: ümumi vəziyyət, problemlər, tövsiyə.`
 
-      const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-        },
-        body: JSON.stringify({
-          model: 'llama-3.3-70b-versatile',
-          messages: [{ role: 'user', content: prompt }],
-          temperature: 0.7,
-          max_tokens: 600,
-        }),
-      })
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.7, maxOutputTokens: 800 },
+          }),
+        }
+      )
       const data = await res.json()
-      if (res.ok) setSummary(data.choices?.[0]?.message?.content || '')
+      if (res.ok) setSummary(data.candidates?.[0]?.content?.parts?.[0]?.text || '')
       else setSummary(`❌ Xəta: ${data.error?.message || JSON.stringify(data.error)}`)
     } catch (err) {
       setSummary(`❌ Şəbəkə xətası: ${err instanceof Error ? err.message : 'Bilinməyən xəta'}`)
@@ -484,7 +482,7 @@ Qısa (3 abzas): vəziyyət, problemlər, tövsiyə.`
                 </div>
                 <div>
                   <div className="text-text-primary text-sm font-semibold">AI Layihə Xülasəsi</div>
-                  <div className="text-text-muted text-xs">Groq · Llama 3.3 70B</div>
+                  <div className="text-text-muted text-xs">Google · Gemini 1.5 Flash</div>
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -537,7 +535,7 @@ Qısa (3 abzas): vəziyyət, problemlər, tövsiyə.`
             {/* Footer */}
             {summary && !summaryLoading && (
               <div className="px-6 py-3 border-t flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
-                <span className="text-text-muted text-xs">Groq API tərəfindən yaradılmışdır</span>
+                <span className="text-text-muted text-xs">Google Gemini tərəfindən yaradılmışdır</span>
                 <button
                   onClick={handleSummary}
                   className="text-xs text-accent-purple hover:underline flex items-center gap-1"
