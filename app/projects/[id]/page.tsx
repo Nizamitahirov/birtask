@@ -135,7 +135,7 @@ Nümunələr: ${taskTitles}
 3 abzas: ümumi vəziyyət, problemlər, tövsiyə.`
 
       const res = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-goog-api-key': apiKey },
