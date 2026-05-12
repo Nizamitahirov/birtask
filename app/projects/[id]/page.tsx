@@ -135,7 +135,7 @@ Nümunələr: ${taskTitles}
 3 abzas: ümumi vəziyyət, problemlər, tövsiyə.`
 
       const res = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent',
+        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-goog-api-key': apiKey },
@@ -482,7 +482,7 @@ Nümunələr: ${taskTitles}
                 </div>
                 <div>
                   <div className="text-text-primary text-sm font-semibold">AI Layihə Xülasəsi</div>
-                  <div className="text-text-muted text-xs">Google · Gemini 1.5 Flash</div>
+                  <div className="text-text-muted text-xs">Google · Gemini 2.5 Flash</div>
                 </div>
               </div>
               <div className="flex items-center gap-1">
