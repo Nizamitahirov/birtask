@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { sheetsApi } from '@/lib/sheets'
+import { db } from '@/lib/db'
 import { useTeamNames } from '@/hooks/useSheets'
 import { Project, Task, TaskStatus } from '@/lib/types'
 import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
@@ -53,8 +53,8 @@ export default function ProjectDetailPage() {
   const fetchData = async () => {
     setLoading(true)
     const [pRes, tRes] = await Promise.all([
-      sheetsApi.projects.getById(id),
-      sheetsApi.tasks.getAll(id),
+      db.projects.getById(id),
+      db.tasks.getAll(id),
     ])
     if (pRes.success && pRes.data) setProject(pRes.data)
     else { toast.error('Layihə tapılmadı'); router.push('/projects') }
@@ -67,7 +67,7 @@ export default function ProjectDetailPage() {
 
   const handleCreateTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     setSaving(true)
-    const res = await sheetsApi.tasks.create({ ...data, projectId: id, projectName: project?.name || '' })
+    const res = await db.tasks.create({ ...data, projectId: id, projectName: project?.name || '' })
     if (res.success) { toast.success('Tapşırıq yaradıldı'); await fetchData() }
     else toast.error(res.error || 'Xəta')
     setSaving(false)
@@ -77,7 +77,7 @@ export default function ProjectDetailPage() {
   const handleEditTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     if (!selectedTask) return
     setSaving(true)
-    const res = await sheetsApi.tasks.update(selectedTask.id, data)
+    const res = await db.tasks.update(selectedTask.id, data)
     if (res.success) { toast.success('Tapşırıq yeniləndi'); await fetchData() }
     else toast.error(res.error || 'Xəta')
     setSaving(false)
@@ -88,7 +88,7 @@ export default function ProjectDetailPage() {
   const handleDeleteTask = async () => {
     if (!confirmDelete) return
     setDeleting(true)
-    const res = await sheetsApi.tasks.delete(confirmDelete.id)
+    const res = await db.tasks.delete(confirmDelete.id)
     if (res.success) { toast.success('Tapşırıq silindi'); await fetchData() }
     else toast.error(res.error || 'Xəta')
     setDeleting(false)
@@ -99,7 +99,7 @@ export default function ProjectDetailPage() {
     if (!project || tasks.length === 0) return
     const completed = tasks.filter(t => t.status === 'Tamamlandı').length
     const newProgress = Math.round((completed / tasks.length) * 100)
-    const res = await sheetsApi.projects.update(project.id, { ...project, progress: newProgress })
+    const res = await db.projects.update(project.id, { ...project, progress: newProgress })
     if (res.success) {
       setProject(prev => prev ? { ...prev, progress: newProgress } : prev)
       toast.success(`İrəliləyiş ${newProgress}% olaraq yeniləndi`)
@@ -162,7 +162,7 @@ Nümunələr: ${taskTitles}
 
   const handleComplete = async (task: Task) => {
     const newStatus: TaskStatus = task.status === 'Tamamlandı' ? 'Gözləyir' : 'Tamamlandı'
-    const res = await sheetsApi.tasks.update(task.id, { ...task, status: newStatus })
+    const res = await db.tasks.update(task.id, { ...task, status: newStatus })
     if (res.success) {
       setTasks(prev => prev.map(t => t.id === task.id ? { ...t, status: newStatus } : t))
     }
@@ -173,7 +173,7 @@ Nümunələr: ${taskTitles}
     const taskId = e.dataTransfer.getData('taskId')
     const task = tasks.find(t => t.id === taskId)
     if (task && task.status !== status) {
-      const res = await sheetsApi.tasks.update(taskId, { ...task, status })
+      const res = await db.tasks.update(taskId, { ...task, status })
       if (res.success) {
         setTasks(prev => prev.map(t => t.id === taskId ? { ...t, status } : t))
         toast.success(`"${task.title}" → ${status}`)

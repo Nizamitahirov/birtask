@@ -9,7 +9,7 @@ export async function GET() {
       .orderBy('createdAt', 'desc')
       .get()
     const users = snapshot.docs.map((doc) => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      // eslint-disable-next-line no-unused-vars
       const { passwordHash, ...rest } = doc.data() as Record<string, unknown>
       return { ...rest, id: doc.id }
     })

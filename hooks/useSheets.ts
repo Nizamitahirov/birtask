@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { sheetsApi } from '@/lib/sheets'
-import { Project, Task, TeamMember, Activity, DashboardStats } from '@/lib/types'
+import { db } from '@/lib/db'
+import { Project, Task, TeamMember, Activity, ActivityLog, DashboardStats } from '@/lib/types'
 import toast from 'react-hot-toast'
 
 export function useProjects() {
@@ -12,7 +12,7 @@ export function useProjects() {
 
   const fetch = useCallback(async () => {
     setLoading(true)
-    const res = await sheetsApi.projects.getAll()
+    const res = await db.projects.getAll()
     if (res.success && res.data) setProjects(res.data)
     else setError(res.error || 'Xəta baş verdi')
     setLoading(false)
@@ -21,21 +21,21 @@ export function useProjects() {
   useEffect(() => { fetch() }, [fetch])
 
   const create = async (data: Omit<Project, 'id' | 'createdAt'>) => {
-    const res = await sheetsApi.projects.create(data)
+    const res = await db.projects.create(data)
     if (res.success) { toast.success('Layihə yaradıldı'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
   }
 
   const update = async (id: string, data: Partial<Project>) => {
-    const res = await sheetsApi.projects.update(id, data)
+    const res = await db.projects.update(id, data)
     if (res.success) { toast.success('Layihə yeniləndi'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
   }
 
   const remove = async (id: string) => {
-    const res = await sheetsApi.projects.delete(id)
+    const res = await db.projects.delete(id)
     if (res.success) { toast.success('Layihə silindi'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
@@ -50,7 +50,7 @@ export function useTasks(projectId?: string) {
 
   const fetch = useCallback(async () => {
     setLoading(true)
-    const res = await sheetsApi.tasks.getAll(projectId)
+    const res = await db.tasks.getAll(projectId)
     if (res.success && res.data) setTasks(res.data)
     setLoading(false)
   }, [projectId])
@@ -58,21 +58,21 @@ export function useTasks(projectId?: string) {
   useEffect(() => { fetch() }, [fetch])
 
   const create = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const res = await sheetsApi.tasks.create(data)
+    const res = await db.tasks.create(data)
     if (res.success) { toast.success('Tapşırıq yaradıldı'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
   }
 
   const update = async (id: string, data: Partial<Task>) => {
-    const res = await sheetsApi.tasks.update(id, data)
+    const res = await db.tasks.update(id, data)
     if (res.success) { toast.success('Tapşırıq yeniləndi'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
   }
 
   const remove = async (id: string) => {
-    const res = await sheetsApi.tasks.delete(id)
+    const res = await db.tasks.delete(id)
     if (res.success) { toast.success('Tapşırıq silindi'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
@@ -87,7 +87,7 @@ export function useTeam() {
 
   const fetch = useCallback(async () => {
     setLoading(true)
-    const res = await sheetsApi.team.getAll()
+    const res = await db.team.getAll()
     if (res.success && res.data) setMembers(res.data)
     setLoading(false)
   }, [])
@@ -95,21 +95,21 @@ export function useTeam() {
   useEffect(() => { fetch() }, [fetch])
 
   const create = async (data: Omit<TeamMember, 'id' | 'createdAt'>) => {
-    const res = await sheetsApi.team.create(data)
+    const res = await db.team.create(data)
     if (res.success) { toast.success('Üzv əlavə edildi'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
   }
 
   const update = async (id: string, data: Partial<TeamMember>) => {
-    const res = await sheetsApi.team.update(id, data)
+    const res = await db.team.update(id, data)
     if (res.success) { toast.success('Üzv yeniləndi'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
   }
 
   const remove = async (id: string) => {
-    const res = await sheetsApi.team.delete(id)
+    const res = await db.team.delete(id)
     if (res.success) { toast.success('Üzv silindi'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
@@ -118,7 +118,7 @@ export function useTeam() {
   return { members, loading, refresh: fetch, create, update, remove }
 }
 
-// Batch load for dashboard - single API call
+// Batch load for dashboard - parallel API calls
 export function useDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
@@ -127,21 +127,43 @@ export function useDashboard() {
   useEffect(() => {
     const fetchAll = async () => {
       setLoading(true)
-      const res = await sheetsApi.batch.getAll()
-      if (res.success && res.data) {
-        const { projects = [], tasks = [], team = [], activity = [] } = res.data
-        const today = new Date()
-        setStats({
-          totalProjects: projects.length,
-          activeProjects: projects.filter((p: Project) => p.status === 'Davam edir').length,
-          completedProjects: projects.filter((p: Project) => p.status === 'Tamamlandı').length,
-          totalTasks: tasks.length,
-          completedTasks: tasks.filter((t: Task) => t.status === 'Tamamlandı').length,
-          overdueTasks: tasks.filter((t: Task) => t.dueDate && new Date(t.dueDate) < today && t.status !== 'Tamamlandı').length,
-          teamSize: team.length,
-        })
-        setActivities(activity.slice(0, 20))
-      }
+      const [projectsRes, tasksRes, teamRes, activityRes] = await Promise.all([
+        db.projects.getAll(),
+        db.tasks.getAll(),
+        db.team.getAll(),
+        db.activity.getAll(),
+      ])
+
+      const projects = (projectsRes.success && projectsRes.data) ? projectsRes.data : []
+      const tasks = (tasksRes.success && tasksRes.data) ? tasksRes.data : []
+      const team = (teamRes.success && teamRes.data) ? teamRes.data : []
+      const activity = (activityRes.success && activityRes.data) ? activityRes.data : []
+
+      const today = new Date()
+      setStats({
+        totalProjects: projects.length,
+        activeProjects: projects.filter((p: Project) => p.status === 'Davam edir').length,
+        completedProjects: projects.filter((p: Project) => p.status === 'Tamamlandı').length,
+        totalTasks: tasks.length,
+        completedTasks: tasks.filter((t: Task) => t.status === 'Tamamlandı').length,
+        overdueTasks: tasks.filter((t: Task) => t.dueDate && new Date(t.dueDate) < today && t.status !== 'Tamamlandı').length,
+        teamSize: team.length,
+      })
+
+      // Map ActivityLog to Activity shape for the feed
+      const mapped: Activity[] = activity.slice(0, 20).map((a: ActivityLog) => ({
+        id: a.id,
+        type: (a.action === 'complete' ? 'complete'
+          : a.action === 'create' ? 'create'
+          : a.action === 'delete' ? 'delete'
+          : 'update') as Activity['type'],
+        message: `${a.userDisplayName}: ${a.entityName}`,
+        entityId: a.entityId,
+        entityType: a.entityType as Activity['entityType'],
+        userId: a.userId,
+        createdAt: a.createdAt,
+      }))
+      setActivities(mapped)
       setLoading(false)
     }
     fetchAll()
@@ -150,13 +172,28 @@ export function useDashboard() {
   return { stats, activities, loading }
 }
 
-// For forms - get team member names
-export function useTeamNames() {
+// For forms - get team member names as string array
+export function useTeamNames(): string[] {
   const [names, setNames] = useState<string[]>([])
   useEffect(() => {
-    sheetsApi.team.getAll().then(res => {
+    db.team.getAll().then(res => {
       if (res.success && res.data) setNames(res.data.map(m => m.name))
     })
   }, [])
   return names
+}
+
+// For lookups - get Record<id, name> mapping
+export function useTeamMap(): Record<string, string> {
+  const [map, setMap] = useState<Record<string, string>>({})
+  useEffect(() => {
+    db.team.getAll().then(res => {
+      if (res.success && res.data) {
+        const m: Record<string, string> = {}
+        res.data.forEach(member => { m[member.id] = member.name })
+        setMap(m)
+      }
+    })
+  }, [])
+  return map
 }

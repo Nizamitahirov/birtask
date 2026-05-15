@@ -14,7 +14,7 @@ export async function GET(
         { status: 404 }
       )
     }
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line no-unused-vars
     const { passwordHash, ...rest } = doc.data() as Record<string, unknown>
     return NextResponse.json({ success: true, data: { ...rest, id: doc.id } })
   } catch (err: unknown) {
@@ -52,7 +52,7 @@ export async function PUT(
       createdAt: now,
     })
 
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    // eslint-disable-next-line no-unused-vars
     const { passwordHash, ...safeUpdated } = updated
     return NextResponse.json({ success: true, data: { ...safeUpdated, id: params.id } })
   } catch (err: unknown) {

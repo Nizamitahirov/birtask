@@ -1,30 +1,622 @@
 'use client'
 
-import { useState } from 'react'
-import { sheetsApi } from '@/lib/sheets'
-import { Settings, Database, ExternalLink, CheckCircle, AlertCircle, RefreshCw } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { db } from '@/lib/db'
+import { User, UserRole } from '@/lib/types'
+import { useAuth } from '@/contexts/AuthContext'
+import {
+  Settings, Database, CheckCircle, AlertCircle, RefreshCw,
+  Users, Plus, Edit2, Trash2, KeyRound, Search, ShieldCheck,
+  UserCheck, Eye, EyeOff, Loader2, X, Shield, UserCog
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 
-export default function SettingsPage() {
-  const [initializing, setInitializing] = useState(false)
+// ── Role badge ────────────────────────────────────────────────────────────────
+
+function RoleBadge({ role }: { role: UserRole }) {
+  const styles: Record<UserRole, string> = {
+    admin:   'bg-accent-purple/10 text-accent-purple border-accent-purple/20',
+    manager: 'bg-accent-blue/10 text-accent-blue border-accent-blue/20',
+    member:  'bg-accent-green/10 text-accent-green border-accent-green/20',
+    viewer:  'bg-white/[0.06] text-text-secondary border-white/[0.10]',
+  }
+  const labels: Record<UserRole, string> = {
+    admin: 'Admin', manager: 'Menecer', member: 'Üzv', viewer: 'İzləyici',
+  }
+  return (
+    <span className={cn('inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border', styles[role])}>
+      {role === 'admin' && <Shield size={9} />}
+      {role === 'manager' && <UserCog size={9} />}
+      {role === 'member' && <UserCheck size={9} />}
+      {role === 'viewer' && <Eye size={9} />}
+      {labels[role]}
+    </span>
+  )
+}
+
+// ── User form (create / edit) ─────────────────────────────────────────────────
+
+interface UserFormProps {
+  initial?: Partial<User>
+  mode: 'create' | 'edit'
+  onSubmit: (data: Partial<User> & { password?: string }) => Promise<void>
+  onCancel: () => void
+  loading?: boolean
+}
+
+function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps) {
+  const [form, setForm] = useState({
+    username:    initial?.username    || '',
+    displayName: initial?.displayName || '',
+    email:       initial?.email       || '',
+    role:        (initial?.role       || 'member') as UserRole,
+    department:  initial?.department  || '',
+    isActive:    initial?.isActive    ?? true,
+    password:    '',
+  })
+  const [showPw, setShowPw] = useState(false)
+
+  const set = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }))
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const payload: Partial<User> & { password?: string; mustChangePassword?: boolean } = {
+      displayName: form.displayName,
+      email:       form.email,
+      role:        form.role,
+      department:  form.department,
+      isActive:    form.isActive,
+    }
+    if (mode === 'create') {
+      payload.username         = form.username
+      payload.password         = form.password
+      payload.mustChangePassword = true
+    }
+    await onSubmit(payload)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      {mode === 'create' && (
+        <div>
+          <label className="block text-text-secondary text-xs mb-1.5">İstifadəçi adı *</label>
+          <input
+            required
+            value={form.username}
+            onChange={e => set('username', e.target.value)}
+            className="input w-full"
+            placeholder="username"
+            autoComplete="off"
+          />
+        </div>
+      )}
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-text-secondary text-xs mb-1.5">Ad Soyad *</label>
+          <input
+            required
+            value={form.displayName}
+            onChange={e => set('displayName', e.target.value)}
+            className="input w-full"
+            placeholder="Ad Soyad"
+          />
+        </div>
+        <div>
+          <label className="block text-text-secondary text-xs mb-1.5">Email</label>
+          <input
+            type="email"
+            value={form.email}
+            onChange={e => set('email', e.target.value)}
+            className="input w-full"
+            placeholder="email@example.com"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-text-secondary text-xs mb-1.5">Rol *</label>
+          <select
+            value={form.role}
+            onChange={e => set('role', e.target.value)}
+            className="select w-full"
+          >
+            <option value="admin">Admin</option>
+            <option value="manager">Menecer</option>
+            <option value="member">Üzv</option>
+            <option value="viewer">İzləyici</option>
+          </select>
+        </div>
+        <div>
+          <label className="block text-text-secondary text-xs mb-1.5">Şöbə</label>
+          <input
+            value={form.department}
+            onChange={e => set('department', e.target.value)}
+            className="input w-full"
+            placeholder="Texnologiya..."
+          />
+        </div>
+      </div>
+
+      {mode === 'create' && (
+        <div>
+          <label className="block text-text-secondary text-xs mb-1.5">İlkin şifrə *</label>
+          <div className="relative">
+            <input
+              required
+              type={showPw ? 'text' : 'password'}
+              value={form.password}
+              onChange={e => set('password', e.target.value)}
+              className="input w-full pr-10"
+              placeholder="••••••••"
+              minLength={6}
+              autoComplete="new-password"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPw(v => !v)}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary"
+            >
+              {showPw ? <EyeOff size={14} /> : <Eye size={14} />}
+            </button>
+          </div>
+          <p className="text-text-muted text-[11px] mt-1">
+            İstifadəçi ilk girişdə şifrəni dəyişəcək.
+          </p>
+        </div>
+      )}
+
+      {mode === 'edit' && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <div>
+            <div className="text-text-primary text-sm font-medium">Aktiv hesab</div>
+            <div className="text-text-muted text-xs">Deaktiv etsəniz, istifadəçi daxil ola bilməz</div>
+          </div>
+          <button
+            type="button"
+            onClick={() => set('isActive', !form.isActive)}
+            className={cn(
+              'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
+              form.isActive ? 'bg-accent-blue' : 'bg-white/[0.12]'
+            )}
+          >
+            <span
+              className={cn(
+                'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200',
+                form.isActive ? 'translate-x-4' : 'translate-x-0'
+              )}
+            />
+          </button>
+        </div>
+      )}
+
+      <div className="flex gap-3 pt-2">
+        <button type="button" onClick={onCancel} className="btn-secondary flex-1 justify-center">
+          Ləğv et
+        </button>
+        <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center disabled:opacity-50">
+          {loading ? (
+            <><Loader2 size={14} className="animate-spin" /> Saxlanılır...</>
+          ) : (mode === 'create' ? 'Yarat' : 'Yenilə')}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ── Reset password form ───────────────────────────────────────────────────────
+
+function ResetPasswordForm({
+  user, onDone, onCancel,
+}: { user: User; onDone: () => void; onCancel: () => void }) {
+  const [newPassword, setNewPassword] = useState('')
+  const [show, setShow] = useState(false)
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (newPassword.length < 6) {
+      toast.error('Şifrə ən azı 6 simvol olmalıdır')
+      return
+    }
+    setLoading(true)
+    const res = await db.users.update(user.id, {
+      mustChangePassword: true,
+    })
+    // Also call a dedicated password reset if available, else update via users api
+    try {
+      const pwRes = await fetch('/api/auth/admin-reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, newPassword }),
+      })
+      const data = await pwRes.json()
+      if (data.success) {
+        toast.success(`"${user.displayName}" üçün şifrə sıfırlandı`)
+        onDone()
+      } else {
+        // Fallback: update user record directly if dedicated endpoint missing
+        if (res.success) {
+          toast.success('Şifrə yeniləndi (admin-reset endpoint yoxdur, yalnız flag qoyuldu)')
+          onDone()
+        } else {
+          toast.error(data.error || 'Şifrə sıfırlana bilmədi')
+        }
+      }
+    } catch {
+      toast.error('Şəbəkə xətası')
+    }
+    setLoading(false)
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="flex items-start gap-3 p-3 rounded-xl bg-accent-yellow/10 border border-accent-yellow/20">
+        <KeyRound size={16} className="text-accent-yellow flex-shrink-0 mt-0.5" />
+        <div>
+          <div className="text-text-primary text-sm font-medium">&ldquo;{user.displayName}&rdquo; üçün şifrə sıfırla</div>
+          <div className="text-text-secondary text-xs mt-0.5">
+            İstifadəçi növbəti girişdə şifrəni dəyişməli olacaq.
+          </div>
+        </div>
+      </div>
+      <div>
+        <label className="block text-text-secondary text-xs mb-1.5">Yeni müvəqqəti şifrə *</label>
+        <div className="relative">
+          <input
+            required
+            type={show ? 'text' : 'password'}
+            value={newPassword}
+            onChange={e => setNewPassword(e.target.value)}
+            className="input w-full pr-10"
+            placeholder="••••••••"
+            minLength={6}
+            autoFocus
+          />
+          <button
+            type="button"
+            onClick={() => setShow(v => !v)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-secondary"
+          >
+            {show ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+        </div>
+      </div>
+      <div className="flex gap-3 pt-1">
+        <button type="button" onClick={onCancel} className="btn-secondary flex-1 justify-center">Ləğv et</button>
+        <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center disabled:opacity-50">
+          {loading ? <><Loader2 size={14} className="animate-spin" /> Sıfırlanır...</> : 'Şifrəni sıfırla'}
+        </button>
+      </div>
+    </form>
+  )
+}
+
+// ── Inline modal ──────────────────────────────────────────────────────────────
+
+function Modal({
+  open, onClose, title, children,
+}: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
+  if (!open) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+      <div
+        className="relative w-full max-w-md rounded-2xl shadow-2xl"
+        style={{ background: 'rgb(var(--bg-card))', border: '1px solid var(--border)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
+          <h3 className="font-semibold text-text-primary text-sm">{title}</h3>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-all"
+          >
+            <X size={14} />
+          </button>
+        </div>
+        <div className="px-6 py-5">{children}</div>
+      </div>
+    </div>
+  )
+}
+
+// ── Users Tab ─────────────────────────────────────────────────────────────────
+
+function UsersTab() {
+  const { user: currentUser } = useAuth()
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [modal, setModal] = useState<'create' | 'edit' | 'reset' | 'delete' | null>(null)
+  const [selected, setSelected] = useState<User | null>(null)
+  const [saving, setSaving] = useState(false)
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true)
+    const res = await db.users.getAll()
+    if (res.success && res.data) setUsers(res.data)
+    else toast.error(res.error || 'İstifadəçilər yüklənə bilmədi')
+    setLoading(false)
+  }, [])
+
+  useEffect(() => { fetchUsers() }, [fetchUsers])
+
+  const filtered = users.filter(u =>
+    u.displayName.toLowerCase().includes(search.toLowerCase()) ||
+    u.username.toLowerCase().includes(search.toLowerCase()) ||
+    u.email?.toLowerCase().includes(search.toLowerCase()) ||
+    u.department?.toLowerCase().includes(search.toLowerCase())
+  )
+
+  const handleCreate = async (data: Partial<User> & { password?: string }) => {
+    setSaving(true)
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    })
+    const json = await res.json()
+    if (json.success) {
+      toast.success('İstifadəçi yaradıldı')
+      await fetchUsers()
+      setModal(null)
+    } else {
+      toast.error(json.error || 'Xəta baş verdi')
+    }
+    setSaving(false)
+  }
+
+  const handleEdit = async (data: Partial<User> & { password?: string }) => {
+    if (!selected) return
+    setSaving(true)
+    const res = await db.users.update(selected.id, data)
+    if (res.success) {
+      toast.success('İstifadəçi yeniləndi')
+      await fetchUsers()
+      setModal(null)
+      setSelected(null)
+    } else {
+      toast.error(res.error || 'Xəta baş verdi')
+    }
+    setSaving(false)
+  }
+
+  const handleDelete = async () => {
+    if (!selected) return
+    setSaving(true)
+    const res = await db.users.delete(selected.id)
+    if (res.success) {
+      toast.success('İstifadəçi silindi')
+      await fetchUsers()
+      setModal(null)
+      setSelected(null)
+    } else {
+      toast.error(res.error || 'Xəta baş verdi')
+    }
+    setSaving(false)
+  }
+
+  const isAdmin = currentUser?.role === 'admin'
+
+  return (
+    <div className="space-y-5">
+      {/* Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+        <div className="relative max-w-xs w-full">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="input pl-9 w-full"
+            placeholder="İstifadəçi axtar..."
+          />
+        </div>
+        {isAdmin && (
+          <button
+            onClick={() => setModal('create')}
+            className="btn-primary"
+          >
+            <Plus size={14} /> Yeni İstifadəçi
+          </button>
+        )}
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div className="space-y-2">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="h-14 rounded-xl bg-white/[0.03] animate-pulse" />
+          ))}
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card p-10 text-center">
+          <Users size={36} className="text-text-muted mx-auto mb-3 opacity-40" />
+          <p className="text-text-secondary text-sm">İstifadəçi tapılmadı</p>
+        </div>
+      ) : (
+        <div className="card overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-white/[0.06]">
+                {['İstifadəçi', 'Rol', 'Şöbə', 'Status', 'Son giriş', ''].map(h => (
+                  <th key={h} className="text-left px-4 py-3 text-text-muted text-xs font-medium whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(u => (
+                <tr
+                  key={u.id}
+                  className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group"
+                >
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                        {(u.displayName || u.username).charAt(0).toUpperCase()}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-text-primary text-sm font-medium truncate flex items-center gap-2">
+                          {u.displayName || u.username}
+                          {u.mustChangePassword && (
+                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-yellow/10 text-accent-yellow border border-accent-yellow/20 flex-shrink-0">
+                              Şifrə dəyişdirin
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-text-muted text-xs">@{u.username}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <RoleBadge role={u.role} />
+                  </td>
+                  <td className="px-4 py-3 text-text-secondary text-xs">
+                    {u.department || '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={cn(
+                      'inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border',
+                      u.isActive
+                        ? 'bg-accent-green/10 text-accent-green border-accent-green/20'
+                        : 'bg-white/[0.04] text-text-muted border-white/[0.08]'
+                    )}>
+                      <span className={cn('w-1.5 h-1.5 rounded-full', u.isActive ? 'bg-accent-green' : 'bg-text-muted')} />
+                      {u.isActive ? 'Aktiv' : 'Deaktiv'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-text-muted text-xs whitespace-nowrap">
+                    {u.lastLoginAt
+                      ? new Date(u.lastLoginAt).toLocaleDateString('az-AZ', { day: 'numeric', month: 'short', year: 'numeric' })
+                      : '—'}
+                  </td>
+                  <td className="px-4 py-3">
+                    {isAdmin && u.id !== currentUser?.id && (
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button
+                          onClick={() => { setSelected(u); setModal('edit') }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all"
+                          title="Düzəlt"
+                        >
+                          <Edit2 size={13} />
+                        </button>
+                        <button
+                          onClick={() => { setSelected(u); setModal('reset') }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-yellow hover:bg-accent-yellow/10 transition-all"
+                          title="Şifrəni sıfırla"
+                        >
+                          <KeyRound size={13} />
+                        </button>
+                        <button
+                          onClick={() => { setSelected(u); setModal('delete') }}
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-all"
+                          title="Sil"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Modals */}
+      <Modal open={modal === 'create'} onClose={() => setModal(null)} title="Yeni İstifadəçi">
+        <UserForm
+          mode="create"
+          onSubmit={handleCreate}
+          onCancel={() => setModal(null)}
+          loading={saving}
+        />
+      </Modal>
+
+      <Modal
+        open={modal === 'edit'}
+        onClose={() => { setModal(null); setSelected(null) }}
+        title="İstifadəçini Düzəlt"
+      >
+        {selected && (
+          <UserForm
+            mode="edit"
+            initial={selected}
+            onSubmit={handleEdit}
+            onCancel={() => { setModal(null); setSelected(null) }}
+            loading={saving}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        open={modal === 'reset'}
+        onClose={() => { setModal(null); setSelected(null) }}
+        title="Şifrəni Sıfırla"
+      >
+        {selected && (
+          <ResetPasswordForm
+            user={selected}
+            onDone={() => { setModal(null); setSelected(null); fetchUsers() }}
+            onCancel={() => { setModal(null); setSelected(null) }}
+          />
+        )}
+      </Modal>
+
+      {/* Delete confirm */}
+      <Modal
+        open={modal === 'delete'}
+        onClose={() => { setModal(null); setSelected(null) }}
+        title="İstifadəçini Sil"
+      >
+        {selected && (
+          <div className="space-y-4">
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-accent-red/10 border border-accent-red/20">
+              <AlertCircle size={16} className="text-accent-red flex-shrink-0 mt-0.5" />
+              <div>
+                <div className="text-text-primary text-sm font-medium">
+                  &ldquo;{selected.displayName}&rdquo; silinəcək
+                </div>
+                <div className="text-text-secondary text-xs mt-0.5">
+                  Bu əməliyyat geri qaytarıla bilməz.
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setModal(null); setSelected(null) }}
+                className="btn-secondary flex-1 justify-center"
+              >
+                Ləğv et
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={saving}
+                className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all bg-accent-red/10 text-accent-red border border-accent-red/20 hover:bg-accent-red/20 disabled:opacity-50"
+              >
+                {saving ? <><Loader2 size={14} className="animate-spin" /> Silinir...</> : 'Sil'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Modal>
+    </div>
+  )
+}
+
+// ── Connection Tab ────────────────────────────────────────────────────────────
+
+function ConnectionTab() {
   const [tested, setTested] = useState<boolean | null>(null)
   const [testing, setTesting] = useState(false)
-
-  const scriptUrl = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL
-  const sheetUrl = process.env.NEXT_PUBLIC_SHEET_URL
-
-  const handleInit = async () => {
-    setInitializing(true)
-    const res = await sheetsApi.setup.init()
-    if (res.success) toast.success('Google Sheets uğurla inisializasiya edildi!')
-    else toast.error(res.error || 'Xəta baş verdi')
-    setInitializing(false)
-  }
 
   const handleTest = async () => {
     setTesting(true)
     setTested(null)
-    const res = await sheetsApi.projects.getAll()
+    const res = await db.projects.getAll()
     setTested(res.success)
     if (res.success) toast.success('Əlaqə uğurla yoxlandı!')
     else toast.error('Əlaqə qurula bilmədi: ' + res.error)
@@ -32,136 +624,97 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 animate-fade-in max-w-2xl">
+    <div className="space-y-4 max-w-xl">
+      <div className="card p-6 space-y-4">
+        <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          <Database size={18} className="text-accent-blue" />
+          Firebase Firestore
+        </h2>
+
+        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+          <div>
+            <div className="text-text-primary text-sm font-medium">Firebase Admin SDK</div>
+            <div className="text-text-muted text-xs mt-0.5">
+              <span className="text-accent-green flex items-center gap-1">
+                <CheckCircle size={11} /> Server tərəfindən konfiqurasiya edilib
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button
+            onClick={handleTest}
+            disabled={testing}
+            className="btn-secondary flex-1 justify-center disabled:opacity-40"
+          >
+            <RefreshCw size={14} className={testing ? 'animate-spin' : ''} />
+            {testing ? 'Yoxlanılır...' : 'Əlaqəni yoxla'}
+          </button>
+        </div>
+
+        {tested !== null && (
+          <div className={`flex items-center gap-2 text-sm p-3 rounded-xl ${tested
+            ? 'bg-accent-green/10 text-accent-green border border-accent-green/20'
+            : 'bg-accent-red/10 text-accent-red border border-accent-red/20'}`}>
+            {tested ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
+            {tested ? 'Firebase Firestore əlaqəsi uğurlu' : 'Əlaqə qurula bilmədi'}
+          </div>
+        )}
+      </div>
+
+      <div className="text-text-muted text-xs text-center">
+        BirTask v1.0.0 — Firebase Firestore ilə inteqrasiyalı layihə idarəetmə platforması
+      </div>
+    </div>
+  )
+}
+
+// ── Main Page ─────────────────────────────────────────────────────────────────
+
+type Tab = 'connection' | 'users'
+
+export default function SettingsPage() {
+  const { user } = useAuth()
+  const [tab, setTab] = useState<Tab>('connection')
+
+  const tabs: { id: Tab; label: string; icon: typeof Settings }[] = [
+    { id: 'connection', label: 'Əlaqə',        icon: Database },
+    { id: 'users',      label: 'İstifadəçilər', icon: Users },
+  ]
+
+  return (
+    <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
       <div>
         <h1 className="page-title">Parametrlər</h1>
         <p className="text-text-secondary text-sm mt-1">Platforma konfiqurasiyası</p>
       </div>
 
-      {/* Connection Status */}
-      <div className="card p-6 space-y-4">
-        <h2 className="font-semibold text-text-primary flex items-center gap-2">
-          <Database size={18} className="text-accent-blue" />
-          Google Sheets Əlaqəsi
-        </h2>
-
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-            <div>
-              <div className="text-text-primary text-sm font-medium">Apps Script URL</div>
-              <div className="text-text-muted text-xs mt-0.5">
-                {scriptUrl ? (
-                  <span className="text-accent-green flex items-center gap-1">
-                    <CheckCircle size={11} /> Konfiqurasiya edilib
-                  </span>
-                ) : (
-                  <span className="text-accent-red flex items-center gap-1">
-                    <AlertCircle size={11} /> .env.local faylında NEXT_PUBLIC_APPS_SCRIPT_URL lazımdır
-                  </span>
-                )}
-              </div>
-            </div>
-            {scriptUrl && (
-              <a href={scriptUrl} target="_blank" rel="noopener noreferrer"
-                className="text-accent-blue hover:text-blue-400 transition-colors">
-                <ExternalLink size={15} />
-              </a>
+      {/* Tab nav */}
+      <div className="flex gap-1 border-b border-white/[0.06] pb-0">
+        {tabs.map(({ id, label, icon: Icon }) => (
+          <button
+            key={id}
+            onClick={() => setTab(id)}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px',
+              tab === id
+                ? 'text-accent-blue border-accent-blue'
+                : 'text-text-secondary border-transparent hover:text-text-primary'
             )}
-          </div>
-
-          <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
-            <div>
-              <div className="text-text-primary text-sm font-medium">Google Sheets URL</div>
-              <div className="text-text-muted text-xs mt-0.5">
-                {sheetUrl ? (
-                  <span className="text-accent-green flex items-center gap-1">
-                    <CheckCircle size={11} /> Konfiqurasiya edilib
-                  </span>
-                ) : (
-                  <span className="text-text-muted">NEXT_PUBLIC_SHEET_URL (ixtiyari)</span>
-                )}
-              </div>
-            </div>
-            {sheetUrl && (
-              <a href={sheetUrl} target="_blank" rel="noopener noreferrer"
-                className="text-accent-blue hover:text-blue-400 transition-colors">
-                <ExternalLink size={15} />
-              </a>
+          >
+            <Icon size={15} />
+            {label}
+            {id === 'users' && user?.role === 'admin' && (
+              <ShieldCheck size={12} className="text-accent-purple opacity-70" />
             )}
-          </div>
-        </div>
-
-        <div className="flex gap-3">
-          <button onClick={handleTest} disabled={testing || !scriptUrl} className="btn-secondary flex-1 justify-center disabled:opacity-40">
-            <RefreshCw size={14} className={testing ? 'animate-spin' : ''} />
-            {testing ? 'Yoxlanılır...' : 'Əlaqəni yoxla'}
           </button>
-          <button onClick={handleInit} disabled={initializing || !scriptUrl} className="btn-primary flex-1 justify-center disabled:opacity-40">
-            <Database size={14} className={initializing ? 'animate-pulse' : ''} />
-            {initializing ? 'İnisializasiya...' : 'Sheet-i inisializasiya et'}
-          </button>
-        </div>
-
-        {tested !== null && (
-          <div className={`flex items-center gap-2 text-sm p-3 rounded-xl ${tested ? 'bg-accent-green/10 text-accent-green border border-accent-green/20' : 'bg-accent-red/10 text-accent-red border border-accent-red/20'}`}>
-            {tested ? <CheckCircle size={16} /> : <AlertCircle size={16} />}
-            {tested ? 'Əlaqə uğurla quruldu' : 'Əlaqə qurula bilmədi'}
-          </div>
-        )}
+        ))}
       </div>
 
-      {/* Setup Guide */}
-      <div className="card p-6 space-y-4">
-        <h2 className="font-semibold text-text-primary flex items-center gap-2">
-          <Settings size={18} className="text-accent-purple" />
-          Quraşdırma Bələdçisi
-        </h2>
-
-        <ol className="space-y-4">
-          {[
-            {
-              n: 1,
-              title: 'Yeni Google Sheet yaradın',
-              desc: 'Google Drive-da yeni bir spreadsheet yaradın.',
-            },
-            {
-              n: 2,
-              title: 'Apps Script-i əlavə edin',
-              desc: 'Sheet-də Extensions > Apps Script açın. apps-script/Code.gs faylının məzmununu yapışdırın.',
-            },
-            {
-              n: 3,
-              title: 'Web App kimi deploy edin',
-              desc: 'Deploy > New Deployment > Web App seçin. "Execute as: Me", "Access: Anyone" seçin. URL-i kopyalayın.',
-            },
-            {
-              n: 4,
-              title: '.env.local faylını yaradın',
-              desc: 'Layihə qovluğunda .env.local faylı yaradın:\nNEXT_PUBLIC_APPS_SCRIPT_URL=sizin-url\nNEXT_PUBLIC_SHEET_URL=sizin-sheet-url',
-            },
-            {
-              n: 5,
-              title: 'Sheet-i inisializasiya edin',
-              desc: 'Yuxarıdakı "Sheet-i inisializasiya et" düyməsini basın. Bu, bütün lazımi cədvəlləri avtomatik yaradacaq.',
-            },
-          ].map(step => (
-            <li key={step.n} className="flex gap-4">
-              <div className="w-7 h-7 rounded-full bg-accent-blue/10 border border-accent-blue/20 flex items-center justify-center text-accent-blue text-xs font-bold flex-shrink-0 mt-0.5">
-                {step.n}
-              </div>
-              <div>
-                <div className="text-text-primary text-sm font-medium">{step.title}</div>
-                <div className="text-text-secondary text-xs mt-1 whitespace-pre-line leading-relaxed">{step.desc}</div>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </div>
-
-      {/* Info */}
-      <div className="text-text-muted text-xs text-center">
-        BirTask v0.1.0 — Google Sheets ilə inteqrasiyalı layihə idarəetmə platforması
-      </div>
+      {/* Tab content */}
+      {tab === 'connection' && <ConnectionTab />}
+      {tab === 'users'      && <UsersTab />}
     </div>
   )
 }

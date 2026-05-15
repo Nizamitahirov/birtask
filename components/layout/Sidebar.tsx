@@ -6,10 +6,13 @@ import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
   Users, Settings, ChevronLeft, ChevronRight,
-  Zap, ExternalLink, Sun, Moon, Map, CalendarDays
+  Zap, Sun, Moon, Map, CalendarDays, LogOut,
+  Shield, UserCog, UserCheck, Eye
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
+import { useAuth } from '@/contexts/AuthContext'
+import { UserRole } from '@/lib/types'
 
 const navItems = [
   { href: '/',          label: 'İdarə Paneli', icon: LayoutDashboard },
@@ -21,10 +24,37 @@ const navItems = [
   { href: '/settings',  label: 'Parametrlər',  icon: Settings },
 ]
 
+const ROLE_LABELS: Record<string, string> = {
+  admin:   'Admin',
+  manager: 'Menecer',
+  member:  'Üzv',
+  viewer:  'İzləyici',
+}
+
+const ROLE_ICONS: Record<string, typeof Shield> = {
+  admin:   Shield,
+  manager: UserCog,
+  member:  UserCheck,
+  viewer:  Eye,
+}
+
+const ROLE_COLORS: Record<string, string> = {
+  admin:   'text-accent-purple',
+  manager: 'text-accent-blue',
+  member:  'text-accent-green',
+  viewer:  'text-text-muted',
+}
+
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false)
   const pathname = usePathname()
   const { theme, toggle } = useTheme()
+  const { user, logout } = useAuth()
+
+  const roleIcon = user?.role ? ROLE_ICONS[user.role] || UserCheck : UserCheck
+  const RoleIcon = roleIcon
+  const roleColor = user?.role ? ROLE_COLORS[user.role] || 'text-text-muted' : 'text-text-muted'
+  const roleLabel = user?.role ? ROLE_LABELS[user.role] || user.role : ''
 
   return (
     <aside
@@ -114,22 +144,56 @@ export function Sidebar() {
         </button>
       </div>
 
-      {/* Google Sheets link */}
-      {process.env.NEXT_PUBLIC_SHEET_URL && !collapsed && (
-        <div className="p-3">
-          <a
-            href={process.env.NEXT_PUBLIC_SHEET_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-3 py-2.5 rounded-xl text-text-secondary hover:text-text-primary transition-all text-xs group"
-            style={{ background: 'var(--surface-1)', border: '1px solid var(--border)' }}
-          >
-            <div className="w-4 h-4 bg-green-500 rounded flex items-center justify-center flex-shrink-0">
-              <span className="text-white text-[8px] font-bold">G</span>
+      {/* User info + logout */}
+      {user && (
+        <div
+          className="px-2 pb-3 pt-2"
+          style={{ borderTop: '1px solid var(--border)' }}
+        >
+          {collapsed ? (
+            /* Collapsed: just avatar + logout button stacked */
+            <div className="flex flex-col items-center gap-1">
+              <div
+                className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
+                title={user.displayName || user.username}
+              >
+                {(user.displayName || user.username).charAt(0).toUpperCase()}
+              </div>
+              <button
+                onClick={logout}
+                title="Çıxış"
+                className="w-8 h-8 rounded-xl flex items-center justify-center text-text-muted hover:text-accent-red hover:bg-accent-red/10 transition-all"
+              >
+                <LogOut size={14} />
+              </button>
             </div>
-            <span className="flex-1">Google Sheets</span>
-            <ExternalLink size={12} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-          </a>
+          ) : (
+            /* Expanded: full user card */
+            <div
+              className="rounded-xl p-3 flex items-center gap-2.5 group"
+              style={{ background: 'var(--surface-1)', border: '1px solid var(--border)' }}
+            >
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                {(user.displayName || user.username).charAt(0).toUpperCase()}
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-text-primary text-xs font-semibold truncate">
+                  {user.displayName || user.username}
+                </div>
+                <div className={cn('flex items-center gap-1 text-[10px] mt-0.5', roleColor)}>
+                  <RoleIcon size={9} />
+                  <span>{roleLabel}</span>
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                title="Çıxış"
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-accent-red hover:bg-accent-red/10 transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
+              >
+                <LogOut size={13} />
+              </button>
+            </div>
+          )}
         </div>
       )}
 
