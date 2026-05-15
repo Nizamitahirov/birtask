@@ -86,9 +86,9 @@ export default function ActivityPage() {
   const [actionFilter, setActionFilter] = useState<string>('Hamısı')
   const [entityFilter, setEntityFilter] = useState<string>('Hamısı')
 
-  const now = new Date()
-  const [selectedYear, setSelectedYear] = useState(now.getFullYear())
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null) // null = all months
+  const currentYear = new Date().getFullYear()
+  const [selectedYear, setSelectedYear] = useState(currentYear)
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
 
   const fetchLogs = async () => {
     setLoading(true)
@@ -104,9 +104,9 @@ export default function ActivityPage() {
   const availableYears = useMemo(() => {
     const years = new Set<number>()
     logs.forEach(l => years.add(new Date(l.createdAt).getFullYear()))
-    years.add(now.getFullYear())
+    years.add(currentYear)
     return Array.from(years).sort((a, b) => b - a)
-  }, [logs, now])
+  }, [logs, currentYear])
 
   const filtered = useMemo(() => {
     return logs.filter(l => {
