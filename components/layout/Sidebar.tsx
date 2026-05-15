@@ -14,6 +14,7 @@ import { useTheme } from '@/hooks/useTheme'
 import { useAuth } from '@/contexts/AuthContext'
 import { UserRole } from '@/lib/types'
 import { NotificationBell } from '@/components/ui/NotificationBell'
+import { GlobalSearchTrigger } from '@/components/ui/GlobalSearch'
 
 const navItems = [
   { href: '/',          label: 'İdarə Paneli', icon: LayoutDashboard },
@@ -123,6 +124,11 @@ export function Sidebar() {
           )
         })}
       </nav>
+
+      {/* Global search trigger */}
+      <div className="px-2 pb-1">
+        <GlobalSearchTrigger collapsed={collapsed} />
+      </div>
 
       {/* Notification bell */}
       <div className="px-2 pb-1">

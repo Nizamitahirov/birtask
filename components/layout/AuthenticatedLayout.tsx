@@ -3,6 +3,7 @@
 import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Sidebar } from '@/components/layout/Sidebar'
+import { GlobalSearch } from '@/components/ui/GlobalSearch'
 import { Loader2 } from 'lucide-react'
 
 export function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
@@ -30,6 +31,7 @@ export function AuthenticatedLayout({ children }: { children: React.ReactNode })
       <main className="flex-1 overflow-auto">
         {children}
       </main>
+      <GlobalSearch />
     </div>
   )
 }

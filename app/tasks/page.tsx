@@ -15,6 +15,7 @@ import { cn, formatDateShort, getDaysLeft } from '@/lib/utils'
 
 const STATUS_COLUMNS: TaskStatus[] = ['Gözləyir', 'Davam edir', 'Yoxlanılır', 'Tamamlandı']
 const PRIORITY_FILTERS = ['Hamısı', 'Kritik', 'Yüksək', 'Orta', 'Aşağı']
+const STATUS_FILTER_OPTIONS: TaskStatus[] = ['Gözləyir', 'Davam edir', 'Yoxlanılır', 'Tamamlandı']
 
 const STATUS_COLORS: Record<TaskStatus, string> = {
   'Gözləyir': '#94A3B8',
@@ -30,6 +31,8 @@ export default function TasksPage() {
   const [search, setSearch] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('Hamısı')
   const [projectFilter, setProjectFilter] = useState('Hamısı')
+  const [statusFilters, setStatusFilters] = useState<TaskStatus[]>([])
+  const [assigneeFilter, setAssigneeFilter] = useState('Hamısı')
   const [view, setView] = useState<'kanban' | 'grid' | 'list' | 'calendar'>('kanban')
   const [calMonth, setCalMonth] = useState(() => {
     const now = new Date()
@@ -47,8 +50,30 @@ export default function TasksPage() {
       t.description?.toLowerCase().includes(search.toLowerCase())
     const matchPriority = priorityFilter === 'Hamısı' || t.priority === priorityFilter
     const matchProject = projectFilter === 'Hamısı' || t.projectId === projectFilter
-    return matchSearch && matchPriority && matchProject
+    const matchStatus = statusFilters.length === 0 || statusFilters.includes(t.status)
+    const matchAssignee = assigneeFilter === 'Hamısı' || t.assignee === assigneeFilter
+    return matchSearch && matchPriority && matchProject && matchStatus && matchAssignee
   })
+
+  const hasActiveFilters = statusFilters.length > 0 || assigneeFilter !== 'Hamısı' ||
+    priorityFilter !== 'Hamısı' || projectFilter !== 'Hamısı' || search !== ''
+
+  const resetFilters = () => {
+    setSearch('')
+    setPriorityFilter('Hamısı')
+    setProjectFilter('Hamısı')
+    setStatusFilters([])
+    setAssigneeFilter('Hamısı')
+  }
+
+  const toggleStatusFilter = (status: TaskStatus) => {
+    setStatusFilters(prev =>
+      prev.includes(status) ? prev.filter(s => s !== status) : [...prev, status]
+    )
+  }
+
+  // Unique assignees from all tasks
+  const assigneeOptions = Array.from(new Set(tasks.map(t => t.assignee).filter(Boolean)))
 
   const handleCreate = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     setSaving(true)
@@ -133,27 +158,72 @@ export default function TasksPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
-        <div className="relative max-w-xs w-full">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            className="input pl-9"
-            placeholder="Tapşırıq axtar..."
-          />
+      <div className="space-y-3">
+        {/* Row 1: search, project, view toggle */}
+        <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
+          <div className="relative max-w-xs w-full">
+            <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-muted" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="input pl-9"
+              placeholder="Tapşırıq axtar..."
+            />
+          </div>
+
+          <select
+            value={projectFilter}
+            onChange={e => setProjectFilter(e.target.value)}
+            className="select max-w-[180px]"
+          >
+            <option value="Hamısı">Bütün layihələr</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+
+          {/* Assignee filter */}
+          <select
+            value={assigneeFilter}
+            onChange={e => setAssigneeFilter(e.target.value)}
+            className="select max-w-[180px]"
+          >
+            <option value="Hamısı">Bütün icraçılar</option>
+            {assigneeOptions.map(a => <option key={a} value={a}>{a}</option>)}
+          </select>
+
+          <div className="flex gap-1 ml-auto">
+            {([['kanban', Columns], ['grid', LayoutGrid], ['list', List], ['calendar', CalendarDays]] as const).map(([v, Icon]) => (
+              <button
+                key={v}
+                onClick={() => setView(v)}
+                title={v === 'kanban' ? 'Kanban' : v === 'grid' ? 'Grid' : v === 'list' ? 'Siyahı' : 'Təqvim'}
+                className={cn('w-8 h-8 rounded-lg flex items-center justify-center transition-all',
+                  view === v ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+              >
+                <Icon size={15} />
+              </button>
+            ))}
+          </div>
         </div>
 
-        <select
-          value={projectFilter}
-          onChange={e => setProjectFilter(e.target.value)}
-          className="select max-w-[180px]"
-        >
-          <option value="Hamısı">Bütün layihələr</option>
-          {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-        </select>
+        {/* Row 2: status chips + priority chips + reset */}
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-text-muted font-medium">Status:</span>
+          {STATUS_FILTER_OPTIONS.map(s => (
+            <button
+              key={s}
+              onClick={() => toggleStatusFilter(s)}
+              className={cn(
+                'px-3 py-1.5 rounded-lg text-xs font-medium transition-all border',
+                statusFilters.includes(s)
+                  ? 'bg-accent-blue/15 text-accent-blue border-accent-blue/30'
+                  : 'text-text-secondary border-transparent hover:text-text-primary hover:bg-white/[0.06]'
+              )}
+            >
+              {s}
+            </button>
+          ))}
 
-        <div className="flex gap-1 flex-wrap">
+          <span className="text-xs text-text-muted font-medium ml-2">Prioritet:</span>
           {PRIORITY_FILTERS.map(p => (
             <button
               key={p}
@@ -168,20 +238,15 @@ export default function TasksPage() {
               {p}
             </button>
           ))}
-        </div>
 
-        <div className="flex gap-1 ml-auto">
-          {([['kanban', Columns], ['grid', LayoutGrid], ['list', List], ['calendar', CalendarDays]] as const).map(([v, Icon]) => (
+          {hasActiveFilters && (
             <button
-              key={v}
-              onClick={() => setView(v)}
-              title={v === 'kanban' ? 'Kanban' : v === 'grid' ? 'Grid' : v === 'list' ? 'Siyahı' : 'Təqvim'}
-              className={cn('w-8 h-8 rounded-lg flex items-center justify-center transition-all',
-                view === v ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+              onClick={resetFilters}
+              className="ml-auto text-xs text-accent-red hover:underline transition-all px-2 py-1.5"
             >
-              <Icon size={15} />
+              Filtrləri sıfırla
             </button>
-          ))}
+          )}
         </div>
       </div>
 
