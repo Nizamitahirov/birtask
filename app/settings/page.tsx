@@ -7,7 +7,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import {
   Settings, Database, CheckCircle, AlertCircle, RefreshCw,
   Users, Plus, Edit2, Trash2, KeyRound, Search, ShieldCheck,
-  UserCheck, Eye, EyeOff, Loader2, X, Shield, UserCog
+  UserCheck, Eye, EyeOff, Loader2, X, Shield, UserCog,
+  Download, Upload, FileText, FileJson, Package
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -670,17 +671,384 @@ function ConnectionTab() {
   )
 }
 
+// ── Export / Import Tab ───────────────────────────────────────────────────────
+
+function ExportImportTab() {
+  const [exportingProjects, setExportingProjects] = useState(false)
+  const [exportingTasks, setExportingTasks] = useState(false)
+  const [exportingBackup, setExportingBackup] = useState(false)
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importType, setImportType] = useState<'projects-csv' | 'tasks-csv' | 'json' | null>(null)
+  const [preview, setPreview] = useState<string[][] | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [importProgress, setImportProgress] = useState(0)
+
+  function objectsToCsv(rows: Record<string, unknown>[]): string {
+    if (rows.length === 0) return ''
+    const headers = Object.keys(rows[0])
+    const lines = [
+      headers.join(','),
+      ...rows.map(r =>
+        headers.map(h => {
+          const v = String(r[h] ?? '')
+          return v.includes(',') || v.includes('"') || v.includes('\n')
+            ? `"${v.replace(/"/g, '""')}"`
+            : v
+        }).join(',')
+      ),
+    ]
+    return lines.join('\n')
+  }
+
+  function downloadBlob(content: string, filename: string, mime: string) {
+    const blob = new Blob([content], { type: mime })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function parseCsv(text: string): string[][] {
+    const lines = text.trim().split('\n')
+    return lines.map(line => {
+      const cells: string[] = []
+      let current = ''
+      let inQuotes = false
+      for (let i = 0; i < line.length; i++) {
+        const ch = line[i]
+        if (ch === '"' && !inQuotes) { inQuotes = true; continue }
+        if (ch === '"' && inQuotes && line[i + 1] === '"') { current += '"'; i++; continue }
+        if (ch === '"' && inQuotes) { inQuotes = false; continue }
+        if (ch === ',' && !inQuotes) { cells.push(current); current = ''; continue }
+        current += ch
+      }
+      cells.push(current)
+      return cells
+    })
+  }
+
+  const handleExportProjects = async () => {
+    setExportingProjects(true)
+    const res = await db.projects.getAll()
+    if (res.success && res.data) {
+      const csv = objectsToCsv(res.data as unknown as Record<string, unknown>[])
+      downloadBlob(csv, `layiheler_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv')
+      toast.success('Layihələr ixrac edildi')
+    } else {
+      toast.error(res.error || 'İxrac xətası')
+    }
+    setExportingProjects(false)
+  }
+
+  const handleExportTasks = async () => {
+    setExportingTasks(true)
+    const res = await db.tasks.getAll()
+    if (res.success && res.data) {
+      const csv = objectsToCsv(res.data as unknown as Record<string, unknown>[])
+      downloadBlob(csv, `tapshiriqlar_${new Date().toISOString().split('T')[0]}.csv`, 'text/csv')
+      toast.success('Tapşırıqlar ixrac edildi')
+    } else {
+      toast.error(res.error || 'İxrac xətası')
+    }
+    setExportingTasks(false)
+  }
+
+  const handleExportBackup = async () => {
+    setExportingBackup(true)
+    const [pRes, tRes, mRes] = await Promise.all([
+      db.projects.getAll(),
+      db.tasks.getAll(),
+      db.team.getAll(),
+    ])
+    const backup = {
+      exportedAt: new Date().toISOString(),
+      version: '1.0',
+      projects: pRes.data || [],
+      tasks: tRes.data || [],
+      team: mRes.data || [],
+    }
+    downloadBlob(
+      JSON.stringify(backup, null, 2),
+      `birtask_backup_${new Date().toISOString().split('T')[0]}.json`,
+      'application/json'
+    )
+    toast.success('Tam yedəklə ixrac edildi')
+    setExportingBackup(false)
+  }
+
+  const handleFileSelect = (file: File, type: 'projects-csv' | 'tasks-csv' | 'json') => {
+    setImportFile(file)
+    setImportType(type)
+    setPreview(null)
+
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const text = e.target?.result as string
+      if (type === 'json') {
+        try {
+          const parsed = JSON.parse(text)
+          const info: string[][] = [
+            ['Sahə', 'Say'],
+            ['Layihələr', String((parsed.projects || []).length)],
+            ['Tapşırıqlar', String((parsed.tasks || []).length)],
+            ['Komanda', String((parsed.team || []).length)],
+            ['Tarix', parsed.exportedAt || 'Bilinmir'],
+          ]
+          setPreview(info)
+        } catch {
+          toast.error('Keçərsiz JSON fayl')
+          setImportFile(null)
+        }
+      } else {
+        const rows = parseCsv(text)
+        setPreview(rows.slice(0, 4))
+      }
+    }
+    reader.readAsText(file)
+  }
+
+  const handleImport = async () => {
+    if (!importFile || !importType) return
+    setImporting(true)
+    setImportProgress(0)
+
+    const reader = new FileReader()
+    reader.onload = async (e) => {
+      const text = e.target?.result as string
+      try {
+        if (importType === 'json') {
+          const backup = JSON.parse(text)
+          const projects: Record<string, unknown>[] = backup.projects || []
+          const tasks: Record<string, unknown>[] = backup.tasks || []
+          const team: Record<string, unknown>[] = backup.team || []
+          const total = projects.length + tasks.length + team.length
+          let done = 0
+
+          for (const proj of projects) {
+            const { id: _pid, createdAt: _pca, ...rest } = proj as Record<string, unknown>
+            void _pid; void _pca
+            await db.projects.create(rest as Parameters<typeof db.projects.create>[0])
+            done++
+            setImportProgress(Math.round((done / total) * 100))
+          }
+          for (const task of tasks) {
+            const { id: _tid, createdAt: _tca, updatedAt: _tua, ...rest } = task as Record<string, unknown>
+            void _tid; void _tca; void _tua
+            await db.tasks.create(rest as Parameters<typeof db.tasks.create>[0])
+            done++
+            setImportProgress(Math.round((done / total) * 100))
+          }
+          for (const member of team) {
+            const { id: _mid, createdAt: _mca, ...rest } = member as Record<string, unknown>
+            void _mid; void _mca
+            await db.team.create(rest as Parameters<typeof db.team.create>[0])
+            done++
+            setImportProgress(Math.round((done / total) * 100))
+          }
+          toast.success(`Yedəklə idxal edildi: ${projects.length} layihə, ${tasks.length} tapşırıq, ${team.length} üzv`)
+        } else if (importType === 'projects-csv') {
+          const rows = parseCsv(text)
+          if (rows.length < 2) { toast.error('CSV boşdur'); return }
+          const headers = rows[0]
+          const dataRows = rows.slice(1)
+          for (let i = 0; i < dataRows.length; i++) {
+            const row = dataRows[i]
+            const obj: Record<string, string> = {}
+            headers.forEach((h, idx) => { obj[h] = row[idx] || '' })
+            const { id: _id, createdAt: _ca, ...rest } = obj
+            void _id; void _ca
+            await db.projects.create(rest as Parameters<typeof db.projects.create>[0])
+            setImportProgress(Math.round(((i + 1) / dataRows.length) * 100))
+          }
+          toast.success(`${dataRows.length} layihə idxal edildi`)
+        } else if (importType === 'tasks-csv') {
+          const rows = parseCsv(text)
+          if (rows.length < 2) { toast.error('CSV boşdur'); return }
+          const headers = rows[0]
+          const dataRows = rows.slice(1)
+          for (let i = 0; i < dataRows.length; i++) {
+            const row = dataRows[i]
+            const obj: Record<string, string> = {}
+            headers.forEach((h, idx) => { obj[h] = row[idx] || '' })
+            const { id: _tid2, createdAt: _ca2, updatedAt: _ua2, ...rest } = obj
+            void _tid2; void _ca2; void _ua2
+            await db.tasks.create(rest as Parameters<typeof db.tasks.create>[0])
+            setImportProgress(Math.round(((i + 1) / dataRows.length) * 100))
+          }
+          toast.success(`${dataRows.length} tapşırıq idxal edildi`)
+        }
+        setImportFile(null)
+        setPreview(null)
+        setImportType(null)
+      } catch (err) {
+        toast.error('İdxal xətası: ' + (err instanceof Error ? err.message : 'Bilinməyən xəta'))
+      }
+      setImporting(false)
+      setImportProgress(0)
+    }
+    reader.readAsText(importFile)
+  }
+
+  return (
+    <div className="space-y-6 max-w-2xl">
+      {/* Export section */}
+      <div className="card p-6 space-y-4">
+        <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          <Download size={18} className="text-accent-blue" />
+          Məlumatları İxrac Et
+        </h2>
+        <p className="text-text-muted text-sm">Bütün layihə məlumatlarını CSV və ya JSON formatında yükləyin.</p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <button
+            onClick={handleExportProjects}
+            disabled={exportingProjects}
+            className="btn-secondary justify-center disabled:opacity-50"
+          >
+            {exportingProjects
+              ? <Loader2 size={14} className="animate-spin" />
+              : <FileText size={14} className="text-accent-green" />}
+            Layihələr CSV
+          </button>
+          <button
+            onClick={handleExportTasks}
+            disabled={exportingTasks}
+            className="btn-secondary justify-center disabled:opacity-50"
+          >
+            {exportingTasks
+              ? <Loader2 size={14} className="animate-spin" />
+              : <FileText size={14} className="text-accent-blue" />}
+            Tapşırıqlar CSV
+          </button>
+          <button
+            onClick={handleExportBackup}
+            disabled={exportingBackup}
+            className="btn-primary justify-center disabled:opacity-50"
+          >
+            {exportingBackup
+              ? <Loader2 size={14} className="animate-spin" />
+              : <Package size={14} />}
+            Tam Yedəklə (JSON)
+          </button>
+        </div>
+      </div>
+
+      {/* Import section */}
+      <div className="card p-6 space-y-4">
+        <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          <Upload size={18} className="text-accent-purple" />
+          Məlumatları İdxal Et
+        </h2>
+        <p className="text-text-muted text-sm">CSV və ya JSON faylından məlumat idxal edin. Mövcud məlumatlar dəyişdirilməyəcək — yeni qeydlər əlavə olunacaq.</p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {[
+            { type: 'projects-csv' as const, label: 'Layihələr CSV', icon: FileText, color: 'text-accent-green', accept: '.csv' },
+            { type: 'tasks-csv' as const,    label: 'Tapşırıqlar CSV', icon: FileText, color: 'text-accent-blue', accept: '.csv' },
+            { type: 'json' as const,         label: 'JSON Yedəklə',    icon: FileJson, color: 'text-accent-purple', accept: '.json' },
+          ].map(({ type, label, icon: Icon, color, accept }) => (
+            <label key={type} className="btn-secondary justify-center cursor-pointer">
+              <Icon size={14} className={color} />
+              {label}
+              <input
+                type="file"
+                accept={accept}
+                className="sr-only"
+                onChange={e => {
+                  const file = e.target.files?.[0]
+                  if (file) handleFileSelect(file, type)
+                  e.target.value = ''
+                }}
+              />
+            </label>
+          ))}
+        </div>
+
+        {/* Preview */}
+        {importFile && preview && (
+          <div className="rounded-xl overflow-hidden border border-white/[0.08]">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-white/[0.03]">
+              <div className="flex items-center gap-2 text-sm">
+                <FileText size={14} className="text-accent-blue" />
+                <span className="text-text-primary font-medium">{importFile.name}</span>
+                <span className="text-text-muted text-xs">({Math.round(importFile.size / 1024)} KB)</span>
+              </div>
+              <button
+                onClick={() => { setImportFile(null); setPreview(null); setImportType(null) }}
+                className="text-text-muted hover:text-text-primary"
+              >
+                <X size={14} />
+              </button>
+            </div>
+            <div className="p-3 overflow-x-auto">
+              <p className="text-text-muted text-xs mb-2 font-medium">
+                {importType === 'json' ? 'Yedəklə məzmunu:' : 'İlk 3 sətir önizləmə:'}
+              </p>
+              <table className="text-xs w-full">
+                {preview.map((row, ri) => (
+                  <tr key={ri} className={ri === 0 ? 'font-semibold text-text-primary' : 'text-text-secondary'}>
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="px-2 py-1 border-b border-white/[0.04] max-w-[160px] truncate">
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </table>
+            </div>
+
+            {/* Progress */}
+            {importing && (
+              <div className="px-4 pb-3">
+                <div className="flex justify-between text-xs text-text-muted mb-1">
+                  <span>İdxal edilir...</span>
+                  <span>{importProgress}%</span>
+                </div>
+                <div className="progress-bar">
+                  <div className="progress-fill bg-accent-blue" style={{ width: `${importProgress}%` }} />
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 px-4 pb-4">
+              <button
+                onClick={() => { setImportFile(null); setPreview(null); setImportType(null) }}
+                className="btn-secondary flex-1 justify-center"
+                disabled={importing}
+              >
+                Ləğv et
+              </button>
+              <button
+                onClick={handleImport}
+                disabled={importing}
+                className="btn-primary flex-1 justify-center disabled:opacity-50"
+              >
+                {importing
+                  ? <><Loader2 size={14} className="animate-spin" /> İdxal edilir...</>
+                  : <><Upload size={14} /> İdxal et</>}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'connection' | 'users'
+type Tab = 'connection' | 'users' | 'export'
 
 export default function SettingsPage() {
   const { user } = useAuth()
   const [tab, setTab] = useState<Tab>('connection')
 
   const tabs: { id: Tab; label: string; icon: typeof Settings }[] = [
-    { id: 'connection', label: 'Əlaqə',        icon: Database },
-    { id: 'users',      label: 'İstifadəçilər', icon: Users },
+    { id: 'connection', label: 'Əlaqə',         icon: Database },
+    { id: 'users',      label: 'İstifadəçilər',  icon: Users },
+    { id: 'export',     label: 'Export / Import', icon: Download },
   ]
 
   return (
@@ -691,13 +1059,13 @@ export default function SettingsPage() {
       </div>
 
       {/* Tab nav */}
-      <div className="flex gap-1 border-b border-white/[0.06] pb-0">
+      <div className="flex gap-1 border-b border-white/[0.06] pb-0 overflow-x-auto">
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
             className={cn(
-              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px',
+              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px whitespace-nowrap',
               tab === id
                 ? 'text-accent-blue border-accent-blue'
                 : 'text-text-secondary border-transparent hover:text-text-primary'
@@ -715,6 +1083,7 @@ export default function SettingsPage() {
       {/* Tab content */}
       {tab === 'connection' && <ConnectionTab />}
       {tab === 'users'      && <UsersTab />}
+      {tab === 'export'     && <ExportImportTab />}
     </div>
   )
 }

@@ -189,6 +189,26 @@ select option {
 /* ── Kanban drag ─────────────────────────────────────────────── */
 .dragging { opacity: 0.5; transform: scale(0.98); }
 
+/* ── Mobile utilities ────────────────────────────────────────── */
+@media (max-width: 767px) {
+  /* Make kanban boards and tables horizontally scrollable */
+  .kanban-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  /* Ensure tables don't overflow page width */
+  .card table {
+    min-width: 560px;
+  }
+  /* Comfortable page padding on mobile */
+  .p-6 {
+    padding: 1rem !important;
+  }
+  .p-6.lg\:p-8 {
+    padding: 1rem !important;
+  }
+}
+
 /* ── Light mode: override inline Tailwind white-alpha utils ─── */
 [data-theme="light"] .bg-white\/\[0\.03\] { background: var(--surface-1) !important; }
 [data-theme="light"] .bg-white\/\[0\.04\] { background: var(--surface-2) !important; }

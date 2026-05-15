@@ -1,13 +1,14 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
   LayoutDashboard, FolderKanban, CheckSquare,
   Users, Settings, ChevronLeft, ChevronRight,
   Zap, Sun, Moon, Map, CalendarDays, LogOut,
-  Shield, UserCog, UserCheck, Eye, Activity
+  Shield, UserCog, UserCheck, Eye, Activity,
+  Repeat, BarChart2, Menu, X
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
@@ -17,14 +18,16 @@ import { NotificationBell } from '@/components/ui/NotificationBell'
 import { GlobalSearchTrigger } from '@/components/ui/GlobalSearch'
 
 const navItems = [
-  { href: '/',          label: 'İdarə Paneli', icon: LayoutDashboard },
-  { href: '/projects',  label: 'Layihələr',    icon: FolderKanban },
-  { href: '/tasks',     label: 'Tapşırıqlar',  icon: CheckSquare },
-  { href: '/calendar',  label: 'Təqvim',       icon: CalendarDays },
-  { href: '/roadmap',   label: 'Yol Xəritəsi', icon: Map },
-  { href: '/team',      label: 'Komanda',      icon: Users },
-  { href: '/activity',  label: 'Aktivlik',     icon: Activity },
-  { href: '/settings',  label: 'Parametrlər',  icon: Settings },
+  { href: '/',           label: 'İdarə Paneli',       icon: LayoutDashboard },
+  { href: '/projects',   label: 'Layihələr',           icon: FolderKanban },
+  { href: '/tasks',      label: 'Tapşırıqlar',         icon: CheckSquare },
+  { href: '/calendar',   label: 'Təqvim',              icon: CalendarDays },
+  { href: '/roadmap',    label: 'Yol Xəritəsi',        icon: Map },
+  { href: '/recurring',  label: 'Təkrarlanan',         icon: Repeat },
+  { href: '/analytics',  label: 'Analitika',           icon: BarChart2 },
+  { href: '/team',       label: 'Komanda',             icon: Users },
+  { href: '/activity',   label: 'Aktivlik',            icon: Activity },
+  { href: '/settings',   label: 'Parametrlər',         icon: Settings },
 ]
 
 const ROLE_LABELS: Record<string, string> = {
@@ -48,8 +51,15 @@ const ROLE_COLORS: Record<string, string> = {
   viewer:  'text-text-muted',
 }
 
-export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false)
+// ── Inner nav content (shared between desktop and mobile overlay) ─────────────
+
+function NavContent({
+  collapsed,
+  onLinkClick,
+}: {
+  collapsed: boolean
+  onLinkClick?: () => void
+}) {
   const pathname = usePathname()
   const { theme, toggle } = useTheme()
   const { user, logout } = useAuth()
@@ -60,13 +70,7 @@ export function Sidebar() {
   const roleLabel = user?.role ? ROLE_LABELS[user.role] || user.role : ''
 
   return (
-    <aside
-      className={cn(
-        'relative flex flex-col h-full border-r transition-all duration-300 ease-in-out z-50',
-        collapsed ? 'w-[68px]' : 'w-[240px]'
-      )}
-      style={{ background: 'rgb(var(--bg-secondary))', borderColor: 'var(--border)' }}
-    >
+    <>
       {/* Logo */}
       <div
         className={cn(
@@ -98,6 +102,7 @@ export function Sidebar() {
               key={href}
               href={href}
               title={collapsed ? label : undefined}
+              onClick={onLinkClick}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative',
                 active
@@ -164,7 +169,6 @@ export function Sidebar() {
           style={{ borderTop: '1px solid var(--border)' }}
         >
           {collapsed ? (
-            /* Collapsed: just avatar + logout button stacked */
             <div className="flex flex-col items-center gap-1">
               <div
                 className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
@@ -181,7 +185,6 @@ export function Sidebar() {
               </button>
             </div>
           ) : (
-            /* Expanded: full user card */
             <div
               className="rounded-xl p-3 flex items-center gap-2.5 group"
               style={{ background: 'var(--surface-1)', border: '1px solid var(--border)' }}
@@ -209,15 +212,89 @@ export function Sidebar() {
           )}
         </div>
       )}
+    </>
+  )
+}
 
-      {/* Collapse btn */}
+// ── Sidebar ───────────────────────────────────────────────────────────────────
+
+export function Sidebar() {
+  const [collapsed, setCollapsed] = useState(false)
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const pathname = usePathname()
+
+  // Close mobile sidebar on route change
+  useEffect(() => {
+    setMobileOpen(false)
+  }, [pathname])
+
+  // Prevent body scroll when mobile sidebar is open
+  useEffect(() => {
+    if (mobileOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => { document.body.style.overflow = '' }
+  }, [mobileOpen])
+
+  return (
+    <>
+      {/* ── Mobile hamburger button (fixed, top-left) ── */}
       <button
-        onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-6 w-6 h-6 rounded-full flex items-center justify-center text-text-secondary hover:text-text-primary transition-all duration-200 z-10"
+        onClick={() => setMobileOpen(true)}
+        className="md:hidden fixed top-4 left-4 z-40 w-9 h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-text-primary transition-all shadow-lg"
         style={{ background: 'rgb(var(--bg-card))', border: '1px solid var(--border)' }}
+        aria-label="Menyüyü aç"
       >
-        {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+        <Menu size={18} />
       </button>
-    </aside>
+
+      {/* ── Mobile overlay backdrop ── */}
+      {mobileOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* ── Mobile sidebar (overlay) ── */}
+      <aside
+        className={cn(
+          'md:hidden fixed inset-y-0 left-0 z-50 w-[260px] flex flex-col transition-transform duration-300',
+          mobileOpen ? 'translate-x-0' : '-translate-x-full'
+        )}
+        style={{ background: 'rgb(var(--bg-secondary))', borderRight: '1px solid var(--border)' }}
+      >
+        {/* Close button */}
+        <button
+          onClick={() => setMobileOpen(false)}
+          className="absolute top-4 right-4 w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-all z-10"
+        >
+          <X size={15} />
+        </button>
+        <NavContent collapsed={false} onLinkClick={() => setMobileOpen(false)} />
+      </aside>
+
+      {/* ── Desktop sidebar ── */}
+      <aside
+        className={cn(
+          'hidden md:relative md:flex md:flex-col h-full border-r transition-all duration-300 ease-in-out z-50',
+          collapsed ? 'md:w-[68px]' : 'md:w-[240px]'
+        )}
+        style={{ background: 'rgb(var(--bg-secondary))', borderColor: 'var(--border)' }}
+      >
+        <NavContent collapsed={collapsed} />
+
+        {/* Collapse btn */}
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="absolute -right-3 top-6 w-6 h-6 rounded-full flex items-center justify-center text-text-secondary hover:text-text-primary transition-all duration-200 z-10"
+          style={{ background: 'rgb(var(--bg-card))', border: '1px solid var(--border)' }}
+        >
+          {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
+        </button>
+      </aside>
+    </>
   )
 }
