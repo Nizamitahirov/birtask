@@ -685,7 +685,7 @@ function ExportImportTab() {
   const [migrating, setMigrating] = useState(false)
   const [migrateResult, setMigrateResult] = useState<string>('')
 
-  const SHEETS_URL = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL
+  const SHEETS_URL = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyBiaZe_MD3ykEwacDTWynD4XbZKpzv2lXNFeOpmAdoWmrvIPs8DcexelZw0boXAz1Esw/exec'
 
   const handleMigrateFromSheets = async () => {
     if (!SHEETS_URL) { toast.error('NEXT_PUBLIC_APPS_SCRIPT_URL təyin edilməyib'); return }
