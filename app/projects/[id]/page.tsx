@@ -16,8 +16,9 @@ import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer'
 import {
   ArrowLeft, Calendar, User, DollarSign, CheckSquare,
   Plus, RefreshCw, Zap, Columns, List, Edit2, Trash2,
-  Sparkles, X, Copy, Check
+  Sparkles, X, Copy, Check, MessageSquare
 } from 'lucide-react'
+import { CommentSection } from '@/components/ui/CommentSection'
 import { formatDate, formatDateShort, getDaysLeft, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
@@ -465,6 +466,15 @@ Nümunələr: ${taskTitles}
           </table>
         </div>
       )}
+
+      {/* Comments Section */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <MessageSquare size={16} className="text-accent-blue" />
+          <h2 className="font-semibold text-text-primary">Şərhlər</h2>
+        </div>
+        <CommentSection entityType="project" entityId={id} />
+      </div>
 
       {/* AI Summary Panel */}
       {summaryOpen && (

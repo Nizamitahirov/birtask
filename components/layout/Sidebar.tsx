@@ -7,12 +7,13 @@ import {
   LayoutDashboard, FolderKanban, CheckSquare,
   Users, Settings, ChevronLeft, ChevronRight,
   Zap, Sun, Moon, Map, CalendarDays, LogOut,
-  Shield, UserCog, UserCheck, Eye
+  Shield, UserCog, UserCheck, Eye, Activity
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
 import { useAuth } from '@/contexts/AuthContext'
 import { UserRole } from '@/lib/types'
+import { NotificationBell } from '@/components/ui/NotificationBell'
 
 const navItems = [
   { href: '/',          label: 'İdarə Paneli', icon: LayoutDashboard },
@@ -21,6 +22,7 @@ const navItems = [
   { href: '/calendar',  label: 'Təqvim',       icon: CalendarDays },
   { href: '/roadmap',   label: 'Yol Xəritəsi', icon: Map },
   { href: '/team',      label: 'Komanda',      icon: Users },
+  { href: '/activity',  label: 'Aktivlik',     icon: Activity },
   { href: '/settings',  label: 'Parametrlər',  icon: Settings },
 ]
 
@@ -121,6 +123,11 @@ export function Sidebar() {
           )
         })}
       </nav>
+
+      {/* Notification bell */}
+      <div className="px-2 pb-1">
+        <NotificationBell collapsed={collapsed} />
+      </div>
 
       {/* Theme toggle */}
       <div className="px-2 pb-2">
