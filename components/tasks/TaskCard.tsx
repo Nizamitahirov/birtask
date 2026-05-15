@@ -3,7 +3,7 @@
 import { Task } from '@/lib/types'
 import { formatDate, getDaysLeft, cn } from '@/lib/utils'
 import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
-import { Calendar, User, Edit2, Trash2, Tag, CheckCircle2, Circle } from 'lucide-react'
+import { Calendar, User, Edit2, Trash2, Tag, CheckCircle2, Circle, FolderKanban } from 'lucide-react'
 
 interface TaskCardProps {
   task: Task
@@ -66,6 +66,13 @@ export function TaskCard({ task, onEdit, onDelete, onComplete, draggable: isDrag
           </button>
         </div>
       </div>
+
+      {task.projectName && (
+        <div className="flex items-center gap-1 text-[10px] text-accent-blue font-medium">
+          <FolderKanban size={10} className="flex-shrink-0" />
+          <span className="truncate">{task.projectName}</span>
+        </div>
+      )}
 
       {task.description && (
         <p className="text-text-muted text-xs leading-relaxed line-clamp-2">{task.description}</p>

@@ -45,11 +45,15 @@ export default function TasksPage() {
   const [deleting, setDeleting] = useState(false)
   const [dragOverStatus, setDragOverStatus] = useState<TaskStatus | null>(null)
 
+  const selectedProject = projects.find(p => p.id === projectFilter)
+
   const filtered = tasks.filter(t => {
     const matchSearch = t.title.toLowerCase().includes(search.toLowerCase()) ||
       t.description?.toLowerCase().includes(search.toLowerCase())
     const matchPriority = priorityFilter === 'Hamısı' || t.priority === priorityFilter
-    const matchProject = projectFilter === 'Hamısı' || t.projectId === projectFilter
+    const matchProject = projectFilter === 'Hamısı' ||
+      t.projectId === projectFilter ||
+      (selectedProject && t.projectName === selectedProject.name)
     const matchStatus = statusFilters.length === 0 || statusFilters.includes(t.status)
     const matchAssignee = assigneeFilter === 'Hamısı' || t.assignee === assigneeFilter
     return matchSearch && matchPriority && matchProject && matchStatus && matchAssignee

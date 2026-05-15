@@ -684,6 +684,8 @@ function ExportImportTab() {
   const [importProgress, setImportProgress] = useState(0)
   const [migrating, setMigrating] = useState(false)
   const [migrateResult, setMigrateResult] = useState<string>('')
+  const [relinking, setRelinking] = useState(false)
+  const [relinkResult, setRelinkResult] = useState<string>('')
 
   const SHEETS_URL = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL || 'https://script.google.com/macros/s/AKfycbyBiaZe_MD3ykEwacDTWynD4XbZKpzv2lXNFeOpmAdoWmrvIPs8DcexelZw0boXAz1Esw/exec'
 
@@ -714,6 +716,26 @@ function ExportImportTab() {
       toast.error(msg)
     }
     setMigrating(false)
+  }
+
+  const handleRelinkTasks = async () => {
+    setRelinking(true)
+    setRelinkResult('')
+    try {
+      const res = await db.tasks.relink()
+      if (res.success && res.data) {
+        const { relinked, total } = res.data
+        setRelinkResult(`✅ ${relinked} tapşırıq layihəyə bağlandı (${total} tapşırıqdan)`)
+        toast.success(`${relinked} tapşırıq uğurla bağlandı`)
+      } else {
+        throw new Error(res.error || 'Xəta')
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Xəta'
+      setRelinkResult(`❌ ${msg}`)
+      toast.error(msg)
+    }
+    setRelinking(false)
   }
 
   function objectsToCsv(rows: Record<string, unknown>[]): string {
@@ -941,6 +963,18 @@ function ExportImportTab() {
           {migrating ? <><span className="animate-spin inline-block mr-2">⟳</span>Köçürülür...</> : '🚀 Google Sheets-dən köçür'}
         </button>
         {migrateResult && <p className="text-sm mt-2">{migrateResult}</p>}
+
+        <div className="border-t border-white/[0.06] pt-4">
+          <p className="text-text-muted text-xs mb-3">Əgər köçürmə artıq edilibsə amma tapşırıqlar layihə altında görünmürsə, aşağıdakı düymə ilə yenidən bağlayın:</p>
+          <button
+            onClick={handleRelinkTasks}
+            disabled={relinking}
+            className="btn-secondary disabled:opacity-50"
+          >
+            {relinking ? <><Loader2 size={14} className="animate-spin" /> Bağlanılır...</> : '🔗 Tapşırıqları layihəyə bağla'}
+          </button>
+          {relinkResult && <p className="text-sm mt-2">{relinkResult}</p>}
+        </div>
       </div>
 
       {/* Export section */}

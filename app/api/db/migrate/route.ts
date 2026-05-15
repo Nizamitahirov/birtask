@@ -32,7 +32,33 @@ export async function POST(req: NextRequest) {
     }
     await batch3.commit()
 
-    return NextResponse.json({ success: true, imported })
+    // Re-link tasks to projects by matching projectName → projectId
+    const projectsSnap = await adminDb.collection('projects').get()
+    const nameToId: Record<string, string> = {}
+    const validIds = new Set<string>()
+    projectsSnap.docs.forEach(doc => {
+      validIds.add(doc.id)
+      const name = (doc.data().name as string) || ''
+      if (name) nameToId[name.toLowerCase().trim()] = doc.id
+    })
+
+    const tasksSnap = await adminDb.collection('tasks').get()
+    const relinkBatch = adminDb.batch()
+    let relinked = 0
+    tasksSnap.docs.forEach(doc => {
+      const task = doc.data()
+      const needsRelink = !task.projectId || !validIds.has(task.projectId as string)
+      if (needsRelink && task.projectName) {
+        const matchId = nameToId[(task.projectName as string).toLowerCase().trim()]
+        if (matchId) {
+          relinkBatch.update(doc.ref, { projectId: matchId })
+          relinked++
+        }
+      }
+    })
+    await relinkBatch.commit()
+
+    return NextResponse.json({ success: true, imported, relinked })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'
     return NextResponse.json({ success: false, error: message }, { status: 500 })

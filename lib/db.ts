@@ -65,6 +65,7 @@ export const db = {
     update: (id: string, data: Partial<Task>) =>
       callApi<Task>(`/tasks/${id}`, 'PUT', data),
     delete: (id: string) => callApi<void>(`/tasks/${id}`, 'DELETE'),
+    relink: () => callApi<{ relinked: number; total: number }>('/tasks/relink', 'POST'),
   },
   team: {
     getAll: () => callApi<TeamMember[]>('/team'),
