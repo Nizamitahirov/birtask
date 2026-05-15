@@ -682,6 +682,39 @@ function ExportImportTab() {
   const [preview, setPreview] = useState<string[][] | null>(null)
   const [importing, setImporting] = useState(false)
   const [importProgress, setImportProgress] = useState(0)
+  const [migrating, setMigrating] = useState(false)
+  const [migrateResult, setMigrateResult] = useState<string>('')
+
+  const SHEETS_URL = process.env.NEXT_PUBLIC_APPS_SCRIPT_URL
+
+  const handleMigrateFromSheets = async () => {
+    if (!SHEETS_URL) { toast.error('NEXT_PUBLIC_APPS_SCRIPT_URL təyin edilməyib'); return }
+    setMigrating(true)
+    setMigrateResult('')
+    try {
+      const res = await fetch(`${SHEETS_URL}?action=getBatch`)
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error || 'Sheets xətası')
+      const { projects = [], tasks = [], team = [] } = json.data || {}
+      const migrateRes = await fetch('/api/db/migrate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projects, tasks, team }),
+      })
+      const result = await migrateRes.json()
+      if (result.success) {
+        setMigrateResult(`✅ ${result.imported.projects} layihə, ${result.imported.tasks} tapşırıq, ${result.imported.team} komanda üzvü köçürüldü`)
+        toast.success('Google Sheets datası Firebase-ə köçürüldü')
+      } else {
+        throw new Error(result.error)
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Xəta'
+      setMigrateResult(`❌ ${msg}`)
+      toast.error(msg)
+    }
+    setMigrating(false)
+  }
 
   function objectsToCsv(rows: Record<string, unknown>[]): string {
     if (rows.length === 0) return ''
@@ -893,6 +926,23 @@ function ExportImportTab() {
 
   return (
     <div className="space-y-6 max-w-2xl">
+      {/* Google Sheets Migration */}
+      <div className="card p-6 space-y-4 border border-accent-purple/20">
+        <h2 className="font-semibold text-text-primary flex items-center gap-2">
+          <span className="text-accent-purple">↗</span>
+          Google Sheets → Firebase Miqrasiyası
+        </h2>
+        <p className="text-text-muted text-sm">Köhnə Google Sheets datasını bir dəfəlik Firebase-ə köçür. Mövcud data üzərindən yazılacaq.</p>
+        <button
+          onClick={handleMigrateFromSheets}
+          disabled={migrating}
+          className="btn-primary disabled:opacity-50"
+        >
+          {migrating ? <><span className="animate-spin inline-block mr-2">⟳</span>Köçürülür...</> : '🚀 Google Sheets-dən köçür'}
+        </button>
+        {migrateResult && <p className="text-sm mt-2">{migrateResult}</p>}
+      </div>
+
       {/* Export section */}
       <div className="card p-6 space-y-4">
         <h2 className="font-semibold text-text-primary flex items-center gap-2">
