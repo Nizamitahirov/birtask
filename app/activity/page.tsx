@@ -124,7 +124,7 @@ export default function ActivityPage() {
   const resetFilters = () => {
     setActionFilter('Hamısı')
     setEntityFilter('Hamısı')
-    setSelectedYear(now.getFullYear())
+    setSelectedYear(currentYear)
     setSelectedMonth(null)
   }
 

@@ -1,9 +1,11 @@
 import * as admin from 'firebase-admin'
 
+let _db: admin.firestore.Firestore | null = null
+let _auth: admin.auth.Auth | null = null
+
 function getApp(): admin.app.App {
   if (admin.apps.length) return admin.apps[0]!
 
-  // Support base64-encoded full service account JSON (most reliable for Vercel)
   if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
     const sa = JSON.parse(
       Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8')
@@ -11,7 +13,6 @@ function getApp(): admin.app.App {
     return admin.initializeApp({ credential: admin.credential.cert(sa) })
   }
 
-  // Fallback: individual env vars (private key must have real newlines)
   return admin.initializeApp({
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
@@ -21,6 +22,25 @@ function getApp(): admin.app.App {
   })
 }
 
-export const adminApp = getApp()
-export const adminDb = admin.firestore(adminApp)
-export const adminAuth = admin.auth(adminApp)
+export function getAdminDb(): admin.firestore.Firestore {
+  if (!_db) _db = admin.firestore(getApp())
+  return _db
+}
+
+export function getAdminAuth(): admin.auth.Auth {
+  if (!_auth) _auth = admin.auth(getApp())
+  return _auth
+}
+
+// Backward-compatible lazy proxies so existing route files don't need changing
+export const adminDb = new Proxy({} as admin.firestore.Firestore, {
+  get(_, prop: string) {
+    return (getAdminDb() as unknown as Record<string, unknown>)[prop]
+  },
+})
+
+export const adminAuth = new Proxy({} as admin.auth.Auth, {
+  get(_, prop: string) {
+    return (getAdminAuth() as unknown as Record<string, unknown>)[prop]
+  },
+})
