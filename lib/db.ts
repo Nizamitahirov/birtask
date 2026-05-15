@@ -1,0 +1,102 @@
+import {
+  Project,
+  Task,
+  TeamMember,
+  ApiResponse,
+  Comment,
+  ActivityLog,
+  Notification,
+  User,
+} from './types'
+
+const API_BASE = '/api/db'
+
+async function callApi<T>(
+  path: string,
+  method: string = 'GET',
+  data?: object
+): Promise<ApiResponse<T>> {
+  try {
+    if (method === 'GET') {
+      const params = data
+        ? '?' +
+          new URLSearchParams(
+            Object.entries(data).map(([k, v]) => [k, String(v)])
+          )
+        : ''
+      const res = await fetch(`${API_BASE}${path}${params}`, {
+        cache: 'no-store',
+      })
+      return res.json()
+    } else {
+      const res = await fetch(`${API_BASE}${path}`, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+      return res.json()
+    }
+  } catch (err: unknown) {
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : 'Bilinməyən xəta',
+    }
+  }
+}
+
+export const db = {
+  projects: {
+    getAll: () => callApi<Project[]>('/projects'),
+    getById: (id: string) => callApi<Project>(`/projects/${id}`),
+    create: (data: Omit<Project, 'id' | 'createdAt'>) =>
+      callApi<Project>('/projects', 'POST', data),
+    update: (id: string, data: Partial<Project>) =>
+      callApi<Project>(`/projects/${id}`, 'PUT', data),
+    delete: (id: string) => callApi<void>(`/projects/${id}`, 'DELETE'),
+  },
+  tasks: {
+    getAll: (projectId?: string) =>
+      callApi<Task[]>('/tasks', 'GET', projectId ? { projectId } : undefined),
+    getById: (id: string) => callApi<Task>(`/tasks/${id}`),
+    create: (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) =>
+      callApi<Task>('/tasks', 'POST', data),
+    update: (id: string, data: Partial<Task>) =>
+      callApi<Task>(`/tasks/${id}`, 'PUT', data),
+    delete: (id: string) => callApi<void>(`/tasks/${id}`, 'DELETE'),
+  },
+  team: {
+    getAll: () => callApi<TeamMember[]>('/team'),
+    create: (data: Omit<TeamMember, 'id' | 'createdAt'>) =>
+      callApi<TeamMember>('/team', 'POST', data),
+    update: (id: string, data: Partial<TeamMember>) =>
+      callApi<TeamMember>(`/team/${id}`, 'PUT', data),
+    delete: (id: string) => callApi<void>(`/team/${id}`, 'DELETE'),
+  },
+  comments: {
+    getAll: (entityType: string, entityId: string) =>
+      callApi<Comment[]>('/comments', 'GET', { entityType, entityId }),
+    create: (data: Omit<Comment, 'id' | 'createdAt'>) =>
+      callApi<Comment>('/comments', 'POST', data),
+    delete: (id: string) => callApi<void>(`/comments/${id}`, 'DELETE'),
+  },
+  activity: {
+    getAll: () => callApi<ActivityLog[]>('/activity'),
+  },
+  notifications: {
+    getAll: (userId: string) =>
+      callApi<Notification[]>('/notifications', 'GET', { userId }),
+    markRead: (id: string) =>
+      callApi<void>(`/notifications/${id}/read`, 'PUT'),
+    markAllRead: (userId: string) =>
+      callApi<void>('/notifications/read-all', 'PUT', { userId }),
+  },
+  users: {
+    getAll: () => callApi<User[]>('/users'),
+    getById: (id: string) => callApi<User>(`/users/${id}`),
+    create: (data: Omit<User, 'id' | 'createdAt' | 'updatedAt'>) =>
+      callApi<User>('/users', 'POST', data),
+    update: (id: string, data: Partial<User>) =>
+      callApi<User>(`/users/${id}`, 'PUT', data),
+    delete: (id: string) => callApi<void>(`/users/${id}`, 'DELETE'),
+  },
+}

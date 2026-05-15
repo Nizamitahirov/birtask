@@ -68,3 +68,82 @@ export interface ApiResponse<T> {
   data?: T
   error?: string
 }
+
+export type UserRole = 'admin' | 'manager' | 'member' | 'viewer'
+
+export interface User {
+  id: string
+  username: string
+  email: string
+  displayName: string
+  role: UserRole
+  department: string
+  passwordHash: string
+  isActive: boolean
+  mustChangePassword: boolean
+  createdAt: string
+  updatedAt: string
+  lastLoginAt?: string
+}
+
+export interface Comment {
+  id: string
+  entityType: 'project' | 'task'
+  entityId: string
+  userId: string
+  userDisplayName: string
+  content: string
+  createdAt: string
+  updatedAt?: string
+}
+
+export interface ActivityLog {
+  id: string
+  action: 'create' | 'update' | 'delete' | 'login' | 'logout' | 'complete' | 'comment'
+  entityType: 'project' | 'task' | 'team' | 'user' | 'comment'
+  entityId: string
+  entityName: string
+  userId: string
+  userDisplayName: string
+  changes?: Record<string, { from: unknown; to: unknown }>
+  createdAt: string
+}
+
+export interface Notification {
+  id: string
+  userId: string
+  type: 'task_assigned' | 'comment_added' | 'project_updated' | 'task_due_soon' | 'task_overdue'
+  title: string
+  message: string
+  entityType: 'project' | 'task'
+  entityId: string
+  read: boolean
+  createdAt: string
+}
+
+export interface TimeEntry {
+  id: string
+  taskId: string
+  projectId: string
+  userId: string
+  userDisplayName: string
+  description: string
+  startTime: string
+  endTime?: string
+  durationMinutes?: number
+  createdAt: string
+}
+
+export interface RecurringTask {
+  id: string
+  projectId: string
+  title: string
+  description: string
+  priority: Priority
+  assignee: string
+  tags: string
+  recurrence: 'daily' | 'weekly' | 'monthly'
+  nextDueDate: string
+  isActive: boolean
+  createdAt: string
+}
