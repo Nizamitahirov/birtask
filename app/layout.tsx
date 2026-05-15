@@ -1,11 +1,12 @@
 import type { Metadata } from 'next'
 import './globals.css'
-import { Sidebar } from '@/components/layout/Sidebar'
+import { AuthProvider } from '@/contexts/AuthContext'
+import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 import { ClientToaster } from '@/components/ui/ClientToaster'
 
 export const metadata: Metadata = {
   title: 'BirTask — Layihə İdarəetmə',
-  description: 'Google Sheets ilə inteqrasiyalı layihə idarəetmə platforması',
+  description: 'Firebase ilə inteqrasiyalı layihə idarəetmə platforması',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -21,12 +22,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         `}} />
       </head>
       <body className="mesh-bg min-h-screen">
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 overflow-auto">
+        <AuthProvider>
+          <AuthenticatedLayout>
             {children}
-          </main>
-        </div>
+          </AuthenticatedLayout>
+        </AuthProvider>
         <ClientToaster />
       </body>
     </html>
