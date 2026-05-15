@@ -34,3 +34,4 @@ birtask-service-account.json
 
 next-env.d.ts
 tsconfig.tsbuildinfo
+.claude/
