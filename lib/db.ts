@@ -7,6 +7,8 @@ import {
   ActivityLog,
   Notification,
   User,
+  TimeEntry,
+  RecurringTask,
 } from './types'
 
 const API_BASE = '/api/db'
@@ -98,5 +100,24 @@ export const db = {
     update: (id: string, data: Partial<User>) =>
       callApi<User>(`/users/${id}`, 'PUT', data),
     delete: (id: string) => callApi<void>(`/users/${id}`, 'DELETE'),
+  },
+  timeEntries: {
+    getAll: (filter?: { taskId?: string; projectId?: string; userId?: string }) =>
+      callApi<TimeEntry[]>('/time-entries', 'GET', filter),
+    create: (data: Omit<TimeEntry, 'id' | 'createdAt'>) =>
+      callApi<TimeEntry>('/time-entries', 'POST', data),
+    update: (id: string, data: Partial<TimeEntry>) =>
+      callApi<TimeEntry>(`/time-entries/${id}`, 'PUT', data),
+    delete: (id: string) => callApi<void>(`/time-entries/${id}`, 'DELETE'),
+  },
+  recurringTasks: {
+    getAll: (projectId?: string) =>
+      callApi<RecurringTask[]>('/recurring-tasks', 'GET', projectId ? { projectId } : undefined),
+    create: (data: Omit<RecurringTask, 'id' | 'createdAt'>) =>
+      callApi<RecurringTask>('/recurring-tasks', 'POST', data),
+    update: (id: string, data: Partial<RecurringTask>) =>
+      callApi<RecurringTask>(`/recurring-tasks/${id}`, 'PUT', data),
+    delete: (id: string) => callApi<void>(`/recurring-tasks/${id}`, 'DELETE'),
+    generate: (id: string) => callApi<Task>(`/recurring-tasks/${id}/generate`, 'POST'),
   },
 }

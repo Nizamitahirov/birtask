@@ -16,9 +16,10 @@ import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer'
 import {
   ArrowLeft, Calendar, User, DollarSign, CheckSquare,
   Plus, RefreshCw, Zap, Columns, List, Edit2, Trash2,
-  Sparkles, X, Copy, Check, MessageSquare
+  Sparkles, X, Copy, Check, MessageSquare, Clock
 } from 'lucide-react'
 import { CommentSection } from '@/components/ui/CommentSection'
+import { TimeTracker } from '@/components/ui/TimeTracker'
 import { formatDate, formatDateShort, getDaysLeft, cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import Link from 'next/link'
@@ -466,6 +467,15 @@ Nümunələr: ${taskTitles}
           </table>
         </div>
       )}
+
+      {/* Time Tracking Section */}
+      <div className="space-y-3">
+        <div className="flex items-center gap-2">
+          <Clock size={16} className="text-accent-blue" />
+          <h2 className="font-semibold text-text-primary">Vaxt İzləmə</h2>
+        </div>
+        <TimeTracker taskId="" projectId={id} />
+      </div>
 
       {/* Comments Section */}
       <div className="space-y-3">
