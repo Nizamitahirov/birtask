@@ -9,10 +9,15 @@ export async function GET(req: NextRequest) {
 
     let query: FirebaseFirestore.Query = adminDb.collection('notifications')
     if (userId) query = query.where('userId', '==', userId)
-    query = query.orderBy('createdAt', 'desc')
 
     const snapshot = await query.get()
-    const notifications = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }))
+    const notifications = snapshot.docs
+      .map((doc) => ({ ...doc.data(), id: doc.id }))
+      .sort((a, b) => {
+        const aTime = (a as { createdAt?: string }).createdAt || ''
+        const bTime = (b as { createdAt?: string }).createdAt || ''
+        return bTime.localeCompare(aTime)
+      })
     return NextResponse.json({ success: true, data: notifications })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'

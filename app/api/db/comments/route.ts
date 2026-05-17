@@ -11,10 +11,15 @@ export async function GET(req: NextRequest) {
     let query: FirebaseFirestore.Query = adminDb.collection('comments')
     if (entityType) query = query.where('entityType', '==', entityType)
     if (entityId) query = query.where('entityId', '==', entityId)
-    query = query.orderBy('createdAt', 'asc')
 
     const snapshot = await query.get()
-    const comments = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }))
+    const comments = snapshot.docs
+      .map((doc) => ({ ...doc.data(), id: doc.id }))
+      .sort((a, b) => {
+        const at = (a as { createdAt?: string }).createdAt || ''
+        const bt = (b as { createdAt?: string }).createdAt || ''
+        return at.localeCompare(bt)
+      })
     return NextResponse.json({ success: true, data: comments })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'

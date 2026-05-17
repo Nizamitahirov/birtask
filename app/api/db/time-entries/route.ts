@@ -15,10 +15,14 @@ export async function GET(req: NextRequest) {
     else if (projectId) query = query.where('projectId', '==', projectId)
     else if (userId) query = query.where('userId', '==', userId)
 
-    query = query.orderBy('createdAt', 'desc')
-
     const snapshot = await query.get()
-    const entries = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }))
+    const entries = snapshot.docs
+      .map(doc => ({ ...doc.data(), id: doc.id }))
+      .sort((a, b) => {
+        const at = (a as { createdAt?: string }).createdAt || ''
+        const bt = (b as { createdAt?: string }).createdAt || ''
+        return bt.localeCompare(at)
+      })
     return NextResponse.json({ success: true, data: entries })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'
