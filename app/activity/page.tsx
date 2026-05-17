@@ -250,12 +250,12 @@ export default function ActivityPage() {
               className="flex items-center gap-4 px-4 py-3 rounded-xl animate-pulse"
               style={{ background: 'var(--surface-1)', border: '1px solid var(--border)' }}
             >
-              <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex-shrink-0" />
+              <div className="w-8 h-8 rounded-lg bg-[var(--surface-2)] flex-shrink-0" />
               <div className="flex-1 space-y-2">
-                <div className="h-3 w-1/3 rounded bg-white/[0.06]" />
-                <div className="h-3 w-1/2 rounded bg-white/[0.04]" />
+                <div className="h-3 w-1/3 rounded bg-[var(--surface-2)]" />
+                <div className="h-3 w-1/2 rounded bg-[var(--surface-2)]" />
               </div>
-              <div className="h-3 w-20 rounded bg-white/[0.04]" />
+              <div className="h-3 w-20 rounded bg-[var(--surface-2)]" />
             </div>
           ))}
         </div>
@@ -283,7 +283,7 @@ export default function ActivityPage() {
                 key={log.id}
                 className={cn(
                   'flex items-start gap-4 px-5 py-4 transition-colors',
-                  'hover:bg-white/[0.02]'
+                  'hover:bg-[var(--surface-2)]'
                 )}
               >
                 {/* Action icon */}

@@ -234,7 +234,7 @@ Nümunələr: ${taskTitles}
           </div>
 
           {/* Stats row */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-white/[0.06]">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-[var(--border)]">
             <div className="flex items-center gap-2 text-sm">
               <User size={15} className="text-accent-blue flex-shrink-0" />
               <div>
@@ -296,7 +296,7 @@ Nümunələr: ${taskTitles}
         <h2 className="font-semibold text-text-primary">
           Tapşırıqlar
           {tasks.length > 0 && (
-            <span className="ml-2 text-xs font-normal text-text-muted bg-white/[0.05] px-2 py-0.5 rounded-full">
+            <span className="ml-2 text-xs font-normal text-text-muted bg-[var(--surface-2)] px-2 py-0.5 rounded-full">
               {tasks.length}
             </span>
           )}
@@ -307,7 +307,7 @@ Nümunələr: ${taskTitles}
               onClick={() => setTaskView('kanban')}
               title="Kanban"
               className={cn('w-7 h-7 rounded-lg flex items-center justify-center transition-all',
-                taskView === 'kanban' ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+                taskView === 'kanban' ? 'bg-[var(--surface-2)] text-text-primary' : 'text-text-muted hover:text-text-primary')}
             >
               <Columns size={13} />
             </button>
@@ -315,7 +315,7 @@ Nümunələr: ${taskTitles}
               onClick={() => setTaskView('list')}
               title="Siyahı"
               className={cn('w-7 h-7 rounded-lg flex items-center justify-center transition-all',
-                taskView === 'list' ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+                taskView === 'list' ? 'bg-[var(--surface-2)] text-text-primary' : 'text-text-muted hover:text-text-primary')}
             >
               <List size={13} />
             </button>
@@ -354,7 +354,7 @@ Nümunələr: ${taskTitles}
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: STATUS_COLORS[status] }} />
                   <span className="text-text-secondary text-sm font-medium">{status}</span>
-                  <span className="text-xs text-text-muted bg-white/[0.05] px-1.5 py-0.5 rounded-full ml-auto">
+                  <span className="text-xs text-text-muted bg-[var(--surface-2)] px-1.5 py-0.5 rounded-full ml-auto">
                     {statusTasks.length}
                   </span>
                 </div>
@@ -366,7 +366,7 @@ Nümunələr: ${taskTitles}
                   onDrop={(e) => handleDrop(e, status)}
                   className={cn(
                     'space-y-2 min-h-[120px] rounded-xl p-1.5 transition-all duration-150',
-                    isOver && 'bg-white/[0.04] ring-1 ring-dashed ring-white/[0.2]'
+                    isOver && 'bg-[var(--surface-2)] ring-1 ring-dashed ring-white/[0.2]'
                   )}
                 >
                   {statusTasks.map(task => (
@@ -382,7 +382,7 @@ Nümunələr: ${taskTitles}
                   {statusTasks.length === 0 && (
                     <div className={cn(
                       'border border-dashed rounded-xl p-4 text-center text-xs transition-all',
-                      isOver ? 'border-white/[0.25] text-text-secondary' : 'border-white/[0.08] text-text-muted'
+                      isOver ? 'border-white/[0.25] text-text-secondary' : 'border-[var(--border)] text-text-muted'
                     )}>
                       {isOver ? 'Buraya burax' : 'Boş'}
                     </div>
@@ -396,7 +396,7 @@ Nümunələr: ${taskTitles}
         <div className="card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/[0.06]">
+              <tr className="border-b border-[var(--border)]">
                 {['Tapşırıq', 'Status', 'Prioritet', 'İcraçı', 'Son tarix', ''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-text-muted text-xs font-medium whitespace-nowrap">{h}</th>
                 ))}
@@ -408,7 +408,7 @@ Nümunələr: ${taskTitles}
                 const overdue = task.dueDate && daysLeft < 0 && task.status !== 'Tamamlandı'
                 const isDone = task.status === 'Tamamlandı'
                 return (
-                  <tr key={task.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
+                  <tr key={task.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors group">
                     <td className="px-4 py-3 max-w-[260px]">
                       <div className="flex items-center gap-2">
                         <button
@@ -450,7 +450,7 @@ Nümunələr: ${taskTitles}
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => { setSelectedTask(task); setModal('edit') }}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-[var(--surface-2)] transition-all"
                         >
                           <Edit2 size={13} />
                         </button>
@@ -511,7 +511,7 @@ Nümunələr: ${taskTitles}
                 {summary && !summaryLoading && (
                   <button
                     onClick={handleCopy}
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.06] transition-all"
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-[var(--surface-2)] transition-all"
                     title="Kopyala"
                   >
                     {copied ? <Check size={14} className="text-accent-green" /> : <Copy size={14} />}
@@ -519,7 +519,7 @@ Nümunələr: ${taskTitles}
                 )}
                 <button
                   onClick={() => setSummaryOpen(false)}
-                  className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.06] transition-all"
+                  className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-[var(--surface-2)] transition-all"
                 >
                   <X size={15} />
                 </button>
@@ -544,8 +544,8 @@ Nümunələr: ${taskTitles}
                   </div>
                   {[...Array(4)].map((_, i) => (
                     <div key={i} className="space-y-2">
-                      <div className="h-3 rounded-full bg-white/[0.06] animate-pulse" style={{ width: `${70 + i * 8}%` }} />
-                      <div className="h-3 rounded-full bg-white/[0.04] animate-pulse" style={{ width: `${55 + i * 6}%` }} />
+                      <div className="h-3 rounded-full bg-[var(--surface-2)] animate-pulse" style={{ width: `${70 + i * 8}%` }} />
+                      <div className="h-3 rounded-full bg-[var(--surface-2)] animate-pulse" style={{ width: `${55 + i * 6}%` }} />
                     </div>
                   ))}
                 </div>

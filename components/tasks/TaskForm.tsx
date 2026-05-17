@@ -41,7 +41,7 @@ export function TaskForm({ initial, projects = [], teamNames = [], onSubmit, onC
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await onSubmit({ ...form, assignee: assignees.join(', ') })
+    await onSubmit({ ...form, assignee: assignees.join(', ') } as Omit<Task, 'id' | 'createdAt' | 'updatedAt'>)
   }
 
   return (

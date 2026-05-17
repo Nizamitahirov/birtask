@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { db } from '@/lib/db'
-import { User, UserRole } from '@/lib/types'
+import { User, UserRole, Workspace } from '@/lib/types'
 import { useAuth } from '@/contexts/AuthContext'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import {
   Settings, Database, CheckCircle, AlertCircle, RefreshCw,
   Users, Plus, Edit2, Trash2, KeyRound, Search, ShieldCheck,
   UserCheck, Eye, EyeOff, Loader2, X, Shield, UserCog,
-  Download, Upload, FileText, FileJson, Package
+  Download, Upload, FileText, FileJson, Package, Layers
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -20,7 +21,7 @@ function RoleBadge({ role }: { role: UserRole }) {
     admin:   'bg-accent-purple/10 text-accent-purple border-accent-purple/20',
     manager: 'bg-accent-blue/10 text-accent-blue border-accent-blue/20',
     member:  'bg-accent-green/10 text-accent-green border-accent-green/20',
-    viewer:  'bg-white/[0.06] text-text-secondary border-white/[0.10]',
+    viewer:  'bg-[var(--surface-2)] text-text-secondary border-[var(--border)]',
   }
   const labels: Record<UserRole, string> = {
     admin: 'Admin', manager: 'Menecer', member: 'Üzv', viewer: 'İzləyici',
@@ -170,7 +171,7 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
       )}
 
       {mode === 'edit' && (
-        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+        <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
           <div>
             <div className="text-text-primary text-sm font-medium">Aktiv hesab</div>
             <div className="text-text-muted text-xs">Deaktiv etsəniz, istifadəçi daxil ola bilməz</div>
@@ -180,7 +181,7 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
             onClick={() => set('isActive', !form.isActive)}
             className={cn(
               'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
-              form.isActive ? 'bg-accent-blue' : 'bg-white/[0.12]'
+              form.isActive ? 'bg-accent-blue' : 'bg-[var(--surface-2)]'
             )}
           >
             <span
@@ -313,7 +314,7 @@ function Modal({
           <h3 className="font-semibold text-text-primary text-sm">{title}</h3>
           <button
             onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-all"
+            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-[var(--surface-2)] transition-all"
           >
             <X size={14} />
           </button>
@@ -429,7 +430,7 @@ function UsersTab() {
       {loading ? (
         <div className="space-y-2">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-14 rounded-xl bg-white/[0.03] animate-pulse" />
+            <div key={i} className="h-14 rounded-xl bg-[var(--surface-2)] animate-pulse" />
           ))}
         </div>
       ) : filtered.length === 0 ? (
@@ -441,7 +442,7 @@ function UsersTab() {
         <div className="card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/[0.06]">
+              <tr className="border-b border-[var(--border)]">
                 {['İstifadəçi', 'Rol', 'Şöbə', 'Status', 'Son giriş', ''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-text-muted text-xs font-medium whitespace-nowrap">{h}</th>
                 ))}
@@ -451,7 +452,7 @@ function UsersTab() {
               {filtered.map(u => (
                 <tr
                   key={u.id}
-                  className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group"
+                  className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors group"
                 >
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
@@ -482,7 +483,7 @@ function UsersTab() {
                       'inline-flex items-center gap-1 text-[10px] font-medium px-2 py-0.5 rounded-full border',
                       u.isActive
                         ? 'bg-accent-green/10 text-accent-green border-accent-green/20'
-                        : 'bg-white/[0.04] text-text-muted border-white/[0.08]'
+                        : 'bg-[var(--surface-2)] text-text-muted border-[var(--border)]'
                     )}>
                       <span className={cn('w-1.5 h-1.5 rounded-full', u.isActive ? 'bg-accent-green' : 'bg-text-muted')} />
                       {u.isActive ? 'Aktiv' : 'Deaktiv'}
@@ -498,7 +499,7 @@ function UsersTab() {
                       <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                         <button
                           onClick={() => { setSelected(u); setModal('edit') }}
-                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all"
+                          className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-[var(--surface-2)] transition-all"
                           title="Düzəlt"
                         >
                           <Edit2 size={13} />
@@ -608,6 +609,197 @@ function UsersTab() {
   )
 }
 
+// ── Workspace Tab ─────────────────────────────────────────────────────────────
+
+const WS_COLORS = ['#5B5BF5','#E85C7A','#0EA5E9','#10B981','#F59E0B','#8B5CF6','#EF4444','#F97316']
+
+function WorkspaceTab() {
+  const { workspaces, currentWorkspace, setCurrentWorkspace, createWorkspace, refresh } = useWorkspace()
+  const [editId, setEditId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', description: '', color: '' })
+  const [saving, setSaving] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [creating, setCreating] = useState(false)
+  const [newForm, setNewForm] = useState({ name: '', description: '', color: '#5B5BF5' })
+  const [newSaving, setNewSaving] = useState(false)
+
+  const startEdit = (ws: Workspace) => {
+    setEditId(ws.id)
+    setEditForm({ name: ws.name, description: ws.description || '', color: ws.color || '#5B5BF5' })
+  }
+
+  const handleSaveEdit = async () => {
+    if (!editId || !editForm.name.trim()) return
+    setSaving(true)
+    const res = await db.workspaces.update(editId, { name: editForm.name.trim(), description: editForm.description, color: editForm.color })
+    if (res.success) {
+      toast.success('Yeniləndi')
+      await refresh()
+      setEditId(null)
+    } else toast.error(res.error || 'Xəta')
+    setSaving(false)
+  }
+
+  const handleDelete = async () => {
+    if (!deleteId) return
+    setDeleting(true)
+    const res = await db.workspaces.delete(deleteId)
+    if (res.success) {
+      toast.success('Silindi')
+      await refresh()
+      setDeleteId(null)
+    } else toast.error(res.error || 'Xəta')
+    setDeleting(false)
+  }
+
+  const handleCreate = async () => {
+    if (!newForm.name.trim()) return
+    setNewSaving(true)
+    await createWorkspace({ name: newForm.name.trim(), description: newForm.description, color: newForm.color })
+    toast.success('İş sahəsi yaradıldı')
+    setNewForm({ name: '', description: '', color: '#5B5BF5' })
+    setCreating(false)
+    setNewSaving(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16, maxWidth: 680 }}>
+      {/* Workspace list */}
+      <div className="cardM" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="cardM-head" style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)' }}>
+          <h3><span className="ico" style={{ background: 'var(--primary-soft)' }}><Layers size={14} style={{ color: 'var(--primary)' }} /></span>İş Sahələri</h3>
+          <button onClick={() => setCreating(c => !c)} className="btn-primaryM" style={{ padding: '6px 14px', fontSize: 12 }}>
+            <Plus size={14} /> Yeni
+          </button>
+        </div>
+
+        {/* Create form */}
+        {creating && (
+          <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>Ad *</label>
+                <input autoFocus value={newForm.name} onChange={e => setNewForm(f => ({ ...f, name: e.target.value }))} className="inputM" placeholder="İş sahəsi adı" />
+              </div>
+              <div>
+                <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>Rəng</label>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 4 }}>
+                  {WS_COLORS.map(c => (
+                    <button key={c} onClick={() => setNewForm(f => ({ ...f, color: c }))} style={{ width: 24, height: 24, borderRadius: 6, background: c, border: newForm.color === c ? '2px solid var(--ink)' : '2px solid transparent', cursor: 'pointer' }} />
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>Açıqlama</label>
+              <input value={newForm.description} onChange={e => setNewForm(f => ({ ...f, description: e.target.value }))} className="inputM" placeholder="İsteğe bağlı açıqlama" />
+            </div>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button onClick={() => setCreating(false)} className="btn-ghostM">Ləğv et</button>
+              <button onClick={handleCreate} disabled={newSaving || !newForm.name.trim()} className="btn-primaryM" style={{ opacity: newSaving || !newForm.name.trim() ? 0.5 : 1 }}>
+                {newSaving ? <><Loader2 size={13} className="animate-spin" /> Yaradılır...</> : 'Yarat'}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* List */}
+        <div>
+          {workspaces.map((ws, i) => (
+            <div key={ws.id} style={{ borderBottom: i < workspaces.length - 1 ? '1px solid var(--border)' : 'none' }}>
+              {editId === ws.id ? (
+                <div style={{ padding: '14px 20px', background: 'var(--surface-2)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>Ad</label>
+                      <input value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} className="inputM" />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>Rəng</label>
+                      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', paddingTop: 4 }}>
+                        {WS_COLORS.map(c => (
+                          <button key={c} onClick={() => setEditForm(f => ({ ...f, color: c }))} style={{ width: 24, height: 24, borderRadius: 6, background: c, border: editForm.color === c ? '2px solid var(--ink)' : '2px solid transparent', cursor: 'pointer' }} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 5 }}>Açıqlama</label>
+                    <input value={editForm.description} onChange={e => setEditForm(f => ({ ...f, description: e.target.value }))} className="inputM" placeholder="İsteğe bağlı" />
+                  </div>
+                  <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                    <button onClick={() => setEditId(null)} className="btn-ghostM">Ləğv et</button>
+                    <button onClick={handleSaveEdit} disabled={saving} className="btn-primaryM" style={{ opacity: saving ? 0.5 : 1 }}>
+                      {saving ? <><Loader2 size={13} className="animate-spin" /> Saxlanılır...</> : 'Yadda saxla'}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 20px' }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 10, background: ws.color || '#5B5BF5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                    {ws.name.slice(0, 2).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{ws.name}</span>
+                      {currentWorkspace?.id === ws.id && (
+                        <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--primary)', background: 'var(--primary-soft)', padding: '2px 8px', borderRadius: 999 }}>Aktiv</span>
+                      )}
+                    </div>
+                    {ws.description && <div style={{ fontSize: 12, color: 'var(--muted-2)', marginTop: 2 }}>{ws.description}</div>}
+                  </div>
+                  <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                    {currentWorkspace?.id !== ws.id && (
+                      <button onClick={() => setCurrentWorkspace(ws)} className="btn-ghostM" style={{ padding: '5px 12px', fontSize: 12 }}>Keç</button>
+                    )}
+                    <button onClick={() => startEdit(ws)} className="btn-ghostM" style={{ padding: '5px 10px', fontSize: 12 }}>
+                      <Edit2 size={13} />
+                    </button>
+                    {workspaces.length > 1 && (
+                      <button
+                        onClick={() => setDeleteId(ws.id)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px', fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'transparent', color: '#EF4444', cursor: 'pointer' }}
+                      >
+                        <Trash2 size={13} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Delete confirmation */}
+      {deleteId && (
+        <div style={{ padding: 16, borderRadius: 12, background: '#FEE2E2', border: '1px solid #FECACA', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0, marginTop: 2 }} />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: '#991B1B' }}>Bu iş sahəsini silmək istəyirsiniz?</div>
+              <div style={{ fontSize: 12, color: '#B91C1C', marginTop: 4 }}>
+                Bu əməliyyat geri qaytarıla bilməz. Daxilindəki məlumatlar silinməyəcək, lakin iş sahəsi bağlantısı kəsiləcək.
+              </div>
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button onClick={() => setDeleteId(null)} className="btn-ghostM">Ləğv et</button>
+            <button
+              onClick={handleDelete}
+              disabled={deleting}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13, borderRadius: 8, background: '#EF4444', color: '#fff', border: 'none', cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1, fontWeight: 700 }}
+            >
+              {deleting ? <><Loader2 size={13} className="animate-spin" /> Silinir...</> : <><Trash2 size={13} /> Sil</>}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Connection Tab ────────────────────────────────────────────────────────────
 
 function ConnectionTab() {
@@ -632,7 +824,7 @@ function ConnectionTab() {
           Firebase Firestore
         </h2>
 
-        <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+        <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
           <div>
             <div className="text-text-primary text-sm font-medium">Firebase Admin SDK</div>
             <div className="text-text-muted text-xs mt-0.5">
@@ -964,7 +1156,7 @@ function ExportImportTab() {
         </button>
         {migrateResult && <p className="text-sm mt-2">{migrateResult}</p>}
 
-        <div className="border-t border-white/[0.06] pt-4">
+        <div className="border-t border-[var(--border)] pt-4">
           <p className="text-text-muted text-xs mb-3">Əgər köçürmə artıq edilibsə amma tapşırıqlar layihə altında görünmürsə, aşağıdakı düymə ilə yenidən bağlayın:</p>
           <button
             onClick={handleRelinkTasks}
@@ -1052,8 +1244,8 @@ function ExportImportTab() {
 
         {/* Preview */}
         {importFile && preview && (
-          <div className="rounded-xl overflow-hidden border border-white/[0.08]">
-            <div className="flex items-center justify-between px-4 py-2.5 bg-white/[0.03]">
+          <div className="rounded-xl overflow-hidden border border-[var(--border)]">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-[var(--surface-2)]">
               <div className="flex items-center gap-2 text-sm">
                 <FileText size={14} className="text-accent-blue" />
                 <span className="text-text-primary font-medium">{importFile.name}</span>
@@ -1074,7 +1266,7 @@ function ExportImportTab() {
                 {preview.map((row, ri) => (
                   <tr key={ri} className={ri === 0 ? 'font-semibold text-text-primary' : 'text-text-secondary'}>
                     {row.map((cell, ci) => (
-                      <td key={ci} className="px-2 py-1 border-b border-white/[0.04] max-w-[160px] truncate">
+                      <td key={ci} className="px-2 py-1 border-b border-[var(--border)] max-w-[160px] truncate">
                         {cell}
                       </td>
                     ))}
@@ -1123,48 +1315,55 @@ function ExportImportTab() {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'connection' | 'users' | 'export'
+type Tab = 'workspace' | 'connection' | 'users' | 'export'
 
 export default function SettingsPage() {
   const { user } = useAuth()
-  const [tab, setTab] = useState<Tab>('connection')
+  const [tab, setTab] = useState<Tab>('workspace')
 
   const tabs: { id: Tab; label: string; icon: typeof Settings }[] = [
+    { id: 'workspace',  label: 'İş Sahələri',   icon: Layers },
     { id: 'connection', label: 'Əlaqə',         icon: Database },
-    { id: 'users',      label: 'İstifadəçilər',  icon: Users },
+    { id: 'users',      label: 'İstifadəçilər', icon: Users },
     { id: 'export',     label: 'Export / Import', icon: Download },
   ]
 
   return (
     <div className="pageM fade-in">
-      <div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)', margin: 0 }} className="">Parametrlər</h1>
-        <p className="text-text-secondary text-sm mt-1">Platforma konfiqurasiyası</p>
+      <div className="page-headerM">
+        <div>
+          <h1>Parametrlər</h1>
+          <p className="sub">Platforma konfiqurasiyası</p>
+        </div>
       </div>
 
       {/* Tab nav */}
-      <div className="flex gap-1 border-b border-white/[0.06] pb-0 overflow-x-auto">
+      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', overflowX: 'auto' }}>
         {tabs.map(({ id, label, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setTab(id)}
-            className={cn(
-              'flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-all border-b-2 -mb-px whitespace-nowrap',
-              tab === id
-                ? 'text-accent-blue border-accent-blue'
-                : 'text-text-secondary border-transparent hover:text-text-primary'
-            )}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 8,
+              padding: '10px 16px', fontSize: 13, fontWeight: 600,
+              borderBottom: tab === id ? '2px solid var(--primary)' : '2px solid transparent',
+              color: tab === id ? 'var(--primary)' : 'var(--muted)',
+              background: 'transparent', border: 'none',
+              cursor: 'pointer', whiteSpace: 'nowrap', marginBottom: -1,
+              transition: 'color .12s',
+            }}
           >
             <Icon size={15} />
             {label}
             {id === 'users' && user?.role === 'admin' && (
-              <ShieldCheck size={12} className="text-accent-purple opacity-70" />
+              <ShieldCheck size={12} style={{ color: '#8B5CF6', opacity: 0.7 }} />
             )}
           </button>
         ))}
       </div>
 
       {/* Tab content */}
+      {tab === 'workspace'  && <WorkspaceTab />}
       {tab === 'connection' && <ConnectionTab />}
       {tab === 'users'      && <UsersTab />}
       {tab === 'export'     && <ExportImportTab />}

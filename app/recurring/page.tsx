@@ -28,7 +28,7 @@ function priorityColor(p: Priority): string {
   return p === 'Kritik' ? 'text-accent-red bg-accent-red/10 border-accent-red/20'
     : p === 'Yüksək' ? 'text-accent-orange bg-accent-orange/10 border-accent-orange/20'
     : p === 'Orta'   ? 'text-accent-yellow bg-accent-yellow/10 border-accent-yellow/20'
-    : 'text-text-secondary bg-white/[0.05] border-white/[0.10]'
+    : 'text-text-secondary bg-[var(--surface-2)] border-[var(--border)]'
 }
 
 // ── Form ──────────────────────────────────────────────────────────────────────
@@ -168,7 +168,7 @@ function RecurringForm({ initial, projects, teamNames, onSubmit, onCancel, loadi
         />
       </div>
 
-      <div className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/[0.06]">
+      <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
         <div>
           <div className="text-text-primary text-sm font-medium">Aktiv</div>
           <div className="text-text-muted text-xs">Şablon aktiv olduqda avtomatik yaradılır</div>
@@ -210,7 +210,7 @@ function Modal({ open, onClose, title, children }: {
       >
         <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 z-10" style={{ borderColor: 'var(--border)', background: 'rgb(var(--bg-card))' }}>
           <h3 className="font-semibold text-text-primary text-sm">{title}</h3>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-all">
+          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-[var(--surface-2)] transition-all">
             <X size={14} />
           </button>
         </div>
@@ -348,8 +348,8 @@ export default function RecurringPage() {
         <div className="space-y-4">
           {[...Array(3)].map((_, i) => (
             <div key={i} className="card p-5 space-y-3">
-              <div className="h-4 w-1/3 rounded-full bg-white/[0.06] animate-pulse" />
-              <div className="h-12 rounded-xl bg-white/[0.03] animate-pulse" />
+              <div className="h-4 w-1/3 rounded-full bg-[var(--surface-2)] animate-pulse" />
+              <div className="h-12 rounded-xl bg-[var(--surface-2)] animate-pulse" />
             </div>
           ))}
         </div>
@@ -372,7 +372,7 @@ export default function RecurringPage() {
                 <span className="text-text-secondary text-sm font-semibold">
                   {projectId === '_none' ? 'Layihəsiz' : projectName(projectId)}
                 </span>
-                <span className="text-xs text-text-muted bg-white/[0.05] px-2 py-0.5 rounded-full">
+                <span className="text-xs text-text-muted bg-[var(--surface-2)] px-2 py-0.5 rounded-full">
                   {groupTasks.length}
                 </span>
               </div>
@@ -416,7 +416,7 @@ export default function RecurringPage() {
                         {recurrenceLabel(task.recurrence)}
                       </span>
                       {task.assignee && (
-                        <span className="badge text-[10px] bg-white/[0.04] text-text-secondary border-white/[0.08]">
+                        <span className="badge text-[10px] bg-[var(--surface-2)] text-text-secondary border-[var(--border)]">
                           {task.assignee}
                         </span>
                       )}
@@ -439,7 +439,7 @@ export default function RecurringPage() {
                     </div>
 
                     {/* Actions */}
-                    <div className="flex gap-2 pt-1 border-t border-white/[0.06]">
+                    <div className="flex gap-2 pt-1 border-t border-[var(--border)]">
                       <button
                         onClick={() => handleGenerate(task)}
                         disabled={generating === task.id}
@@ -452,7 +452,7 @@ export default function RecurringPage() {
                       </button>
                       <button
                         onClick={() => { setSelected(task); setModal('edit') }}
-                        className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all"
+                        className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-[var(--surface-2)] transition-all"
                       >
                         <Edit2 size={13} />
                       </button>

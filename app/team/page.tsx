@@ -86,7 +86,7 @@ function MemberForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await onSubmit({ ...form })
+    await onSubmit({ ...form } as Omit<TeamMember, 'id' | 'createdAt'>)
   }
 
   return (

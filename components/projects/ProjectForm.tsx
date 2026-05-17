@@ -37,7 +37,7 @@ export function ProjectForm({ initial, teamNames = [], onSubmit, onCancel, loadi
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    await onSubmit({ ...form, owner: owners.join(', ') })
+    await onSubmit({ ...form, owner: owners.join(', ') } as Omit<Project, 'id' | 'createdAt'>)
   }
 
   return (

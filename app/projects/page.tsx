@@ -101,7 +101,7 @@ export default function ProjectsPage() {
                 'px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
                 statusFilter === s
                   ? 'bg-accent-blue text-white'
-                  : 'text-text-secondary hover:text-text-primary hover:bg-white/[0.06]'
+                  : 'text-text-secondary hover:text-text-primary hover:bg-[var(--surface-2)]'
               )}
             >
               {s}
@@ -112,14 +112,14 @@ export default function ProjectsPage() {
           <button
             onClick={() => setView('grid')}
             className={cn('w-8 h-8 rounded-lg flex items-center justify-center transition-all',
-              view === 'grid' ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+              view === 'grid' ? 'bg-[var(--surface-2)] text-text-primary' : 'text-text-muted hover:text-text-primary')}
           >
             <LayoutGrid size={15} />
           </button>
           <button
             onClick={() => setView('list')}
             className={cn('w-8 h-8 rounded-lg flex items-center justify-center transition-all',
-              view === 'list' ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+              view === 'list' ? 'bg-[var(--surface-2)] text-text-primary' : 'text-text-muted hover:text-text-primary')}
           >
             <List size={15} />
           </button>
@@ -157,7 +157,7 @@ export default function ProjectsPage() {
         <div className="card overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-white/[0.06]">
+              <tr className="border-b border-[var(--border)]">
                 {['Layihə', 'Status', 'Prioritet', 'Məsul', 'Son tarix', 'Tapşırıq', 'İrəliləyiş', ''].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-text-muted text-xs font-medium whitespace-nowrap">{h}</th>
                 ))}
@@ -167,7 +167,7 @@ export default function ProjectsPage() {
               {filtered.map(p => {
                 const count = taskCounts[p.id] || 0
                 return (
-                  <tr key={p.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
+                  <tr key={p.id} className="border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors group">
                     <td className="px-4 py-3 max-w-[200px]">
                       <div className="flex items-center gap-2">
                         <div
@@ -210,7 +210,7 @@ export default function ProjectsPage() {
                         <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
                           <button
                             onClick={() => { setSelected(p); setModal('edit') }}
-                            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all"
+                            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-[var(--surface-2)] transition-all"
                           >
                             <Edit2 size={13} />
                           </button>

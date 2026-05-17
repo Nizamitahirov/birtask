@@ -139,15 +139,15 @@ export default function RoadmapPage() {
         <div className="card overflow-hidden">
           <div className="flex">
             {/* Project labels */}
-            <div className="flex-shrink-0 border-r border-white/[0.06]" style={{ width: LABEL_WIDTH }}>
+            <div className="flex-shrink-0 border-r border-[var(--border)]" style={{ width: LABEL_WIDTH }}>
               {/* Month header spacer */}
-              <div className="h-10 border-b border-white/[0.06] flex items-center px-4">
+              <div className="h-10 border-b border-[var(--border)] flex items-center px-4">
                 <span className="text-text-muted text-xs font-medium">Layihə</span>
               </div>
               {projectBars.map(({ project }) => (
                 <div
                   key={project.id}
-                  className="flex items-center gap-2 px-4 border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors"
+                  className="flex items-center gap-2 px-4 border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors"
                   style={{ height: ROW_HEIGHT }}
                 >
                   <div
@@ -168,11 +168,11 @@ export default function RoadmapPage() {
             <div ref={containerRef} className="flex-1 overflow-x-auto">
               <div style={{ width: timelineWidth, minWidth: '100%' }}>
                 {/* Month headers */}
-                <div className="flex h-10 border-b border-white/[0.06] relative">
+                <div className="flex h-10 border-b border-[var(--border)] relative">
                   {months.map(m => (
                     <div
                       key={m.name}
-                      className="absolute top-0 flex items-center border-r border-white/[0.04] h-full px-2"
+                      className="absolute top-0 flex items-center border-r border-[var(--border)] h-full px-2"
                       style={{ left: m.x, width: m.width }}
                     >
                       <span className="text-text-muted text-xs font-medium whitespace-nowrap overflow-hidden">{m.name}</span>
@@ -191,7 +191,7 @@ export default function RoadmapPage() {
                 {projectBars.map(({ project, startX, width, progress }) => (
                   <div
                     key={project.id}
-                    className="relative border-b border-white/[0.04] hover:bg-white/[0.015] transition-colors"
+                    className="relative border-b border-[var(--border)] hover:bg-[var(--surface-2)] transition-colors"
                     style={{ height: ROW_HEIGHT, width: timelineWidth }}
                   >
                     {/* Grid lines */}
@@ -248,7 +248,7 @@ export default function RoadmapPage() {
 
           {/* Today marker legend */}
           {todayX >= 0 && (
-            <div className="flex items-center gap-2 px-4 py-2 border-t border-white/[0.06]">
+            <div className="flex items-center gap-2 px-4 py-2 border-t border-[var(--border)]">
               <div className="w-4 h-0.5 bg-accent-blue/60" />
               <span className="text-text-muted text-xs">Bugün ({today.toLocaleDateString('az-AZ')})</span>
             </div>
