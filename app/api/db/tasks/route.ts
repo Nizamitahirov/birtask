@@ -6,13 +6,17 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url)
     const projectId = searchParams.get('projectId')
+    const workspaceId = searchParams.get('workspaceId')
 
     let query: FirebaseFirestore.Query = adminDb.collection('tasks')
-    if (projectId) query = query.where('projectId', '==', projectId)
+    if (workspaceId) query = query.where('workspaceId', '==', workspaceId)
+    else if (projectId) query = query.where('projectId', '==', projectId)
+
+    if (projectId && workspaceId) query = query.where('projectId', '==', projectId)
 
     const snapshot = await query.get()
     const tasks = snapshot.docs
-      .map((doc) => ({ ...doc.data(), id: doc.id }))
+      .map(doc => ({ ...doc.data(), id: doc.id }))
       .sort((a, b) => {
         const at = (a as { createdAt?: string }).createdAt || ''
         const bt = (b as { createdAt?: string }).createdAt || ''
@@ -43,6 +47,7 @@ export async function POST(req: NextRequest) {
       entityType: 'task',
       entityId: docRef.id,
       entityName: data.title || '',
+      workspaceId: data.workspaceId || '',
       userId: 'system',
       userDisplayName: 'System',
       createdAt: now,

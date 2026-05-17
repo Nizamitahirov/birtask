@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { db } from '@/lib/db'
 import { Project, Task, TeamMember, TimeEntry } from '@/lib/types'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { cn } from '@/lib/utils'
 import {
   BarChart2, TrendingUp, Clock, CheckSquare,
@@ -207,6 +208,7 @@ function DonutChart({ slices }: { slices: DonutSlice[] }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function AnalyticsPage() {
+  const { currentWorkspaceId } = useWorkspace()
   const [projects, setProjects] = useState<Project[]>([])
   const [tasks, setTasks] = useState<Task[]>([])
   const [team, setTeam] = useState<TeamMember[]>([])
@@ -216,10 +218,11 @@ export default function AnalyticsPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
+    const wsId = currentWorkspaceId || undefined
     const [pRes, tRes, mRes, eRes] = await Promise.all([
-      db.projects.getAll(),
-      db.tasks.getAll(),
-      db.team.getAll(),
+      db.projects.getAll(wsId),
+      db.tasks.getAll(undefined, wsId),
+      db.team.getAll(wsId),
       db.timeEntries.getAll(),
     ])
     if (pRes.success && pRes.data) setProjects(pRes.data)
@@ -227,7 +230,7 @@ export default function AnalyticsPage() {
     if (mRes.success && mRes.data) setTeam(mRes.data)
     if (eRes.success && eRes.data) setTimeEntries(eRes.data)
     setLoading(false)
-  }, [])
+  }, [currentWorkspaceId])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 

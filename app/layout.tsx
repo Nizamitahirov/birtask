@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/contexts/AuthContext'
+import { WorkspaceProvider } from '@/contexts/WorkspaceContext'
 import { AuthenticatedLayout } from '@/components/layout/AuthenticatedLayout'
 import { ClientToaster } from '@/components/ui/ClientToaster'
 
@@ -40,9 +41,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <AuthProvider>
-          <AuthenticatedLayout>
-            {children}
-          </AuthenticatedLayout>
+          <WorkspaceProvider>
+            <AuthenticatedLayout>
+              {children}
+            </AuthenticatedLayout>
+          </WorkspaceProvider>
         </AuthProvider>
         <ClientToaster />
       </body>

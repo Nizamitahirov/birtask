@@ -1,9 +1,21 @@
+export interface Workspace {
+  id: string
+  name: string
+  description?: string
+  color: string
+  ownerId: string
+  memberIds: string[]
+  createdAt: string
+  updatedAt: string
+}
+
 export type ProjectStatus = 'Planlaşdırılır' | 'Davam edir' | 'Tamamlandı' | 'Dayandırıldı'
 export type TaskStatus = 'Gözləyir' | 'Davam edir' | 'Yoxlanılır' | 'Tamamlandı'
 export type Priority = 'Aşağı' | 'Orta' | 'Yüksək' | 'Kritik'
 
 export interface Project {
   id: string
+  workspaceId: string
   name: string
   description: string
   status: ProjectStatus
@@ -19,6 +31,7 @@ export interface Project {
 
 export interface Task {
   id: string
+  workspaceId: string
   projectId: string
   projectName: string
   title: string
@@ -34,6 +47,7 @@ export interface Task {
 
 export interface TeamMember {
   id: string
+  workspaceId: string
   name: string
   email: string
   role: string
@@ -99,6 +113,7 @@ export interface Comment {
 
 export interface ActivityLog {
   id: string
+  workspaceId?: string
   action: 'create' | 'update' | 'delete' | 'login' | 'logout' | 'complete' | 'comment'
   entityType: 'project' | 'task' | 'team' | 'user' | 'comment'
   entityId: string
@@ -123,6 +138,7 @@ export interface Notification {
 
 export interface TimeEntry {
   id: string
+  workspaceId?: string
   taskId: string
   projectId: string
   userId: string
@@ -136,6 +152,7 @@ export interface TimeEntry {
 
 export interface RecurringTask {
   id: string
+  workspaceId?: string
   projectId: string
   title: string
   description: string

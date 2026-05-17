@@ -9,6 +9,7 @@ import {
   User,
   TimeEntry,
   RecurringTask,
+  Workspace,
 } from './types'
 
 const API_BASE = '/api/db'
@@ -47,8 +48,20 @@ async function callApi<T>(
 }
 
 export const db = {
+  workspaces: {
+    getAll: () => callApi<Workspace[]>('/workspaces'),
+    getById: (id: string) => callApi<Workspace>(`/workspaces/${id}`),
+    create: (data: Omit<Workspace, 'id' | 'createdAt' | 'updatedAt'>) =>
+      callApi<Workspace>('/workspaces', 'POST', data),
+    update: (id: string, data: Partial<Workspace>) =>
+      callApi<Workspace>(`/workspaces/${id}`, 'PUT', data),
+    delete: (id: string) => callApi<void>(`/workspaces/${id}`, 'DELETE'),
+    setup: (data: { name?: string; color?: string; ownerId?: string }) =>
+      callApi<{ workspaceId: string; migrated: number }>('/workspaces/setup', 'POST', data),
+  },
   projects: {
-    getAll: () => callApi<Project[]>('/projects'),
+    getAll: (workspaceId?: string) =>
+      callApi<Project[]>('/projects', 'GET', workspaceId ? { workspaceId } : undefined),
     getById: (id: string) => callApi<Project>(`/projects/${id}`),
     create: (data: Omit<Project, 'id' | 'createdAt'>) =>
       callApi<Project>('/projects', 'POST', data),
@@ -57,8 +70,8 @@ export const db = {
     delete: (id: string) => callApi<void>(`/projects/${id}`, 'DELETE'),
   },
   tasks: {
-    getAll: (projectId?: string) =>
-      callApi<Task[]>('/tasks', 'GET', projectId ? { projectId } : undefined),
+    getAll: (projectId?: string, workspaceId?: string) =>
+      callApi<Task[]>('/tasks', 'GET', { ...(workspaceId ? { workspaceId } : {}), ...(projectId ? { projectId } : {}) }),
     getById: (id: string) => callApi<Task>(`/tasks/${id}`),
     create: (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) =>
       callApi<Task>('/tasks', 'POST', data),
@@ -68,7 +81,8 @@ export const db = {
     relink: () => callApi<{ relinked: number; total: number }>('/tasks/relink', 'POST'),
   },
   team: {
-    getAll: () => callApi<TeamMember[]>('/team'),
+    getAll: (workspaceId?: string) =>
+      callApi<TeamMember[]>('/team', 'GET', workspaceId ? { workspaceId } : undefined),
     create: (data: Omit<TeamMember, 'id' | 'createdAt'>) =>
       callApi<TeamMember>('/team', 'POST', data),
     update: (id: string, data: Partial<TeamMember>) =>
@@ -83,7 +97,8 @@ export const db = {
     delete: (id: string) => callApi<void>(`/comments/${id}`, 'DELETE'),
   },
   activity: {
-    getAll: () => callApi<ActivityLog[]>('/activity'),
+    getAll: (workspaceId?: string) =>
+      callApi<ActivityLog[]>('/activity', 'GET', workspaceId ? { workspaceId } : undefined),
   },
   notifications: {
     getAll: (userId: string) =>

@@ -3,25 +3,27 @@
 import { useState, useEffect, useCallback } from 'react'
 import { db } from '@/lib/db'
 import { Project, Task, TeamMember, Activity, ActivityLog, DashboardStats } from '@/lib/types'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import toast from 'react-hot-toast'
 
 export function useProjects() {
+  const { currentWorkspaceId } = useWorkspace()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetch = useCallback(async () => {
     setLoading(true)
-    const res = await db.projects.getAll()
+    const res = await db.projects.getAll(currentWorkspaceId || undefined)
     if (res.success && res.data) setProjects(res.data)
     else setError(res.error || 'Xəta baş verdi')
     setLoading(false)
-  }, [])
+  }, [currentWorkspaceId])
 
   useEffect(() => { fetch() }, [fetch])
 
   const create = async (data: Omit<Project, 'id' | 'createdAt'>) => {
-    const res = await db.projects.create(data)
+    const res = await db.projects.create({ ...data, workspaceId: currentWorkspaceId || '' })
     if (res.success) { toast.success('Layihə yaradıldı'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
@@ -45,20 +47,21 @@ export function useProjects() {
 }
 
 export function useTasks(projectId?: string) {
+  const { currentWorkspaceId } = useWorkspace()
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetch = useCallback(async () => {
     setLoading(true)
-    const res = await db.tasks.getAll(projectId)
+    const res = await db.tasks.getAll(projectId, currentWorkspaceId || undefined)
     if (res.success && res.data) setTasks(res.data)
     setLoading(false)
-  }, [projectId])
+  }, [projectId, currentWorkspaceId])
 
   useEffect(() => { fetch() }, [fetch])
 
   const create = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
-    const res = await db.tasks.create(data)
+    const res = await db.tasks.create({ ...data, workspaceId: currentWorkspaceId || '' })
     if (res.success) { toast.success('Tapşırıq yaradıldı'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
@@ -82,20 +85,21 @@ export function useTasks(projectId?: string) {
 }
 
 export function useTeam() {
+  const { currentWorkspaceId } = useWorkspace()
   const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
 
   const fetch = useCallback(async () => {
     setLoading(true)
-    const res = await db.team.getAll()
+    const res = await db.team.getAll(currentWorkspaceId || undefined)
     if (res.success && res.data) setMembers(res.data)
     setLoading(false)
-  }, [])
+  }, [currentWorkspaceId])
 
   useEffect(() => { fetch() }, [fetch])
 
   const create = async (data: Omit<TeamMember, 'id' | 'createdAt'>) => {
-    const res = await db.team.create(data)
+    const res = await db.team.create({ ...data, workspaceId: currentWorkspaceId || '' })
     if (res.success) { toast.success('Üzv əlavə edildi'); await fetch() }
     else toast.error(res.error || 'Xəta baş verdi')
     return res
@@ -118,20 +122,21 @@ export function useTeam() {
   return { members, loading, refresh: fetch, create, update, remove }
 }
 
-// Batch load for dashboard - parallel API calls
 export function useDashboard() {
+  const { currentWorkspaceId } = useWorkspace()
   const [stats, setStats] = useState<DashboardStats | null>(null)
   const [activities, setActivities] = useState<Activity[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    if (!currentWorkspaceId) return
     const fetchAll = async () => {
       setLoading(true)
       const [projectsRes, tasksRes, teamRes, activityRes] = await Promise.all([
-        db.projects.getAll(),
-        db.tasks.getAll(),
-        db.team.getAll(),
-        db.activity.getAll(),
+        db.projects.getAll(currentWorkspaceId),
+        db.tasks.getAll(undefined, currentWorkspaceId),
+        db.team.getAll(currentWorkspaceId),
+        db.activity.getAll(currentWorkspaceId),
       ])
 
       const projects = (projectsRes.success && projectsRes.data) ? projectsRes.data : []
@@ -150,7 +155,6 @@ export function useDashboard() {
         teamSize: team.length,
       })
 
-      // Map ActivityLog to Activity shape for the feed
       const mapped: Activity[] = activity.slice(0, 20).map((a: ActivityLog) => ({
         id: a.id,
         type: (a.action === 'complete' ? 'complete'
@@ -167,33 +171,35 @@ export function useDashboard() {
       setLoading(false)
     }
     fetchAll()
-  }, [])
+  }, [currentWorkspaceId])
 
   return { stats, activities, loading }
 }
 
-// For forms - get team member names as string array
 export function useTeamNames(): string[] {
+  const { currentWorkspaceId } = useWorkspace()
   const [names, setNames] = useState<string[]>([])
   useEffect(() => {
-    db.team.getAll().then(res => {
+    if (!currentWorkspaceId) return
+    db.team.getAll(currentWorkspaceId).then(res => {
       if (res.success && res.data) setNames(res.data.map(m => m.name))
     })
-  }, [])
+  }, [currentWorkspaceId])
   return names
 }
 
-// For lookups - get Record<id, name> mapping
 export function useTeamMap(): Record<string, string> {
+  const { currentWorkspaceId } = useWorkspace()
   const [map, setMap] = useState<Record<string, string>>({})
   useEffect(() => {
-    db.team.getAll().then(res => {
+    if (!currentWorkspaceId) return
+    db.team.getAll(currentWorkspaceId).then(res => {
       if (res.success && res.data) {
         const m: Record<string, string> = {}
         res.data.forEach(member => { m[member.id] = member.name })
         setMap(m)
       }
     })
-  }, [])
+  }, [currentWorkspaceId])
   return map
 }

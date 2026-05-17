@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { db } from '@/lib/db'
 import { RecurringTask, Priority, Project } from '@/lib/types'
 import { useTeamNames } from '@/hooks/useSheets'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { cn } from '@/lib/utils'
 import {
   Repeat, Plus, Edit2, Trash2, Play, RefreshCw,
@@ -222,6 +223,7 @@ function Modal({ open, onClose, title, children }: {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function RecurringPage() {
+  const { currentWorkspaceId } = useWorkspace()
   const [tasks, setTasks] = useState<RecurringTask[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
@@ -234,14 +236,15 @@ export default function RecurringPage() {
 
   const fetchAll = useCallback(async () => {
     setLoading(true)
+    const wsId = currentWorkspaceId || undefined
     const [tRes, pRes] = await Promise.all([
       db.recurringTasks.getAll(),
-      db.projects.getAll(),
+      db.projects.getAll(wsId),
     ])
     if (tRes.success && tRes.data) setTasks(tRes.data)
     if (pRes.success && pRes.data) setProjects(pRes.data)
     setLoading(false)
-  }, [])
+  }, [currentWorkspaceId])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 

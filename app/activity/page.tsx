@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react'
 import { db } from '@/lib/db'
 import { ActivityLog } from '@/lib/types'
 import { useAuth } from '@/contexts/AuthContext'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import {
   Activity, Plus, Edit2, Trash2, CheckCircle2, LogIn, LogOut,
   MessageSquare, Filter, RefreshCw, Shield, ChevronDown
@@ -80,6 +81,7 @@ const ALL_ENTITY_TYPES = ['Hamısı', 'project', 'task', 'team', 'user', 'commen
 
 export default function ActivityPage() {
   const { user } = useAuth()
+  const { currentWorkspaceId } = useWorkspace()
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -92,13 +94,13 @@ export default function ActivityPage() {
 
   const fetchLogs = async () => {
     setLoading(true)
-    const res = await db.activity.getAll()
+    const res = await db.activity.getAll(currentWorkspaceId || undefined)
     if (res.success && res.data) setLogs(res.data)
     else toast.error(res.error || 'Aktivlik məlumatları yüklənmədi')
     setLoading(false)
   }
 
-  useEffect(() => { fetchLogs() }, [])
+  useEffect(() => { fetchLogs() }, [currentWorkspaceId])
 
   // Derive available years from logs
   const availableYears = useMemo(() => {

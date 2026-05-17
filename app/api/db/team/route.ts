@@ -2,13 +2,22 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const snapshot = await adminDb
-      .collection('team')
-      .orderBy('createdAt', 'desc')
-      .get()
-    const members = snapshot.docs.map((doc) => ({ ...doc.data(), id: doc.id }))
+    const { searchParams } = new URL(req.url)
+    const workspaceId = searchParams.get('workspaceId')
+
+    let query: FirebaseFirestore.Query = adminDb.collection('team')
+    if (workspaceId) query = query.where('workspaceId', '==', workspaceId)
+
+    const snapshot = await query.get()
+    const members = snapshot.docs
+      .map(doc => ({ ...doc.data(), id: doc.id }))
+      .sort((a, b) => {
+        const at = (a as { createdAt?: string }).createdAt || ''
+        const bt = (b as { createdAt?: string }).createdAt || ''
+        return bt.localeCompare(at)
+      })
     return NextResponse.json({ success: true, data: members })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'
@@ -33,6 +42,7 @@ export async function POST(req: NextRequest) {
       entityType: 'team',
       entityId: docRef.id,
       entityName: data.name || '',
+      workspaceId: data.workspaceId || '',
       userId: 'system',
       userDisplayName: 'System',
       createdAt: now,

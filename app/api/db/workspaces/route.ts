@@ -2,23 +2,17 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
 
-export async function GET(req: NextRequest) {
+export async function GET() {
   try {
-    const { searchParams } = new URL(req.url)
-    const workspaceId = searchParams.get('workspaceId')
-
-    let query: FirebaseFirestore.Query = adminDb.collection('projects')
-    if (workspaceId) query = query.where('workspaceId', '==', workspaceId)
-
-    const snapshot = await query.get()
-    const projects = snapshot.docs
+    const snapshot = await adminDb.collection('workspaces').get()
+    const workspaces = snapshot.docs
       .map(doc => ({ ...doc.data(), id: doc.id }))
       .sort((a, b) => {
         const at = (a as { createdAt?: string }).createdAt || ''
         const bt = (b as { createdAt?: string }).createdAt || ''
-        return bt.localeCompare(at)
+        return at.localeCompare(bt)
       })
-    return NextResponse.json({ success: true, data: projects })
+    return NextResponse.json({ success: true, data: workspaces })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'
     return NextResponse.json({ success: false, error: message }, { status: 500 })
@@ -29,25 +23,18 @@ export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
     const now = new Date().toISOString()
-    const docRef = await adminDb.collection('projects').add({
-      ...data,
+    const docRef = await adminDb.collection('workspaces').add({
+      name: data.name || 'Yeni İş Sahəsi',
+      description: data.description || '',
+      color: data.color || '#5B5BF5',
+      ownerId: data.ownerId || '',
+      memberIds: data.memberIds || [],
       createdAt: now,
+      updatedAt: now,
       id: '',
     })
     await docRef.update({ id: docRef.id })
-    const created = { ...data, id: docRef.id, createdAt: now }
-
-    await adminDb.collection('activity').add({
-      action: 'create',
-      entityType: 'project',
-      entityId: docRef.id,
-      entityName: data.name || '',
-      workspaceId: data.workspaceId || '',
-      userId: 'system',
-      userDisplayName: 'System',
-      createdAt: now,
-    })
-
+    const created = { ...data, id: docRef.id, createdAt: now, updatedAt: now }
     return NextResponse.json({ success: true, data: created }, { status: 201 })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'

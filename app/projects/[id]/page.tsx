@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { db } from '@/lib/db'
 import { useTeamNames } from '@/hooks/useSheets'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { Project, Task, TaskStatus } from '@/lib/types'
 import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
 import { Modal } from '@/components/ui/Modal'
@@ -36,6 +37,7 @@ const STATUS_COLORS: Record<TaskStatus, string> = {
 export default function ProjectDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { currentWorkspaceId } = useWorkspace()
   const [project, setProject] = useState<Project | null>(null)
   const [tasks, setTasks] = useState<Task[]>([])
   const [loading, setLoading] = useState(true)
@@ -69,7 +71,7 @@ export default function ProjectDetailPage() {
 
   const handleCreateTask = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
     setSaving(true)
-    const res = await db.tasks.create({ ...data, projectId: id, projectName: project?.name || '' })
+    const res = await db.tasks.create({ ...data, projectId: id, projectName: project?.name || '', workspaceId: currentWorkspaceId || '' })
     if (res.success) { toast.success('Tapşırıq yaradıldı'); await fetchData() }
     else toast.error(res.error || 'Xəta')
     setSaving(false)
