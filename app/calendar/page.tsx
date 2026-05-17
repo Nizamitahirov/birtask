@@ -220,31 +220,27 @@ export default function CalendarPage() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Main Calendar */}
-      <div className="pageM fade-in">
+      <div className="pageM fade-in" style={{ flex: 1, minWidth: 0 }}>
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <h1 className="page-title">Təqvim</h1>
-            <button
-              onClick={jumpToToday}
-              className="text-xs px-2.5 py-1 rounded-lg border border-white/[0.1] text-text-secondary hover:text-text-primary hover:border-white/[0.2] transition-all"
-            >
-              Bugün
-            </button>
+        <div className="page-headerM">
+          <div>
+            <h1>Təqvim</h1>
+            <p className="sub">Tapşırıqları tarixə görə izləyin</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
             <select
               value={projectFilter}
               onChange={e => setProjectFilter(e.target.value)}
-              className="select text-xs !py-1.5 max-w-[160px]"
+              className="inputM"
+              style={{ maxWidth: 160, padding: '6px 10px', fontSize: 12 }}
             >
               <option value="all">Bütün layihələr</option>
               {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
             </select>
-            <button onClick={refresh} className="btn-secondary w-9 h-9 !p-0 justify-center" title="Yenilə">
+            <button onClick={refresh} className="btn-ghostM" style={{ width: 36, height: 36, padding: 0, justifyContent: 'center' }} title="Yenilə">
               <RefreshCw size={15} />
             </button>
-            <button onClick={() => { setNewTaskDate(selectedDay ? toLocalDateStr(selectedDay) : ''); setModal('create') }} className="btn-primary">
+            <button onClick={() => { setNewTaskDate(selectedDay ? toLocalDateStr(selectedDay) : ''); setModal('create') }} className="btn-primaryM">
               <Plus size={15} /> Tapşırıq
             </button>
           </div>
@@ -253,11 +249,12 @@ export default function CalendarPage() {
         {/* View toggle + navigation */}
         <div className="flex items-center justify-between flex-shrink-0">
           <div className="flex items-center gap-2">
-            <button onClick={() => navigate(-1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.06] transition-all">
+            <button onClick={() => navigate(-1)} className="btn-ghostM" style={{ width: 32, height: 32, padding: 0, justifyContent: 'center' }}>
               <ChevronLeft size={15} />
             </button>
-            <span className="text-text-primary font-semibold text-sm min-w-[200px] text-center">{headerTitle}</span>
-            <button onClick={() => navigate(1)} className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.06] transition-all">
+            <button onClick={jumpToToday} className="btn-ghostM" style={{ padding: '4px 10px', fontSize: 12 }}>Bugün</button>
+            <span style={{ color: 'var(--ink)', fontWeight: 600, fontSize: 14, minWidth: 200, textAlign: 'center' }}>{headerTitle}</span>
+            <button onClick={() => navigate(1)} className="btn-ghostM" style={{ width: 32, height: 32, padding: 0, justifyContent: 'center' }}>
               <ChevronRight size={15} />
             </button>
           </div>
@@ -267,8 +264,12 @@ export default function CalendarPage() {
                 key={v}
                 onClick={() => setView(v)}
                 title={v === 'month' ? 'Ay' : v === 'week' ? 'Həftə' : 'Gündəlik'}
-                className={cn('w-8 h-8 rounded-lg flex items-center justify-center transition-all text-sm',
-                  view === v ? 'bg-white/[0.1] text-text-primary' : 'text-text-muted hover:text-text-primary')}
+                className="btn-ghostM"
+                style={{
+                  width: 32, height: 32, padding: 0, justifyContent: 'center',
+                  background: view === v ? 'var(--surface-2)' : 'transparent',
+                  color: view === v ? 'var(--ink)' : 'var(--muted)',
+                }}
               >
                 <Icon size={15} />
               </button>
@@ -283,9 +284,9 @@ export default function CalendarPage() {
               {[...Array(35)].map((_, i) => <CardSkeleton key={i} />)}
             </div>
           ) : view === 'month' ? (
-            <div className="card overflow-hidden h-full flex flex-col">
+            <div className="cardM" style={{ padding: 0, overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
               {/* Day names header */}
-              <div className="grid grid-cols-7 border-b border-white/[0.06] flex-shrink-0">
+              <div className="grid grid-cols-7 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
                 {DAY_NAMES_SHORT.map(d => (
                   <div key={d} className="py-2 text-center text-[11px] font-medium text-text-muted">{d}</div>
                 ))}
@@ -307,16 +308,24 @@ export default function CalendarPage() {
                       key={i}
                       onClick={() => isCurrentMonth && handleDayClick(cellDate)}
                       className={cn(
-                        'border-r border-b border-white/[0.04] p-1.5 cursor-pointer transition-colors',
-                        isCurrentMonth ? 'hover:bg-white/[0.02]' : 'opacity-25 pointer-events-none',
-                        isSelected && isCurrentMonth && 'bg-accent-blue/5 border-accent-blue/20'
+                        'border-r border-b p-1.5 cursor-pointer transition-colors',
+                        isCurrentMonth ? '' : 'opacity-25 pointer-events-none',
                       )}
+                      style={{
+                        borderColor: 'var(--border)',
+                        background: isSelected && isCurrentMonth ? 'var(--primary-soft)' : isToday ? 'var(--surface-2)' : 'transparent',
+                      }}
                     >
                       <div className="flex items-center justify-between mb-1">
                         <div className={cn(
                           'w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors',
-                          isToday ? 'bg-accent-blue text-white' : isSelected ? 'text-accent-blue font-bold' : 'text-text-muted'
-                        )}>
+                        )}
+                          style={{
+                            background: isToday ? 'var(--primary)' : 'transparent',
+                            color: isToday ? '#fff' : isSelected ? 'var(--primary)' : 'var(--muted)',
+                            fontWeight: isSelected ? 700 : 500,
+                          }}
+                        >
                           {isCurrentMonth ? dayNum : ''}
                         </div>
                         {isCurrentMonth && (
@@ -358,8 +367,8 @@ export default function CalendarPage() {
               </div>
             </div>
           ) : view === 'week' ? (
-            <div className="card overflow-hidden">
-              <div className="grid grid-cols-7 border-b border-white/[0.06]">
+            <div className="cardM" style={{ padding: 0, overflow: 'hidden' }}>
+              <div className="grid grid-cols-7 border-b" style={{ borderColor: 'var(--border)' }}>
                 {weekDays.map((d, i) => {
                   const isToday = isSameDay(d, today)
                   const isSelected = selectedDay ? isSameDay(d, selectedDay) : false
@@ -367,16 +376,19 @@ export default function CalendarPage() {
                     <div
                       key={i}
                       onClick={() => handleDayClick(d)}
-                      className={cn(
-                        'py-3 px-2 text-center cursor-pointer hover:bg-white/[0.02] transition-colors border-r border-white/[0.04]',
-                        isSelected && 'bg-accent-blue/5'
-                      )}
+                      className="py-3 px-2 text-center cursor-pointer transition-colors border-r"
+                      style={{
+                        borderColor: 'var(--border)',
+                        background: isSelected ? 'var(--primary-soft)' : 'transparent',
+                      }}
                     >
                       <div className="text-[11px] text-text-muted mb-1">{DAY_NAMES_SHORT[i]}</div>
-                      <div className={cn(
-                        'w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold mx-auto',
-                        isToday ? 'bg-accent-blue text-white' : isSelected ? 'text-accent-blue' : 'text-text-secondary'
-                      )}>
+                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold mx-auto"
+                        style={{
+                          background: isToday ? 'var(--primary)' : 'transparent',
+                          color: isToday ? '#fff' : isSelected ? 'var(--primary)' : 'var(--muted)',
+                        }}
+                      >
                         {d.getDate()}
                       </div>
                       {/* Task count dot */}
@@ -402,16 +414,18 @@ export default function CalendarPage() {
                   return (
                     <div
                       key={i}
-                      className={cn(
-                        'border-r border-white/[0.04] p-2 space-y-1.5 cursor-pointer hover:bg-white/[0.01] transition-colors',
-                        (isToday || isSelected) && 'bg-accent-blue/[0.03]'
-                      )}
+                      className="border-r p-2 space-y-1.5 cursor-pointer transition-colors"
+                      style={{
+                        borderColor: 'var(--border)',
+                        background: (isToday || isSelected) ? 'var(--surface-2)' : 'transparent',
+                      }}
                       onClick={() => handleDayClick(d)}
                     >
                       {dayTasks.length === 0 && (
                         <button
                           onClick={e => { e.stopPropagation(); openCreateForDay(d) }}
-                          className="w-full py-3 border border-dashed border-white/[0.06] rounded-lg text-xs text-text-muted hover:border-white/[0.15] hover:text-text-secondary transition-all flex items-center justify-center gap-1"
+                          className="w-full py-3 rounded-lg text-xs flex items-center justify-center gap-1 transition-all"
+                          style={{ border: '1px dashed var(--border)', color: 'var(--muted)' }}
                         >
                           <Plus size={11} />
                         </button>
@@ -455,7 +469,7 @@ export default function CalendarPage() {
             /* Agenda view */
             <div className="space-y-4">
               {groupedAgenda.length === 0 ? (
-                <div className="card p-12 text-center">
+                <div className="cardM" style={{ padding: 48, textAlign: 'center' }}>
                   <CalendarDays size={40} className="text-text-muted mx-auto mb-3 opacity-40" />
                   <p className="text-text-secondary text-sm">Bu ay üçün tapşırıq yoxdur</p>
                 </div>
@@ -485,7 +499,8 @@ export default function CalendarPage() {
                         return (
                           <div
                             key={t.id}
-                            className="card p-3 flex items-center gap-3 cursor-pointer hover:border-white/[0.12] transition-all group"
+                            className="cardM flex items-center gap-3 cursor-pointer transition-all group"
+                          style={{ padding: 12 }}
                             onClick={() => openEdit(t)}
                           >
                             <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ background: sc.text }} />
@@ -496,7 +511,8 @@ export default function CalendarPage() {
                                 </span>
                                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
                                   <button onClick={e => { e.stopPropagation(); openEdit(t) }}
-                                    className="w-6 h-6 rounded flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all">
+                                    className="w-6 h-6 rounded flex items-center justify-center text-text-secondary hover:text-text-primary transition-all"
+                                    style={{ background: 'transparent' }}>
                                     <Edit2 size={11} />
                                   </button>
                                   <button onClick={e => { e.stopPropagation(); setConfirmDelete(t) }}
@@ -537,7 +553,7 @@ export default function CalendarPage() {
 
       {/* Day Detail Panel */}
       {selectedDay && view !== 'agenda' && (
-        <div className="w-72 flex-shrink-0 border-l overflow-y-auto" style={{ borderColor: 'var(--border)', background: 'rgb(var(--bg-secondary))' }}>
+        <div className="w-72 flex-shrink-0 border-l overflow-y-auto" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
           <div className="p-4">
             <div className="flex items-center justify-between mb-4">
               <div>
@@ -551,7 +567,8 @@ export default function CalendarPage() {
               </div>
               <button
                 onClick={() => openCreateForDay(selectedDay)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-blue hover:bg-accent-blue/10 border border-white/[0.08] transition-all"
+                className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-blue hover:bg-accent-blue/10 transition-all"
+                style={{ border: '1px solid var(--border)' }}
                 title="Bu günə tapşırıq əlavə et"
               >
                 <Plus size={14} />
@@ -616,7 +633,7 @@ export default function CalendarPage() {
                           <div className="flex items-center gap-1 flex-wrap">
                             <Tag size={9} className="text-text-muted" />
                             {t.tags.split(',').map(tg => tg.trim()).filter(Boolean).map(tag => (
-                              <span key={tag} className="text-[9px] px-1 py-0.5 rounded bg-white/[0.06] text-text-muted">{tag}</span>
+                              <span key={tag} className="text-[9px] px-1 py-0.5 rounded text-text-muted" style={{ background: 'var(--surface-2)' }}>{tag}</span>
                             ))}
                           </div>
                         )}

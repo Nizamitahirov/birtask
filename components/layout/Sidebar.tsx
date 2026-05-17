@@ -99,10 +99,10 @@ function WorkspaceSwitcher() {
           left: 8,
           right: 8,
           zIndex: 200,
-          background: 'var(--surface-1)',
+          background: 'var(--surface)',
           border: '1px solid var(--border)',
           borderRadius: 12,
-          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+          boxShadow: '0 12px 32px rgba(15,17,41,0.15)',
           padding: '6px',
           marginTop: 4,
         }}>

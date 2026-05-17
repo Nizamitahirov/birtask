@@ -1,20 +1,35 @@
 'use client'
 
 import { useState } from 'react'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { GlobalSearch } from '@/components/ui/GlobalSearch'
+import toast from 'react-hot-toast'
 
 function WorkspaceSetup() {
-  const { runSetup } = useWorkspace()
+  const { runSetup, setNeedsSetup, refresh } = useWorkspace()
+  const router = useRouter()
   const [name, setName] = useState('')
   const [loading, setLoading] = useState(false)
 
   const handleCreate = async () => {
     setLoading(true)
-    await runSetup(name.trim() || undefined)
+    try {
+      const wsId = await runSetup(name.trim() || undefined)
+      if (wsId) {
+        setNeedsSetup(false)
+        router.push('/')
+      } else {
+        // Fallback: force refresh and check again
+        await refresh()
+        setNeedsSetup(false)
+        router.push('/')
+      }
+    } catch {
+      toast.error('Xəta baş verdi, yenidən cəhd edin')
+    }
     setLoading(false)
   }
 
@@ -30,10 +45,11 @@ function WorkspaceSetup() {
       <div style={{
         width: '100%',
         maxWidth: 420,
-        background: 'var(--surface-1)',
+        background: 'var(--surface)',
         border: '1px solid var(--border)',
         borderRadius: 20,
         padding: 40,
+        boxShadow: 'var(--shadow-lg)',
         display: 'flex',
         flexDirection: 'column',
         gap: 24,
@@ -61,9 +77,10 @@ function WorkspaceSetup() {
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <input
+            autoFocus
             value={name}
             onChange={e => setName(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') handleCreate() }}
+            onKeyDown={e => { if (e.key === 'Enter' && !loading) handleCreate() }}
             placeholder="İş sahəsinin adı (məs. PMO, Marketing...)"
             style={{
               width: '100%',
@@ -75,6 +92,7 @@ function WorkspaceSetup() {
               fontSize: 14,
               outline: 'none',
               boxSizing: 'border-box',
+              fontFamily: 'Montserrat, sans-serif',
             }}
           />
           <button
@@ -95,6 +113,7 @@ function WorkspaceSetup() {
               alignItems: 'center',
               justifyContent: 'center',
               gap: 8,
+              fontFamily: 'Montserrat, sans-serif',
             }}
           >
             {loading ? (

@@ -14,6 +14,7 @@ interface WorkspaceContextType {
   refresh: () => Promise<void>
   createWorkspace: (data: { name: string; description?: string; color?: string }) => Promise<Workspace | null>
   needsSetup: boolean
+  setNeedsSetup: (v: boolean) => void
   runSetup: (name?: string) => Promise<string | null>
 }
 
@@ -26,6 +27,7 @@ const WorkspaceContext = createContext<WorkspaceContextType>({
   refresh: async () => {},
   createWorkspace: async () => null,
   needsSetup: false,
+  setNeedsSetup: () => {},
   runSetup: async () => null,
 })
 
@@ -99,6 +101,17 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       await refresh()
       return res.data.workspaceId
     }
+    // If setup endpoint failed, try creating workspace directly
+    const createRes = await db.workspaces.create({
+      name: name || 'Ana İş Sahəsi',
+      color: '#5B5BF5',
+      ownerId: user?.id || '',
+      memberIds: [],
+    })
+    if (createRes.success) {
+      await refresh()
+      return createRes.data?.id || null
+    }
     return null
   }
 
@@ -112,6 +125,7 @@ export function WorkspaceProvider({ children }: { children: React.ReactNode }) {
       refresh,
       createWorkspace,
       needsSetup,
+      setNeedsSetup,
       runSetup,
     }}>
       {children}
