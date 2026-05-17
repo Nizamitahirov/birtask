@@ -12,8 +12,14 @@ function omitPassword(data: Record<string, unknown>) {
 
 export async function GET() {
   try {
-    const snapshot = await adminDb.collection('users').orderBy('createdAt', 'desc').get()
-    const users = snapshot.docs.map((doc) => omitPassword({ ...doc.data(), id: doc.id }))
+    const snapshot = await adminDb.collection('users').get()
+    const users = snapshot.docs
+      .map((doc) => omitPassword({ ...doc.data(), id: doc.id }))
+      .sort((a, b) => {
+        const at = (a as { createdAt?: string }).createdAt || ''
+        const bt = (b as { createdAt?: string }).createdAt || ''
+        return bt.localeCompare(at)
+      })
     return NextResponse.json({ success: true, data: users })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'

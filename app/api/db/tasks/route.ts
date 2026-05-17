@@ -53,6 +53,29 @@ export async function POST(req: NextRequest) {
       createdAt: now,
     })
 
+    // Create notification for assignee if task has one
+    if (data.assignee) {
+      try {
+        const userSnapshot = await adminDb.collection('users')
+          .where('displayName', '==', data.assignee)
+          .get()
+        if (!userSnapshot.empty) {
+          const assigneeUser = userSnapshot.docs[0]
+          await adminDb.collection('notifications').add({
+            userId: assigneeUser.id,
+            type: 'task_assigned',
+            title: 'Yeni tapşırıq',
+            message: `"${data.title}" tapşırığı sizə təyin edildi`,
+            entityId: docRef.id,
+            entityType: 'task',
+            read: false,
+            createdAt: now,
+            id: '',
+          }).then(async ref => { await ref.update({ id: ref.id }) })
+        }
+      } catch {}
+    }
+
     return NextResponse.json({ success: true, data: created }, { status: 201 })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'

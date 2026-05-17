@@ -156,9 +156,10 @@ export function NotificationBell({ collapsed }: NotificationBellProps) {
           className="absolute z-[100] w-80 rounded-2xl shadow-2xl overflow-hidden"
           style={{
             bottom: 0,
-            left: collapsed ? '60px' : '248px',
-            background: 'rgb(var(--bg-card))',
+            left: 'calc(100% + 8px)',
+            background: 'var(--surface)',
             border: '1px solid var(--border)',
+            boxShadow: '0 8px 32px rgba(15,17,41,0.15)',
           }}
         >
           {/* Panel header */}
@@ -188,7 +189,10 @@ export function NotificationBell({ collapsed }: NotificationBellProps) {
               )}
               <button
                 onClick={() => setOpen(false)}
-                className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-all"
+                className="w-6 h-6 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary transition-all"
+                style={{ }}
+                onMouseEnter={e => (e.currentTarget.style.background = 'var(--surface-2)')}
+                onMouseLeave={e => (e.currentTarget.style.background = '')}
               >
                 <X size={13} />
               </button>
@@ -201,10 +205,10 @@ export function NotificationBell({ collapsed }: NotificationBellProps) {
               <div className="p-4 space-y-3">
                 {[...Array(3)].map((_, i) => (
                   <div key={i} className="flex gap-3 animate-pulse">
-                    <div className="w-8 h-8 rounded-lg bg-white/[0.06] flex-shrink-0" />
+                    <div className="w-8 h-8 rounded-lg flex-shrink-0" style={{ background: 'var(--surface-2)' }} />
                     <div className="flex-1 space-y-1.5">
-                      <div className="h-3 w-3/4 rounded bg-white/[0.06]" />
-                      <div className="h-3 w-1/2 rounded bg-white/[0.04]" />
+                      <div className="h-3 w-3/4 rounded" style={{ background: 'var(--surface-2)' }} />
+                      <div className="h-3 w-1/2 rounded" style={{ background: 'var(--surface-3)' }} />
                     </div>
                   </div>
                 ))}
@@ -225,7 +229,7 @@ export function NotificationBell({ collapsed }: NotificationBellProps) {
                       'flex gap-3 px-4 py-3 transition-all group cursor-pointer',
                       !n.read
                         ? 'bg-accent-blue/[0.04] hover:bg-accent-blue/[0.07]'
-                        : 'hover:bg-white/[0.02]'
+                        : ''
                     )}
                   >
                     <div

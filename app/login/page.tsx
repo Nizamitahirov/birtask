@@ -139,6 +139,7 @@ export default function LoginPage() {
                     required
                     autoComplete="username"
                     autoFocus
+                    style={{ background: 'var(--surface)', color: 'var(--ink)' }}
                   />
                 </div>
               </div>
@@ -157,6 +158,7 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     required
                     autoComplete="current-password"
+                    style={{ background: 'var(--surface)', color: 'var(--ink)' }}
                   />
                   <button
                     type="button"
@@ -216,6 +218,7 @@ export default function LoginPage() {
                     required
                     minLength={6}
                     autoFocus
+                    style={{ background: 'var(--surface)', color: 'var(--ink)' }}
                   />
                   <button
                     type="button"
@@ -241,6 +244,7 @@ export default function LoginPage() {
                     placeholder="••••••••"
                     required
                     minLength={6}
+                    style={{ background: 'var(--surface)', color: 'var(--ink)' }}
                   />
                   <button
                     type="button"

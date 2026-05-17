@@ -42,6 +42,30 @@ export async function PUT(
       createdAt: now,
     })
 
+    // Notify new assignee on reassignment
+    if (data.assignee) {
+      try {
+        const userSnapshot = await adminDb.collection('users')
+          .where('displayName', '==', data.assignee)
+          .get()
+        if (!userSnapshot.empty) {
+          const assigneeUser = userSnapshot.docs[0]
+          const taskTitle = data.title || updated?.title || ''
+          await adminDb.collection('notifications').add({
+            userId: assigneeUser.id,
+            type: 'task_assigned',
+            title: 'Tapşırıq yeniləndi',
+            message: `"${taskTitle}" tapşırığı sizin üçün yeniləndi`,
+            entityId: params.id,
+            entityType: 'task',
+            read: false,
+            createdAt: now,
+            id: '',
+          }).then(async ref => { await ref.update({ id: ref.id }) })
+        }
+      } catch {}
+    }
+
     return NextResponse.json({ success: true, data: { ...updated, id: params.id } })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'

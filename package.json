@@ -27,6 +27,7 @@
     "react-dom": "^18",
     "react-hot-toast": "^2.4.1",
     "recharts": "^2.12.7",
+    "resend": "^6.12.3",
     "tailwind-merge": "^2.4.0"
   },
   "devDependencies": {

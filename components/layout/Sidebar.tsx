@@ -7,6 +7,7 @@ import { useTheme } from '@/hooks/useTheme'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { Workspace } from '@/lib/types'
+import { NotificationBell } from '@/components/ui/NotificationBell'
 
 const NAV_MAIN = [
   { href: '/',           label: 'İdarə Paneli', icon: 'space_dashboard' },
@@ -150,30 +151,46 @@ function WorkspaceSwitcher() {
           <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0' }} />
 
           {creating ? (
-            <div style={{ padding: '6px 10px', display: 'flex', gap: 6 }}>
+            <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Yeni İş Sahəsi
+              </div>
               <input
                 autoFocus
                 value={newName}
                 onChange={e => setNewName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') { setCreating(false); setNewName('') } }}
-                placeholder="İş sahəsi adı..."
+                placeholder="İş sahəsinin adı..."
                 style={{
-                  flex: 1, fontSize: 13, padding: '6px 10px',
+                  width: '100%', fontSize: 13, padding: '9px 12px',
                   borderRadius: 8, border: '1px solid var(--border)',
-                  background: 'var(--surface-2)', color: 'var(--ink)', outline: 'none',
+                  background: 'var(--surface)', color: 'var(--ink)', outline: 'none',
+                  fontFamily: 'inherit', fontWeight: 500,
                 }}
               />
-              <button
-                onClick={handleCreate}
-                disabled={saving || !newName.trim()}
-                style={{
-                  padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer',
-                  opacity: saving || !newName.trim() ? 0.5 : 1,
-                }}
-              >
-                {saving ? '...' : 'Yarat'}
-              </button>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  onClick={handleCreate}
+                  disabled={saving || !newName.trim()}
+                  style={{
+                    flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700,
+                    background: 'var(--primary)', color: '#fff', border: 'none', cursor: 'pointer',
+                    opacity: saving || !newName.trim() ? 0.5 : 1, fontFamily: 'inherit',
+                  }}
+                >
+                  {saving ? 'Yaradılır...' : 'Yarat'}
+                </button>
+                <button
+                  onClick={() => { setCreating(false); setNewName('') }}
+                  style={{
+                    flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, fontWeight: 600,
+                    background: 'var(--surface-2)', color: 'var(--ink-2)', border: '1px solid var(--border)',
+                    cursor: 'pointer', fontFamily: 'inherit',
+                  }}
+                >
+                  Ləğv et
+                </button>
+              </div>
             </div>
           ) : (
             <button
