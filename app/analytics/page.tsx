@@ -68,7 +68,7 @@ function StatCard({ icon: Icon, label, value, sub, color }: {
   color: string
 }) {
   return (
-    <div className="card p-5 flex items-start gap-4">
+    <div className="cardM flex items-start gap-4">
       <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0', color)}>
         <Icon size={18} className="text-white" />
       </div>
@@ -318,7 +318,7 @@ export default function AnalyticsPage() {
   })
 
   const STATUS_BADGE: Record<string, string> = {
-    'Planlaşdırılır': 'bg-white/[0.06] text-text-secondary border-white/[0.10]',
+    'Planlaşdırılır': 'bg-[var(--surface-2)] text-text-secondary border-[var(--border)]',
     'Davam edir':     'bg-accent-blue/10 text-accent-blue border-accent-blue/20',
     'Tamamlandı':     'bg-accent-green/10 text-accent-green border-accent-green/20',
     'Dayandırıldı':   'bg-accent-red/10 text-accent-red border-accent-red/20',
@@ -327,30 +327,23 @@ export default function AnalyticsPage() {
   return (
     <div className="pageM fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+      <div className="page-headerM">
         <div>
-          <h1 className="page-title flex items-center gap-2">
-            <BarChart2 size={22} className="text-accent-blue" />
-            KPI Analitika
-          </h1>
-          <p className="text-text-secondary text-sm mt-1">Layihə və komanda performansı</p>
+          <h1>KPI Analitika</h1>
+          <p className="sub">Layihə və komanda performansı</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
           {(Object.keys(DATE_RANGE_LABELS) as DateRange[]).map(r => (
             <button
               key={r}
               onClick={() => setRange(r)}
-              className={cn(
-                'px-3 py-1.5 rounded-lg text-xs font-medium transition-all',
-                range === r
-                  ? 'bg-accent-blue text-white'
-                  : 'text-text-secondary hover:text-text-primary bg-white/[0.04] hover:bg-white/[0.08]'
-              )}
+              className={range === r ? 'btn-primaryM' : 'btn-ghostM'}
+              style={{ padding: '6px 12px', fontSize: 12 }}
             >
               {DATE_RANGE_LABELS[r]}
             </button>
           ))}
-          <button onClick={fetchAll} className="btn-secondary !py-1.5 !px-3 ml-1">
+          <button onClick={fetchAll} className="btn-ghostM" style={{ width: 36, height: 36, padding: 0, justifyContent: 'center' }}>
             <RefreshCw size={13} className={loading ? 'animate-spin' : ''} />
           </button>
         </div>
@@ -359,7 +352,7 @@ export default function AnalyticsPage() {
       {loading ? (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="card p-5 h-24 animate-pulse bg-white/[0.02]" />
+            <div key={i} className="cardM h-24 animate-pulse" style={{ opacity: 0.5 }} />
           ))}
         </div>
       ) : (
@@ -399,7 +392,7 @@ export default function AnalyticsPage() {
           {/* Charts row */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Bar chart */}
-            <div className="card p-5 space-y-4">
+            <div className="cardM space-y-4">
               <div className="flex items-center gap-2">
                 <TrendingUp size={16} className="text-accent-blue" />
                 <h2 className="font-semibold text-text-primary text-sm">Həftəlik Tamamlanan Tapşırıqlar</h2>
@@ -408,7 +401,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Donut chart */}
-            <div className="card p-5 space-y-4">
+            <div className="cardM space-y-4">
               <div className="flex items-center gap-2">
                 <CheckSquare size={16} className="text-accent-green" />
                 <h2 className="font-semibold text-text-primary text-sm">Tapşırıq Status Bölgüsü</h2>
@@ -421,7 +414,7 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Team Performance */}
-          <div className="card overflow-hidden">
+          <div className="cardM" style={{ padding: 0, overflow: 'hidden' }}>
             <div className="flex items-center gap-2 px-5 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
               <Users size={16} className="text-accent-purple" />
               <h2 className="font-semibold text-text-primary text-sm">Komanda Performansı</h2>
@@ -432,7 +425,7 @@ export default function AnalyticsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="border-b border-white/[0.06]">
+                    <tr style={{ borderBottom: '1px solid var(--border)' }}>
                       {['Üzv', 'Verilmiş', 'Tamamlanan', 'Uğur nisbəti', 'Qeydə alınan vaxt'].map(h => (
                         <th key={h} className="text-left px-5 py-3 text-text-muted text-xs font-medium whitespace-nowrap">{h}</th>
                       ))}
@@ -440,7 +433,7 @@ export default function AnalyticsPage() {
                   </thead>
                   <tbody>
                     {teamPerf.sort((a, b) => b.rate - a.rate).map(m => (
-                      <tr key={m.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors">
+                      <tr key={m.id} className="hover:bg-[var(--surface-2)] transition-colors" style={{ borderBottom: '1px solid var(--border)' }}>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2.5">
                             <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
@@ -456,7 +449,7 @@ export default function AnalyticsPage() {
                         <td className="px-5 py-3 text-accent-green font-medium">{m.done}</td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 max-w-[80px] h-1.5 rounded-full bg-white/[0.08]">
+                            <div className="flex-1 max-w-[80px] h-1.5 rounded-full" style={{ background: 'var(--surface-2)' }}>
                               <div
                                 className="h-full rounded-full bg-gradient-to-r from-accent-blue to-accent-green transition-all"
                                 style={{ width: `${m.rate}%` }}
@@ -488,11 +481,11 @@ export default function AnalyticsPage() {
               <h2 className="font-semibold text-text-primary">Layihə Sağlamlığı</h2>
             </div>
             {projectHealth.length === 0 ? (
-              <div className="card p-10 text-center text-text-muted text-sm">Layihə tapılmadı</div>
+              <div className="cardM text-center text-text-muted text-sm" style={{ padding: 40 }}>Layihə tapılmadı</div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
                 {projectHealth.map(proj => (
-                  <div key={proj.id} className="card p-4 space-y-3">
+                  <div key={proj.id} className="cardM space-y-3">
                     {/* Project header */}
                     <div className="flex items-start gap-3">
                       <div
@@ -503,7 +496,7 @@ export default function AnalyticsPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="font-semibold text-text-primary text-sm truncate">{proj.name}</div>
-                        <span className={cn('badge text-[10px] mt-0.5', STATUS_BADGE[proj.status] || 'bg-white/[0.06] text-text-secondary border-white/[0.10]')}>
+                        <span className={cn('badge text-[10px] mt-0.5', STATUS_BADGE[proj.status] || 'bg-[var(--surface-2)] text-text-secondary border-[var(--border)]')}>
                           {proj.status}
                         </span>
                       </div>
@@ -525,15 +518,15 @@ export default function AnalyticsPage() {
 
                     {/* Stats */}
                     <div className="flex gap-3 text-xs">
-                      <div className="flex-1 text-center p-2 rounded-lg bg-white/[0.03]">
+                      <div className="flex-1 text-center p-2 rounded-lg" style={{ background: 'var(--surface-2)' }}>
                         <div className="font-semibold text-text-primary">{proj.projTasks}</div>
                         <div className="text-text-muted">Tapşırıq</div>
                       </div>
-                      <div className="flex-1 text-center p-2 rounded-lg bg-white/[0.03]">
+                      <div className="flex-1 text-center p-2 rounded-lg" style={{ background: 'var(--surface-2)' }}>
                         <div className="font-semibold text-accent-green">{proj.done}</div>
                         <div className="text-text-muted">Tamamlandı</div>
                       </div>
-                      <div className="flex-1 text-center p-2 rounded-lg bg-white/[0.03]">
+                      <div className="flex-1 text-center p-2 rounded-lg" style={{ background: 'var(--surface-2)' }}>
                         <div className={cn('font-semibold', proj.overdue > 0 ? 'text-accent-red' : 'text-text-muted')}>
                           {proj.overdue}
                         </div>

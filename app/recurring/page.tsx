@@ -84,7 +84,7 @@ function RecurringForm({ initial, projects, teamNames, onSubmit, onCancel, loadi
         <select
           value={form.projectId}
           onChange={e => set('projectId', e.target.value)}
-          className="select w-full"
+          className="inputM w-full"
           required
         >
           <option value="">Layihə seçin...</option>
@@ -100,7 +100,7 @@ function RecurringForm({ initial, projects, teamNames, onSubmit, onCancel, loadi
           required
           value={form.title}
           onChange={e => set('title', e.target.value)}
-          className="input w-full"
+          className="inputM w-full"
           placeholder="Tapşırıq başlığı..."
         />
       </div>
@@ -118,13 +118,13 @@ function RecurringForm({ initial, projects, teamNames, onSubmit, onCancel, loadi
       <div className="grid grid-cols-2 gap-3">
         <div>
           <label className="block text-text-secondary text-xs mb-1.5">Prioritet</label>
-          <select value={form.priority} onChange={e => set('priority', e.target.value)} className="select w-full">
+          <select value={form.priority} onChange={e => set('priority', e.target.value)} className="inputM w-full">
             {PRIORITIES.map(p => <option key={p} value={p}>{p}</option>)}
           </select>
         </div>
         <div>
           <label className="block text-text-secondary text-xs mb-1.5">Təkrarlama</label>
-          <select value={form.recurrence} onChange={e => set('recurrence', e.target.value)} className="select w-full">
+          <select value={form.recurrence} onChange={e => set('recurrence', e.target.value)} className="inputM w-full">
             {RECURRENCES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
         </div>
@@ -134,7 +134,7 @@ function RecurringForm({ initial, projects, teamNames, onSubmit, onCancel, loadi
         <div>
           <label className="block text-text-secondary text-xs mb-1.5">İcraçı</label>
           {teamNames.length > 0 ? (
-            <select value={form.assignee} onChange={e => set('assignee', e.target.value)} className="select w-full">
+            <select value={form.assignee} onChange={e => set('assignee', e.target.value)} className="inputM w-full">
               <option value="">Seçin...</option>
               {teamNames.map(n => <option key={n} value={n}>{n}</option>)}
             </select>
@@ -142,7 +142,7 @@ function RecurringForm({ initial, projects, teamNames, onSubmit, onCancel, loadi
             <input
               value={form.assignee}
               onChange={e => set('assignee', e.target.value)}
-              className="input w-full"
+              className="inputM w-full"
               placeholder="Ad Soyad"
             />
           )}
@@ -153,7 +153,7 @@ function RecurringForm({ initial, projects, teamNames, onSubmit, onCancel, loadi
             type="date"
             value={form.nextDueDate}
             onChange={e => set('nextDueDate', e.target.value)}
-            className="input w-full"
+            className="inputM w-full"
           />
         </div>
       </div>
@@ -163,7 +163,7 @@ function RecurringForm({ initial, projects, teamNames, onSubmit, onCancel, loadi
         <input
           value={form.tags}
           onChange={e => set('tags', e.target.value)}
-          className="input w-full"
+          className="inputM w-full"
           placeholder="üst, alt, ..."
         />
       </div>
@@ -185,8 +185,8 @@ function RecurringForm({ initial, projects, teamNames, onSubmit, onCancel, loadi
       </div>
 
       <div className="flex gap-3 pt-1">
-        <button type="button" onClick={onCancel} className="btn-secondary flex-1 justify-center">Ləğv et</button>
-        <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center disabled:opacity-50">
+        <button type="button" onClick={onCancel} className="btn-ghostM flex-1 justify-center">Ləğv et</button>
+        <button type="submit" disabled={loading} className="btn-primaryM flex-1 justify-center disabled:opacity-50">
           {loading ? <><Loader2 size={14} className="animate-spin" /> Saxlanılır...</> : 'Yadda saxla'}
         </button>
       </div>
@@ -310,19 +310,16 @@ export default function RecurringPage() {
   return (
     <div className="pageM fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
+      <div className="page-headerM">
         <div>
-          <h1 className="page-title flex items-center gap-2">
-            <Repeat size={22} className="text-accent-blue" />
-            Təkrarlanan Tapşırıqlar
-          </h1>
-          <p className="text-text-secondary text-sm mt-1">Avtomatik tapşırıq şablonlarını idarə edin</p>
+          <h1>Təkrarlanan Tapşırıqlar</h1>
+          <p className="sub">Avtomatik tapşırıq şablonlarını idarə edin</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={fetchAll} className="btn-secondary !py-1.5 !px-3">
+        <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
+          <button onClick={fetchAll} className="btn-ghostM" style={{ width: 36, height: 36, padding: 0, justifyContent: 'center' }}>
             <RefreshCw size={13} />
           </button>
-          <button onClick={() => { setSelected(null); setModal('create') }} className="btn-primary">
+          <button onClick={() => { setSelected(null); setModal('create') }} className="btn-primaryM">
             <Plus size={14} /> Yeni Şablon
           </button>
         </div>
@@ -333,7 +330,8 @@ export default function RecurringPage() {
         <select
           value={filterProject}
           onChange={e => setFilterProject(e.target.value)}
-          className="select max-w-xs"
+          className="inputM"
+          style={{ maxWidth: 280 }}
         >
           <option value="">Bütün layihələr</option>
           {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -347,18 +345,18 @@ export default function RecurringPage() {
       {loading ? (
         <div className="space-y-4">
           {[...Array(3)].map((_, i) => (
-            <div key={i} className="card p-5 space-y-3">
+            <div key={i} className="cardM space-y-3">
               <div className="h-4 w-1/3 rounded-full bg-[var(--surface-2)] animate-pulse" />
               <div className="h-12 rounded-xl bg-[var(--surface-2)] animate-pulse" />
             </div>
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="card p-16 text-center">
+        <div className="cardM text-center" style={{ padding: 64 }}>
           <Repeat size={40} className="text-text-muted mx-auto mb-3 opacity-30" />
           <p className="text-text-secondary text-sm font-medium">Şablon tapılmadı</p>
           <p className="text-text-muted text-xs mt-1">Avtomatik tapşırıqlar üçün şablon yaradın</p>
-          <button onClick={() => setModal('create')} className="btn-primary mt-4 mx-auto">
+          <button onClick={() => setModal('create')} className="btn-primaryM mt-4 mx-auto">
             <Plus size={14} /> Şablon yarat
           </button>
         </div>
@@ -383,7 +381,7 @@ export default function RecurringPage() {
                   <div
                     key={task.id}
                     className={cn(
-                      'card p-4 space-y-3 transition-all',
+                      'cardM space-y-3 transition-all',
                       !task.isActive && 'opacity-60'
                     )}
                   >
@@ -508,7 +506,7 @@ export default function RecurringPage() {
               </div>
             </div>
             <div className="flex gap-3">
-              <button onClick={() => { setModal(null); setSelected(null) }} className="btn-secondary flex-1 justify-center">Ləğv et</button>
+              <button onClick={() => { setModal(null); setSelected(null) }} className="btn-ghostM flex-1 justify-center">Ləğv et</button>
               <button
                 onClick={handleDelete}
                 disabled={saving}

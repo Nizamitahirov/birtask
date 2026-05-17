@@ -149,21 +149,18 @@ export default function ActivityPage() {
       {/* Header */}
       <div className="page-headerM">
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)', margin: 0 }} className="">Aktivlik Jurnalı</h1>
-          <p className="text-text-secondary text-sm mt-1">
+          <h1>Aktivlik Jurnalı</h1>
+          <p className="sub">
             {filtered.length} qeyd {logs.length !== filtered.length ? `(${logs.length} ümumi)` : ''}
           </p>
         </div>
-        <button onClick={fetchLogs} className="btn-secondary w-9 h-9 !p-0 justify-center self-start sm:self-auto">
+        <button onClick={fetchLogs} className="btn-ghostM" style={{ width: 36, height: 36, padding: 0, justifyContent: 'center', flexShrink: 0 }}>
           <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
         </button>
       </div>
 
       {/* Filters */}
-      <div
-        className="rounded-2xl p-4 space-y-4"
-        style={{ background: 'var(--surface-1)', border: '1px solid var(--border)' }}
-      >
+      <div className="cardM space-y-4">
         <div className="flex items-center gap-2">
           <Filter size={14} className="text-text-muted" />
           <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Filtrlər</span>
@@ -183,7 +180,7 @@ export default function ActivityPage() {
             <select
               value={actionFilter}
               onChange={e => setActionFilter(e.target.value)}
-              className="select pr-8 min-w-[140px] appearance-none"
+              className="inputM pr-8 min-w-[140px] appearance-none"
             >
               {ALL_ACTIONS.map(a => (
                 <option key={a} value={a}>
@@ -199,7 +196,7 @@ export default function ActivityPage() {
             <select
               value={entityFilter}
               onChange={e => setEntityFilter(e.target.value)}
-              className="select pr-8 min-w-[140px] appearance-none"
+              className="inputM pr-8 min-w-[140px] appearance-none"
             >
               {ALL_ENTITY_TYPES.map(e => (
                 <option key={e} value={e}>
@@ -215,7 +212,7 @@ export default function ActivityPage() {
             <select
               value={selectedYear}
               onChange={e => setSelectedYear(Number(e.target.value))}
-              className="select pr-8 min-w-[100px] appearance-none"
+              className="inputM pr-8 min-w-[100px] appearance-none"
             >
               {availableYears.map(y => (
                 <option key={y} value={y}>{y}</option>
@@ -229,7 +226,7 @@ export default function ActivityPage() {
             <select
               value={selectedMonth ?? ''}
               onChange={e => setSelectedMonth(e.target.value === '' ? null : Number(e.target.value))}
-              className="select pr-8 min-w-[140px] appearance-none"
+              className="inputM pr-8 min-w-[140px] appearance-none"
             >
               <option value="">Bütün aylar</option>
               {MONTH_NAMES_AZ.map((m, i) => (
@@ -247,8 +244,7 @@ export default function ActivityPage() {
           {[...Array(8)].map((_, i) => (
             <div
               key={i}
-              className="flex items-center gap-4 px-4 py-3 rounded-xl animate-pulse"
-              style={{ background: 'var(--surface-1)', border: '1px solid var(--border)' }}
+              className="cardM flex items-center gap-4 px-4 py-3 animate-pulse"
             >
               <div className="w-8 h-8 rounded-lg bg-[var(--surface-2)] flex-shrink-0" />
               <div className="flex-1 space-y-2">
@@ -276,7 +272,7 @@ export default function ActivityPage() {
           )}
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="cardM" style={{ padding: 0, overflow: 'hidden' }}>
           <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
             {filtered.map((log, i) => (
               <div

@@ -87,7 +87,7 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
             required
             value={form.username}
             onChange={e => set('username', e.target.value)}
-            className="input w-full"
+            className="inputM w-full"
             placeholder="username"
             autoComplete="off"
           />
@@ -101,7 +101,7 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
             required
             value={form.displayName}
             onChange={e => set('displayName', e.target.value)}
-            className="input w-full"
+            className="inputM w-full"
             placeholder="Ad Soyad"
           />
         </div>
@@ -111,7 +111,7 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
             type="email"
             value={form.email}
             onChange={e => set('email', e.target.value)}
-            className="input w-full"
+            className="inputM w-full"
             placeholder="email@example.com"
           />
         </div>
@@ -123,7 +123,7 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
           <select
             value={form.role}
             onChange={e => set('role', e.target.value)}
-            className="select w-full"
+            className="inputM w-full"
           >
             <option value="admin">Admin</option>
             <option value="manager">Menecer</option>
@@ -136,7 +136,7 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
           <input
             value={form.department}
             onChange={e => set('department', e.target.value)}
-            className="input w-full"
+            className="inputM w-full"
             placeholder="Texnologiya..."
           />
         </div>
@@ -151,7 +151,7 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
               type={showPw ? 'text' : 'password'}
               value={form.password}
               onChange={e => set('password', e.target.value)}
-              className="input w-full pr-10"
+              className="inputM w-full pr-10"
               placeholder="••••••••"
               minLength={6}
               autoComplete="new-password"
@@ -195,10 +195,10 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
       )}
 
       <div className="flex gap-3 pt-2">
-        <button type="button" onClick={onCancel} className="btn-secondary flex-1 justify-center">
+        <button type="button" onClick={onCancel} className="btn-ghostM flex-1 justify-center">
           Ləğv et
         </button>
-        <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center disabled:opacity-50">
+        <button type="submit" disabled={loading} className="btn-primaryM flex-1 justify-center disabled:opacity-50">
           {loading ? (
             <><Loader2 size={14} className="animate-spin" /> Saxlanılır...</>
           ) : (mode === 'create' ? 'Yarat' : 'Yenilə')}
@@ -287,8 +287,8 @@ function ResetPasswordForm({
         </div>
       </div>
       <div className="flex gap-3 pt-1">
-        <button type="button" onClick={onCancel} className="btn-secondary flex-1 justify-center">Ləğv et</button>
-        <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center disabled:opacity-50">
+        <button type="button" onClick={onCancel} className="btn-ghostM flex-1 justify-center">Ləğv et</button>
+        <button type="submit" disabled={loading} className="btn-primaryM flex-1 justify-center disabled:opacity-50">
           {loading ? <><Loader2 size={14} className="animate-spin" /> Sıfırlanır...</> : 'Şifrəni sıfırla'}
         </button>
       </div>
@@ -412,14 +412,14 @@ function UsersTab() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="input pl-9 w-full"
+            className="inputM pl-9 w-full"
             placeholder="İstifadəçi axtar..."
           />
         </div>
         {isAdmin && (
           <button
             onClick={() => setModal('create')}
-            className="btn-primary"
+            className="btn-primaryM"
           >
             <Plus size={14} /> Yeni İstifadəçi
           </button>
@@ -434,12 +434,12 @@ function UsersTab() {
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <div className="card p-10 text-center">
+        <div className="cardM text-center" style={{ padding: 40 }}>
           <Users size={36} className="text-text-muted mx-auto mb-3 opacity-40" />
           <p className="text-text-secondary text-sm">İstifadəçi tapılmadı</p>
         </div>
       ) : (
-        <div className="card overflow-hidden">
+        <div className="cardM" style={{ padding: 0, overflow: 'hidden' }}>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-[var(--border)]">
@@ -590,7 +590,7 @@ function UsersTab() {
             <div className="flex gap-3">
               <button
                 onClick={() => { setModal(null); setSelected(null) }}
-                className="btn-secondary flex-1 justify-center"
+                className="btn-ghostM flex-1 justify-center"
               >
                 Ləğv et
               </button>
@@ -818,16 +818,16 @@ function ConnectionTab() {
 
   return (
     <div className="space-y-4 max-w-xl">
-      <div className="card p-6 space-y-4">
-        <h2 className="font-semibold text-text-primary flex items-center gap-2">
+      <div className="cardM space-y-4">
+        <h2 className="font-semibold flex items-center gap-2" style={{ color: 'var(--ink)' }}>
           <Database size={18} className="text-accent-blue" />
           Firebase Firestore
         </h2>
 
-        <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
+        <div className="flex items-center justify-between p-3 rounded-xl" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
           <div>
-            <div className="text-text-primary text-sm font-medium">Firebase Admin SDK</div>
-            <div className="text-text-muted text-xs mt-0.5">
+            <div className="text-sm font-medium" style={{ color: 'var(--ink)' }}>Firebase Admin SDK</div>
+            <div className="text-xs mt-0.5" style={{ color: 'var(--muted)' }}>
               <span className="text-accent-green flex items-center gap-1">
                 <CheckCircle size={11} /> Server tərəfindən konfiqurasiya edilib
               </span>
@@ -839,7 +839,7 @@ function ConnectionTab() {
           <button
             onClick={handleTest}
             disabled={testing}
-            className="btn-secondary flex-1 justify-center disabled:opacity-40"
+            className="btn-ghostM flex-1 justify-center disabled:opacity-40"
           >
             <RefreshCw size={14} className={testing ? 'animate-spin' : ''} />
             {testing ? 'Yoxlanılır...' : 'Əlaqəni yoxla'}
@@ -1141,7 +1141,7 @@ function ExportImportTab() {
   return (
     <div className="space-y-6 max-w-2xl">
       {/* Google Sheets Migration */}
-      <div className="card p-6 space-y-4 border border-accent-purple/20">
+      <div className="cardM space-y-4" style={{ borderColor: 'var(--primary)' }}>
         <h2 className="font-semibold text-text-primary flex items-center gap-2">
           <span className="text-accent-purple">↗</span>
           Google Sheets → Firebase Miqrasiyası
@@ -1150,7 +1150,7 @@ function ExportImportTab() {
         <button
           onClick={handleMigrateFromSheets}
           disabled={migrating}
-          className="btn-primary disabled:opacity-50"
+          className="btn-primaryM disabled:opacity-50"
         >
           {migrating ? <><span className="animate-spin inline-block mr-2">⟳</span>Köçürülür...</> : '🚀 Google Sheets-dən köçür'}
         </button>
@@ -1161,7 +1161,7 @@ function ExportImportTab() {
           <button
             onClick={handleRelinkTasks}
             disabled={relinking}
-            className="btn-secondary disabled:opacity-50"
+            className="btn-ghostM disabled:opacity-50"
           >
             {relinking ? <><Loader2 size={14} className="animate-spin" /> Bağlanılır...</> : '🔗 Tapşırıqları layihəyə bağla'}
           </button>
@@ -1170,7 +1170,7 @@ function ExportImportTab() {
       </div>
 
       {/* Export section */}
-      <div className="card p-6 space-y-4">
+      <div className="cardM space-y-4">
         <h2 className="font-semibold text-text-primary flex items-center gap-2">
           <Download size={18} className="text-accent-blue" />
           Məlumatları İxrac Et
@@ -1181,7 +1181,7 @@ function ExportImportTab() {
           <button
             onClick={handleExportProjects}
             disabled={exportingProjects}
-            className="btn-secondary justify-center disabled:opacity-50"
+            className="btn-ghostM justify-center disabled:opacity-50"
           >
             {exportingProjects
               ? <Loader2 size={14} className="animate-spin" />
@@ -1191,7 +1191,7 @@ function ExportImportTab() {
           <button
             onClick={handleExportTasks}
             disabled={exportingTasks}
-            className="btn-secondary justify-center disabled:opacity-50"
+            className="btn-ghostM justify-center disabled:opacity-50"
           >
             {exportingTasks
               ? <Loader2 size={14} className="animate-spin" />
@@ -1201,7 +1201,7 @@ function ExportImportTab() {
           <button
             onClick={handleExportBackup}
             disabled={exportingBackup}
-            className="btn-primary justify-center disabled:opacity-50"
+            className="btn-primaryM justify-center disabled:opacity-50"
           >
             {exportingBackup
               ? <Loader2 size={14} className="animate-spin" />
@@ -1212,7 +1212,7 @@ function ExportImportTab() {
       </div>
 
       {/* Import section */}
-      <div className="card p-6 space-y-4">
+      <div className="cardM space-y-4">
         <h2 className="font-semibold text-text-primary flex items-center gap-2">
           <Upload size={18} className="text-accent-purple" />
           Məlumatları İdxal Et
@@ -1225,7 +1225,7 @@ function ExportImportTab() {
             { type: 'tasks-csv' as const,    label: 'Tapşırıqlar CSV', icon: FileText, color: 'text-accent-blue', accept: '.csv' },
             { type: 'json' as const,         label: 'JSON Yedəklə',    icon: FileJson, color: 'text-accent-purple', accept: '.json' },
           ].map(({ type, label, icon: Icon, color, accept }) => (
-            <label key={type} className="btn-secondary justify-center cursor-pointer">
+            <label key={type} className="btn-ghostM justify-center cursor-pointer">
               <Icon size={14} className={color} />
               {label}
               <input
@@ -1291,7 +1291,7 @@ function ExportImportTab() {
             <div className="flex gap-3 px-4 pb-4">
               <button
                 onClick={() => { setImportFile(null); setPreview(null); setImportType(null) }}
-                className="btn-secondary flex-1 justify-center"
+                className="btn-ghostM flex-1 justify-center"
                 disabled={importing}
               >
                 Ləğv et
@@ -1299,7 +1299,7 @@ function ExportImportTab() {
               <button
                 onClick={handleImport}
                 disabled={importing}
-                className="btn-primary flex-1 justify-center disabled:opacity-50"
+                className="btn-primaryM flex-1 justify-center disabled:opacity-50"
               >
                 {importing
                   ? <><Loader2 size={14} className="animate-spin" /> İdxal edilir...</>
