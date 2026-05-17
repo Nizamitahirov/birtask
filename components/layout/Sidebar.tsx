@@ -1,300 +1,138 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import {
-  LayoutDashboard, FolderKanban, CheckSquare,
-  Users, Settings, ChevronLeft, ChevronRight,
-  Zap, Sun, Moon, Map, CalendarDays, LogOut,
-  Shield, UserCog, UserCheck, Eye, Activity,
-  Repeat, BarChart2, Menu, X
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { useTheme } from '@/hooks/useTheme'
 import { useAuth } from '@/contexts/AuthContext'
-import { UserRole } from '@/lib/types'
-import { NotificationBell } from '@/components/ui/NotificationBell'
-import { GlobalSearchTrigger } from '@/components/ui/GlobalSearch'
 
-const navItems = [
-  { href: '/',           label: 'İdarə Paneli',       icon: LayoutDashboard },
-  { href: '/projects',   label: 'Layihələr',           icon: FolderKanban },
-  { href: '/tasks',      label: 'Tapşırıqlar',         icon: CheckSquare },
-  { href: '/calendar',   label: 'Təqvim',              icon: CalendarDays },
-  { href: '/roadmap',    label: 'Yol Xəritəsi',        icon: Map },
-  { href: '/recurring',  label: 'Təkrarlanan',         icon: Repeat },
-  { href: '/analytics',  label: 'Analitika',           icon: BarChart2 },
-  { href: '/team',       label: 'Komanda',             icon: Users },
-  { href: '/activity',   label: 'Aktivlik',            icon: Activity },
-  { href: '/settings',   label: 'Parametrlər',         icon: Settings },
+const NAV_MAIN = [
+  { href: '/',           label: 'İdarə Paneli', icon: 'space_dashboard' },
+  { href: '/projects',   label: 'Layihələr',    icon: 'folder' },
+  { href: '/tasks',      label: 'Tapşırıqlar',  icon: 'check_box' },
+  { href: '/calendar',   label: 'Təqvim',       icon: 'calendar_month' },
+  { href: '/roadmap',    label: 'Yol Xəritəsi', icon: 'route' },
+  { href: '/recurring',  label: 'Təkrarlanan',  icon: 'autorenew' },
+  { href: '/analytics',  label: 'Analitika',    icon: 'analytics' },
 ]
 
+const NAV_ADMIN = [
+  { href: '/team',       label: 'Komanda',      icon: 'groups' },
+  { href: '/activity',   label: 'Aktivlik',     icon: 'bolt' },
+  { href: '/settings',   label: 'Parametrlər',  icon: 'settings' },
+]
+
+function initials(name: string) {
+  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+}
+
 const ROLE_LABELS: Record<string, string> = {
-  admin:   'Admin',
+  admin: 'Admin',
   manager: 'Menecer',
-  member:  'Üzv',
-  viewer:  'İzləyici',
+  member: 'Üzv',
+  viewer: 'İzləyici',
 }
 
-const ROLE_ICONS: Record<string, typeof Shield> = {
-  admin:   Shield,
-  manager: UserCog,
-  member:  UserCheck,
-  viewer:  Eye,
-}
-
-const ROLE_COLORS: Record<string, string> = {
-  admin:   'text-accent-purple',
-  manager: 'text-accent-blue',
-  member:  'text-accent-green',
-  viewer:  'text-text-muted',
-}
-
-// ── Inner nav content (shared between desktop and mobile overlay) ─────────────
-
-function NavContent({
-  collapsed,
-  onLinkClick,
-}: {
-  collapsed: boolean
-  onLinkClick?: () => void
-}) {
+export function Sidebar() {
   const pathname = usePathname()
   const { theme, toggle } = useTheme()
   const { user, logout } = useAuth()
 
-  const roleIcon = user?.role ? ROLE_ICONS[user.role] || UserCheck : UserCheck
-  const RoleIcon = roleIcon
-  const roleColor = user?.role ? ROLE_COLORS[user.role] || 'text-text-muted' : 'text-text-muted'
+  const displayName = user?.displayName || user?.username || 'İstifadəçi'
   const roleLabel = user?.role ? ROLE_LABELS[user.role] || user.role : ''
 
   return (
-    <>
-      {/* Logo */}
-      <div
-        className={cn(
-          'flex items-center gap-3 px-4 py-5',
-          collapsed && 'justify-center px-0'
-        )}
-        style={{ borderBottom: '1px solid var(--border)' }}
-      >
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center flex-shrink-0 shadow-glow-blue">
-          <Zap size={16} className="text-white" />
+    <aside className="sideM">
+      {/* Brand */}
+      <div className="brandM">
+        <div className="logo">b</div>
+        <div>
+          <div className="nm">Birtask</div>
+          <div className="ws">Layihə İdarəetmə</div>
         </div>
-        {!collapsed && (
-          <div>
-            <span className="font-bold text-text-primary text-sm tracking-wide">BirTask</span>
-            <p className="text-[10px] text-text-muted">Layihə İdarəetmə</p>
-          </div>
-        )}
       </div>
 
-      {/* Nav */}
-      <nav className="flex-1 py-4 px-2 space-y-1 overflow-y-auto">
-        {!collapsed && (
-          <p className="section-label px-2 mb-3">Menyü</p>
-        )}
-        {navItems.map(({ href, label, icon: Icon }) => {
+      {/* Workspace switcher */}
+      <div className="ws-switch">
+        <div className="av">PM</div>
+        <div className="info">
+          <div className="t">PMO İş sahəsi</div>
+          <div className="s">Bütün layihələr</div>
+        </div>
+        <span className="material-symbols-rounded chev" style={{ fontSize: 16 }}>unfold_more</span>
+      </div>
+
+      <div className="sec-lbl">Menyu</div>
+
+      <nav className="navM">
+        {NAV_MAIN.map(({ href, label, icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
           return (
             <Link
               key={href}
               href={href}
-              title={collapsed ? label : undefined}
-              onClick={onLinkClick}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative',
-                active
-                  ? 'bg-accent-blue/10 text-accent-blue border border-accent-blue/20'
-                  : 'text-text-secondary hover:text-text-primary',
-                collapsed && 'justify-center px-0 mx-auto w-10 h-10'
-              )}
-              style={!active ? { ':hover': { background: 'var(--surface-2)' } } as React.CSSProperties : undefined}
+              className={'navM-item' + (active ? ' active' : '')}
             >
-              <Icon size={18} className="flex-shrink-0" />
-              {!collapsed && <span className="text-sm font-medium">{label}</span>}
-              {active && !collapsed && (
-                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-accent-blue" />
-              )}
-              {collapsed && (
-                <div
-                  className="absolute left-full ml-3 px-2 py-1 rounded-lg text-xs text-text-primary whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50"
-                  style={{ background: 'rgb(var(--bg-card))', border: '1px solid var(--border)' }}
-                >
-                  {label}
-                </div>
-              )}
+              <span className="ico">
+                <span className="material-symbols-rounded">{icon}</span>
+              </span>
+              <span>{label}</span>
+            </Link>
+          )
+        })}
+
+        <div className="sec-lbl">İdarəetmə</div>
+
+        {NAV_ADMIN.map(({ href, label, icon }) => {
+          const active = pathname.startsWith(href)
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={'navM-item' + (active ? ' active' : '')}
+            >
+              <span className="ico">
+                <span className="material-symbols-rounded">{icon}</span>
+              </span>
+              <span>{label}</span>
             </Link>
           )
         })}
       </nav>
 
-      {/* Global search trigger */}
-      <div className="px-2 pb-1">
-        <GlobalSearchTrigger collapsed={collapsed} />
-      </div>
-
-      {/* Notification bell */}
-      <div className="px-2 pb-1">
-        <NotificationBell collapsed={collapsed} />
-      </div>
-
-      {/* Theme toggle */}
-      <div className="px-2 pb-2">
+      {/* Footer */}
+      <div className="side-foot">
+        {/* Theme toggle */}
         <button
           onClick={toggle}
+          className="navM-item"
+          style={{ width: '100%', textAlign: 'left' }}
           title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
-          className={cn(
-            'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 text-text-secondary hover:text-text-primary w-full',
-            collapsed && 'justify-center px-0 mx-auto w-10 h-10'
-          )}
-          style={{ background: 'var(--surface-1)' }}
         >
-          {theme === 'dark'
-            ? <Sun size={18} className="flex-shrink-0 text-accent-yellow" />
-            : <Moon size={18} className="flex-shrink-0 text-accent-blue" />}
-          {!collapsed && (
-            <span className="text-sm font-medium">
-              {theme === 'dark' ? 'Light Mode' : 'Dark Mode'}
+          <span className="ico">
+            <span className="material-symbols-rounded">
+              {theme === 'dark' ? 'light_mode' : 'dark_mode'}
             </span>
-          )}
+          </span>
+          <span>{theme === 'dark' ? 'Light Mode' : 'Dark Mode'}</span>
         </button>
+
+        {/* User card */}
+        {user && (
+          <div className="user-card" onClick={logout} title="Çıxış et">
+            <div className="av">{initials(displayName)}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="nm" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {displayName}
+              </div>
+              <div className="rl">{roleLabel} · çıxış</div>
+            </div>
+            <span className="material-symbols-rounded" style={{ fontSize: 16, color: 'var(--muted-2)' }}>
+              logout
+            </span>
+          </div>
+        )}
       </div>
-
-      {/* User info + logout */}
-      {user && (
-        <div
-          className="px-2 pb-3 pt-2"
-          style={{ borderTop: '1px solid var(--border)' }}
-        >
-          {collapsed ? (
-            <div className="flex flex-col items-center gap-1">
-              <div
-                className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center text-white text-xs font-bold flex-shrink-0"
-                title={user.displayName || user.username}
-              >
-                {(user.displayName || user.username).charAt(0).toUpperCase()}
-              </div>
-              <button
-                onClick={logout}
-                title="Çıxış"
-                className="w-8 h-8 rounded-xl flex items-center justify-center text-text-muted hover:text-accent-red hover:bg-accent-red/10 transition-all"
-              >
-                <LogOut size={14} />
-              </button>
-            </div>
-          ) : (
-            <div
-              className="rounded-xl p-3 flex items-center gap-2.5 group"
-              style={{ background: 'var(--surface-1)', border: '1px solid var(--border)' }}
-            >
-              <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
-                {(user.displayName || user.username).charAt(0).toUpperCase()}
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-text-primary text-xs font-semibold truncate">
-                  {user.displayName || user.username}
-                </div>
-                <div className={cn('flex items-center gap-1 text-[10px] mt-0.5', roleColor)}>
-                  <RoleIcon size={9} />
-                  <span>{roleLabel}</span>
-                </div>
-              </div>
-              <button
-                onClick={logout}
-                title="Çıxış"
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-accent-red hover:bg-accent-red/10 transition-all flex-shrink-0 opacity-0 group-hover:opacity-100"
-              >
-                <LogOut size={13} />
-              </button>
-            </div>
-          )}
-        </div>
-      )}
-    </>
-  )
-}
-
-// ── Sidebar ───────────────────────────────────────────────────────────────────
-
-export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false)
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const pathname = usePathname()
-
-  // Close mobile sidebar on route change
-  useEffect(() => {
-    setMobileOpen(false)
-  }, [pathname])
-
-  // Prevent body scroll when mobile sidebar is open
-  useEffect(() => {
-    if (mobileOpen) {
-      document.body.style.overflow = 'hidden'
-    } else {
-      document.body.style.overflow = ''
-    }
-    return () => { document.body.style.overflow = '' }
-  }, [mobileOpen])
-
-  return (
-    <>
-      {/* ── Mobile hamburger button (fixed, top-left) ── */}
-      <button
-        onClick={() => setMobileOpen(true)}
-        className="md:hidden fixed top-4 left-4 z-40 w-9 h-9 rounded-xl flex items-center justify-center text-text-secondary hover:text-text-primary transition-all shadow-lg"
-        style={{ background: 'rgb(var(--bg-card))', border: '1px solid var(--border)' }}
-        aria-label="Menyüyü aç"
-      >
-        <Menu size={18} />
-      </button>
-
-      {/* ── Mobile overlay backdrop ── */}
-      {mobileOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
-      {/* ── Mobile sidebar (overlay) ── */}
-      <aside
-        className={cn(
-          'md:hidden fixed inset-y-0 left-0 z-50 w-[260px] flex flex-col transition-transform duration-300',
-          mobileOpen ? 'translate-x-0' : '-translate-x-full'
-        )}
-        style={{ background: 'rgb(var(--bg-secondary))', borderRight: '1px solid var(--border)' }}
-      >
-        {/* Close button */}
-        <button
-          onClick={() => setMobileOpen(false)}
-          className="absolute top-4 right-4 w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-white/[0.06] transition-all z-10"
-        >
-          <X size={15} />
-        </button>
-        <NavContent collapsed={false} onLinkClick={() => setMobileOpen(false)} />
-      </aside>
-
-      {/* ── Desktop sidebar ── */}
-      <aside
-        className={cn(
-          'hidden md:relative md:flex md:flex-col h-full border-r transition-all duration-300 ease-in-out z-50',
-          collapsed ? 'md:w-[68px]' : 'md:w-[240px]'
-        )}
-        style={{ background: 'rgb(var(--bg-secondary))', borderColor: 'var(--border)' }}
-      >
-        <NavContent collapsed={collapsed} />
-
-        {/* Collapse btn */}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-6 w-6 h-6 rounded-full flex items-center justify-center text-text-secondary hover:text-text-primary transition-all duration-200 z-10"
-          style={{ background: 'rgb(var(--bg-card))', border: '1px solid var(--border)' }}
-        >
-          {collapsed ? <ChevronRight size={12} /> : <ChevronLeft size={12} />}
-        </button>
-      </aside>
-    </>
+    </aside>
   )
 }

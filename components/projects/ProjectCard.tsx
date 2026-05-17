@@ -3,9 +3,29 @@
 import { Project } from '@/lib/types'
 import { formatDate, getDaysLeft } from '@/lib/utils'
 import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
-import { Calendar, User, Edit2, Trash2, CheckSquare } from 'lucide-react'
+import { Edit2, Trash2 } from 'lucide-react'
 import Link from 'next/link'
-import { cn } from '@/lib/utils'
+
+const VIBRANT_PALETTES: [string, string][] = [
+  ['#5B5BF5', '#B57BFF'],
+  ['#FF8B7B', '#FFD466'],
+  ['#16C098', '#67E8C5'],
+  ['#4DABF7', '#A78BFA'],
+  ['#E879C8', '#FF8FB1'],
+  ['#F5A524', '#FF8B7B'],
+  ['#7C5BF7', '#E879C8'],
+  ['#16C098', '#5B5BF5'],
+]
+
+function paletteIndexFor(seed: string) {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0
+  return Math.abs(h) % 8
+}
+
+function avatarPaletteFor(seed: string): [string, string] {
+  return VIBRANT_PALETTES[(paletteIndexFor(seed) + 3) % 8]
+}
 
 interface ProjectCardProps {
   project: Project
@@ -16,73 +36,127 @@ interface ProjectCardProps {
 export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
   const daysLeft = getDaysLeft(project.endDate)
   const progress = Number(project.progress) || 0
+  const [c1, c2] = avatarPaletteFor(project.id)
+
+  const STATUS_COLORS: Record<string, string> = {
+    'Davam edir':     'indigo',
+    'Tamamlandı':     'green',
+    'Yoxlanılır':     'info',
+    'Planlaşdırılır': 'muted',
+    'Gözləyir':       'warn',
+    'Dayandırıldı':   'accent',
+  }
+  const statusColor = STATUS_COLORS[project.status] || 'muted'
 
   return (
-    <div className="card p-5 hover:border-white/[0.12] hover:shadow-card-hover transition-all duration-300 group flex flex-col gap-4">
+    <div className="cardM" style={{
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 16,
+      transition: 'transform .12s, box-shadow .12s',
+    }}
+    onMouseEnter={e => {
+      (e.currentTarget as HTMLDivElement).style.transform = 'translateY(-2px)'
+      ;(e.currentTarget as HTMLDivElement).style.boxShadow = 'var(--shadow)'
+    }}
+    onMouseLeave={e => {
+      (e.currentTarget as HTMLDivElement).style.transform = ''
+      ;(e.currentTarget as HTMLDivElement).style.boxShadow = ''
+    }}>
       {/* Top */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-3 min-w-0">
-          <div
-            className="w-9 h-9 rounded-xl flex-shrink-0 flex items-center justify-center text-white font-bold text-sm"
-            style={{ background: project.color || '#3B82F6' }}
-          >
-            {project.name.charAt(0).toUpperCase()}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, minWidth: 0 }}>
+          <div style={{
+            width: 40, height: 40,
+            borderRadius: 12,
+            background: `linear-gradient(135deg, ${c1}, ${c2})`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: 'white', fontWeight: 800, fontSize: 14,
+            flexShrink: 0,
+            letterSpacing: '-0.02em',
+          }}>
+            {project.name.substring(0, 2).toUpperCase()}
           </div>
-          <div className="min-w-0">
-            <h3 className="text-text-primary font-semibold text-sm truncate">{project.name}</h3>
-            <p className="text-text-muted text-xs mt-0.5 truncate">{project.description || 'Təsvir yoxdur'}</p>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {project.name}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {project.description || 'Təsvir yoxdur'}
+            </div>
           </div>
         </div>
-        <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
           <button
             onClick={() => onEdit(project)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.08] transition-all"
+            className="icon-btn"
+            style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: 'var(--surface-2)' }}
           >
-            <Edit2 size={13} />
+            <Edit2 size={12} />
           </button>
           <button
             onClick={() => onDelete(project)}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-all"
+            className="icon-btn"
+            style={{ width: 28, height: 28, borderRadius: 8, border: 'none', background: 'var(--accent-soft)', color: 'var(--accent)' }}
           >
-            <Trash2 size={13} />
+            <Trash2 size={12} />
           </button>
         </div>
       </div>
 
-      {/* Badges */}
-      <div className="flex flex-wrap gap-2">
-        <StatusBadge status={project.status} />
-        <PriorityBadge priority={project.priority} />
+      {/* Status */}
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+        <span className={`pill ${statusColor}`}>
+          <span className="dot" />
+          {project.status}
+        </span>
+        {project.priority && (
+          <span className={`pill ${project.priority === 'Yüksək' ? 'accent' : project.priority === 'Orta' ? 'warn' : 'muted'}`}>
+            {project.priority}
+          </span>
+        )}
       </div>
 
       {/* Progress */}
       <div>
-        <div className="flex justify-between items-center mb-1.5">
-          <span className="text-text-muted text-xs">İrəliləyiş</span>
-          <span className={cn('text-xs font-semibold', progress >= 100 ? 'text-accent-green' : 'text-text-primary')}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>İrəliləyiş</span>
+          <span style={{ fontSize: 12, fontWeight: 700, color: progress >= 100 ? 'var(--success)' : 'var(--ink)' }}>
             {progress}%
           </span>
         </div>
-        <div className="progress-bar">
+        <div className="progressM">
           <div
-            className="progress-fill"
+            className="progressM-fill"
             style={{
               width: `${progress}%`,
-              background: progress >= 100 ? '#10B981' : project.color || '#3B82F6',
+              background: progress >= 100
+                ? 'var(--success)'
+                : `linear-gradient(90deg, ${c1}, ${c2})`,
             }}
           />
         </div>
       </div>
 
       {/* Meta */}
-      <div className="flex items-center justify-between text-xs text-text-muted pt-1 border-t border-white/[0.04]">
-        <div className="flex items-center gap-1">
-          <User size={11} />
-          <span className="truncate max-w-[100px]">{project.owner || '—'}</span>
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        fontSize: 11,
+        color: 'var(--muted)',
+        paddingTop: 8,
+        borderTop: '1px solid var(--border-2)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span className="material-symbols-rounded" style={{ fontSize: 13 }}>person</span>
+          <span style={{ maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {project.owner || '—'}
+          </span>
         </div>
-        <div className="flex items-center gap-1">
-          <Calendar size={11} />
-          <span className={cn(daysLeft < 0 && project.status !== 'Tamamlandı' ? 'text-accent-red' : '')}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+          <span className="material-symbols-rounded" style={{ fontSize: 13 }}>calendar_today</span>
+          <span style={{ color: daysLeft < 0 && project.status !== 'Tamamlandı' ? 'var(--accent)' : 'inherit' }}>
             {project.endDate
               ? daysLeft < 0
                 ? `${Math.abs(daysLeft)}g gecikdi`
@@ -92,18 +166,24 @@ export function ProjectCard({ project, onEdit, onDelete }: ProjectCardProps) {
         </div>
       </div>
 
-      {/* Footer: budget + View Tasks */}
-      <div className="flex items-center gap-2">
+      {/* Footer */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
         {project.budget && (
-          <span className="text-xs text-text-muted">
+          <span style={{ fontSize: 11, color: 'var(--muted)' }}>
             ₼{Number(project.budget).toLocaleString()}
           </span>
         )}
         <Link
           href={`/projects/${project.id}`}
-          className="ml-auto flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg transition-all text-accent-blue hover:bg-accent-blue/10 border border-accent-blue/20"
+          className="btn-primaryM"
+          style={{
+            marginLeft: 'auto',
+            padding: '6px 12px',
+            fontSize: 12,
+            boxShadow: 'none',
+          }}
         >
-          <CheckSquare size={12} />
+          <span className="material-symbols-rounded" style={{ fontSize: 13 }}>check_box</span>
           Tapşırıqlar
         </Link>
       </div>

@@ -1,5 +1,22 @@
-import { cn, STATUS_COLORS, PRIORITY_COLORS, PRIORITY_DOT } from '@/lib/utils'
 import { Priority, ProjectStatus, TaskStatus } from '@/lib/types'
+
+const STATUS_PILL: Record<string, string> = {
+  'Davam edir':     'indigo',
+  'Tamamlandı':     'green',
+  'Yoxlanılır':     'info',
+  'Planlaşdırılır': 'muted',
+  'Gözləyir':       'warn',
+  'Dayandırıldı':   'accent',
+}
+
+const PRIORITY_PILL: Record<string, string> = {
+  'Yüksək': 'accent',
+  'Orta':   'warn',
+  'Aşağı':  'muted',
+  'High':   'accent',
+  'Medium': 'warn',
+  'Low':    'muted',
+}
 
 interface StatusBadgeProps {
   status: ProjectStatus | TaskStatus
@@ -7,9 +24,10 @@ interface StatusBadgeProps {
 }
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
+  const color = STATUS_PILL[status] || 'muted'
   return (
-    <span className={cn('badge', STATUS_COLORS[status], className)}>
-      <span className="w-1.5 h-1.5 rounded-full bg-current" />
+    <span className={`pill ${color} ${className || ''}`}>
+      <span className="dot" />
       {status}
     </span>
   )
@@ -21,9 +39,9 @@ interface PriorityBadgeProps {
 }
 
 export function PriorityBadge({ priority, className }: PriorityBadgeProps) {
+  const color = PRIORITY_PILL[priority] || 'muted'
   return (
-    <span className={cn('inline-flex items-center gap-1.5 text-xs font-medium', PRIORITY_COLORS[priority], className)}>
-      <span className={cn('w-1.5 h-1.5 rounded-full', PRIORITY_DOT[priority])} />
+    <span className={`pill ${color} ${className || ''}`}>
       {priority}
     </span>
   )

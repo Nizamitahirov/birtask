@@ -1136,9 +1136,9 @@ export default function SettingsPage() {
   ]
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
+    <div className="pageM fade-in">
       <div>
-        <h1 className="page-title">Parametrlər</h1>
+        <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)', margin: 0 }} className="">Parametrlər</h1>
         <p className="text-text-secondary text-sm mt-1">Platforma konfiqurasiyası</p>
       </div>
 

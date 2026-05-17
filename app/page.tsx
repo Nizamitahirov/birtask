@@ -2,239 +2,467 @@
 
 import { useState, useEffect } from 'react'
 import { useDashboard } from '@/hooks/useSheets'
-import { StatsCard } from '@/components/dashboard/StatsCard'
-import { ActivityFeed } from '@/components/dashboard/ActivityFeed'
-import { CardSkeleton, Skeleton } from '@/components/ui/Skeleton'
-import {
-  FolderKanban, CheckSquare, Users, AlertCircle,
-  TrendingUp, Clock, Award, ArrowRight
-} from 'lucide-react'
+import { useProjects } from '@/hooks/useSheets'
 import Link from 'next/link'
+
+const VIBRANT_PALETTES = [
+  ['#5B5BF5', '#B57BFF'],
+  ['#FF8B7B', '#FFD466'],
+  ['#16C098', '#67E8C5'],
+  ['#4DABF7', '#A78BFA'],
+  ['#E879C8', '#FF8FB1'],
+  ['#F5A524', '#FF8B7B'],
+  ['#7C5BF7', '#E879C8'],
+  ['#16C098', '#5B5BF5'],
+]
+
+function paletteIndexFor(seed: string) {
+  let h = 0
+  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0
+  return Math.abs(h) % 8
+}
+
+function avatarPaletteFor(seed: string): [string, string] {
+  return VIBRANT_PALETTES[(paletteIndexFor(seed) + 3) % 8] as [string, string]
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  'Davam edir':     'indigo',
+  'Tamamlandı':     'green',
+  'Yoxlanılır':     'info',
+  'Planlaşdırılır': 'muted',
+  'Gözləyir':       'warn',
+  'Dayandırıldı':   'accent',
+}
 
 export default function DashboardPage() {
   const { stats, activities, loading } = useDashboard()
-  const [dateStr, setDateStr] = useState('')
+  const { projects } = useProjects()
+  const [animate, setAnimate] = useState(false)
+  const [tab, setTab] = useState('all')
+
   useEffect(() => {
-    setDateStr(new Date().toLocaleDateString('az-AZ', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }))
+    const t = setTimeout(() => setAnimate(true), 80)
+    return () => clearTimeout(t)
   }, [])
 
-  const completionRate = stats
-    ? stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0
+  const completionRate = stats && stats.totalTasks > 0
+    ? Math.round((stats.completedTasks / stats.totalTasks) * 100)
     : 0
 
+  const hour = new Date().getHours()
+  const greeting = hour < 5 ? 'Gecə xeyir' : hour < 12 ? 'Sabahın xeyir' : hour < 18 ? 'Salam' : 'Axşamın xeyir'
+
+  const filteredProjects = tab === 'active'
+    ? projects.filter(p => (p.status as string) === 'Davam edir')
+    : tab === 'review'
+      ? projects.filter(p => (p.status as string) === 'Yoxlanılır' || (p.status as string) === 'Tamamlandı')
+      : projects
+
+  const r = 72
+  const circumference = 2 * Math.PI * r
+  const dash = animate ? (completionRate / 100) * circumference : 0
+
   return (
-    <div className="p-6 lg:p-8 space-y-8 animate-fade-in">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="page-title">İdarə Paneli</h1>
-          <p className="text-text-secondary text-sm mt-1">{dateStr}</p>
+    <div className="pageM fade-in">
+
+      {/* HERO */}
+      <div className="hero">
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <div className="greeting">{greeting} 👋</div>
+          <h1>
+            Bu gün{' '}
+            <span style={{
+              background: 'linear-gradient(90deg, #FFD466, #FF8FB1)',
+              WebkitBackgroundClip: 'text',
+              WebkitTextFillColor: 'transparent',
+            }}>
+              {stats?.completedTasks ?? 0}
+            </span>{' '}
+            tapşırıq tamamlandı.
+          </h1>
+          <p>
+            {stats?.activeProjects ?? 0} aktiv layihə üzərində işləyirsiniz.
+            Komandanız bu həftə yaxşı irəliləyiş göstərir.
+          </p>
+          <div className="cta-row">
+            <Link href="/tasks" className="cta">
+              <span className="material-symbols-rounded" style={{ fontSize: 14 }}>add_task</span>
+              Yeni tapşırıq
+            </Link>
+            <Link href="/calendar" className="cta ghost">
+              <span className="material-symbols-rounded" style={{ fontSize: 14 }}>calendar_today</span>
+              Cədvəlim
+            </Link>
+          </div>
         </div>
-        <div className="hidden sm:flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-accent-green animate-pulse" />
-          <span className="text-text-secondary text-xs">Google Sheets ilə sinxron</span>
+        <div className="hero-side">
+          <div className="hero-stat">
+            <div className="ico">
+              <span className="material-symbols-rounded" style={{ fontSize: 18 }}>trending_up</span>
+            </div>
+            <div>
+              <div className="v">{completionRate}%</div>
+              <div className="l">Tamamlanma · bu ay</div>
+            </div>
+          </div>
+          <div className="hero-stat">
+            <div className="ico">
+              <span className="material-symbols-rounded" style={{ fontSize: 18 }}>schedule</span>
+            </div>
+            <div>
+              <div className="v">{stats?.totalProjects ?? 0}</div>
+              <div className="l">Ümumi layihə</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* Stats Grid */}
-      {loading ? (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => <CardSkeleton key={i} />)}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatsCard
-            title="Ümumi Layihə"
-            value={stats?.totalProjects ?? 0}
-            subtitle={`${stats?.activeProjects ?? 0} aktiv`}
-            icon={FolderKanban}
-            color="blue"
-          />
-          <StatsCard
-            title="Tapşırıqlar"
-            value={stats?.totalTasks ?? 0}
-            subtitle={`${stats?.completedTasks ?? 0} tamamlandı`}
-            icon={CheckSquare}
-            color="purple"
-          />
-          <StatsCard
-            title="Komanda"
-            value={stats?.teamSize ?? 0}
-            subtitle="aktiv üzv"
-            icon={Users}
-            color="cyan"
-          />
-          <StatsCard
-            title="Gecikmiş"
-            value={stats?.overdueTasks ?? 0}
-            subtitle="tapşırıq"
-            icon={AlertCircle}
-            color="red"
-          />
-        </div>
-      )}
+      {/* STAT CARDS */}
+      <div className="statsM stagger">
+        <StatCard
+          color="indigo"
+          icon="folder"
+          label="Aktiv layihələr"
+          value={stats?.activeProjects ?? 0}
+          total={stats?.totalProjects ?? 0}
+          delta="+2"
+          deltaDir="up"
+          loading={loading}
+        />
+        <StatCard
+          color="pink"
+          icon="check_circle"
+          label="Tamamlanan tapşırıqlar"
+          value={stats?.completedTasks ?? 0}
+          total={stats?.totalTasks ?? 0}
+          delta="+18%"
+          deltaDir="up"
+          loading={loading}
+        />
+        <StatCard
+          color="info"
+          icon="visibility"
+          label="Yoxlanılır"
+          value={0}
+          total={stats?.totalTasks ?? 0}
+          delta="−3"
+          deltaDir="up"
+          loading={loading}
+        />
+        <StatCard
+          color="warn"
+          icon="warning"
+          label="Gecikmiş tapşırıqlar"
+          value={stats?.overdueTasks ?? 0}
+          total={stats?.totalTasks ?? 0}
+          delta="−2"
+          deltaDir="up"
+          loading={loading}
+        />
+      </div>
 
-      {/* Middle Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Progress Overview */}
-        <div className="lg:col-span-2 card p-6 space-y-5">
-          <div className="flex items-center justify-between">
-            <h2 className="font-semibold text-text-primary flex items-center gap-2">
-              <TrendingUp size={18} className="text-accent-blue" />
-              Ümumi İrəliləyiş
-            </h2>
-            <Link href="/projects" className="text-xs text-accent-blue hover:underline flex items-center gap-1">
-              Hamısı <ArrowRight size={12} />
-            </Link>
+      {/* GRID: projects + donut */}
+      <div className="gridM">
+        {/* Projects card */}
+        <div className="cardM">
+          <div className="cardM-head">
+            <h3>
+              <span className="ico">
+                <span className="material-symbols-rounded" style={{ fontSize: 16 }}>folder_open</span>
+              </span>
+              Cari layihələr
+            </h3>
+            <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+              <div className="tabs" style={{
+                display: 'flex',
+                background: 'var(--surface-2)',
+                borderRadius: 10,
+                padding: 3,
+                gap: 2,
+              }}>
+                <button
+                  className={tab === 'all' ? 'on' : ''}
+                  onClick={() => setTab('all')}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 8,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: tab === 'all' ? 'var(--ink)' : 'var(--muted)',
+                    background: tab === 'all' ? 'var(--surface)' : 'transparent',
+                    boxShadow: tab === 'all' ? 'var(--shadow-sm)' : 'none',
+                  }}
+                >
+                  Hamısı
+                </button>
+                <button
+                  onClick={() => setTab('active')}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 8,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: tab === 'active' ? 'var(--ink)' : 'var(--muted)',
+                    background: tab === 'active' ? 'var(--surface)' : 'transparent',
+                    boxShadow: tab === 'active' ? 'var(--shadow-sm)' : 'none',
+                  }}
+                >
+                  Aktiv
+                </button>
+                <button
+                  onClick={() => setTab('review')}
+                  style={{
+                    padding: '5px 12px',
+                    borderRadius: 8,
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: tab === 'review' ? 'var(--ink)' : 'var(--muted)',
+                    background: tab === 'review' ? 'var(--surface)' : 'transparent',
+                    boxShadow: tab === 'review' ? 'var(--shadow-sm)' : 'none',
+                  }}
+                >
+                  Bitirilir
+                </button>
+              </div>
+              <Link href="/projects" className="cardM-head" style={{
+                fontSize: 12,
+                fontWeight: 700,
+                color: 'var(--primary)',
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 4,
+                marginBottom: 0,
+              }}>
+                Hamısını gör
+                <span className="material-symbols-rounded" style={{ fontSize: 14 }}>arrow_forward</span>
+              </Link>
+            </div>
           </div>
 
           {loading ? (
-            <div className="space-y-4">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
               {[...Array(3)].map((_, i) => (
-                <div key={i} className="space-y-2">
-                  <Skeleton className="h-4 w-1/3" />
-                  <Skeleton className="h-2 w-full" />
-                </div>
+                <div key={i} className="skeleton" style={{ height: 52, borderRadius: 12 }} />
               ))}
             </div>
           ) : (
-            <div className="space-y-4">
-              <ProgressRow
-                label="Layihə tamamlanma"
-                value={stats?.completedProjects ?? 0}
-                total={stats?.totalProjects ?? 1}
-                color="#3B82F6"
-              />
-              <ProgressRow
-                label="Tapşırıq tamamlanma"
-                value={stats?.completedTasks ?? 0}
-                total={stats?.totalTasks ?? 1}
-                color="#8B5CF6"
-              />
-              <ProgressRow
-                label="Aktiv layihələr"
-                value={stats?.activeProjects ?? 0}
-                total={stats?.totalProjects ?? 1}
-                color="#06B6D4"
-              />
+            <div className="projM">
+              {filteredProjects.slice(0, 6).map(p => {
+                const [c1, c2] = avatarPaletteFor(p.id)
+                const pct = Number(p.progress) || 0
+                const statusColor = STATUS_COLORS[p.status as string] || 'muted'
+                return (
+                  <div className="projM-row" key={p.id}>
+                    <div className="projM-head">
+                      <div
+                        className="projM-swatch"
+                        style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}
+                      >
+                        {p.name.substring(0, 2).toUpperCase()}
+                      </div>
+                      <div className="projM-text">
+                        <div className="n">{p.name}</div>
+                        <div className="s">{pct}% · {p.owner || '—'}</div>
+                      </div>
+                    </div>
+                    <span className={`pill ${statusColor}`}>
+                      <span className="dot" />
+                      {p.status}
+                    </span>
+                    <div className="projM-progress">
+                      <div className="progressM">
+                        <div
+                          className="progressM-fill"
+                          style={{
+                            width: animate ? `${pct}%` : '0%',
+                            background: `linear-gradient(90deg, ${c1}, ${c2})`,
+                          }}
+                        />
+                      </div>
+                      <span className="projM-pct">{pct}%</span>
+                    </div>
+                  </div>
+                )
+              })}
+              {filteredProjects.length === 0 && (
+                <div style={{
+                  padding: '40px 20px',
+                  textAlign: 'center',
+                  color: 'var(--muted)',
+                  fontSize: 13,
+                }}>
+                  Layihə tapılmadı
+                </div>
+              )}
             </div>
           )}
-
-          {/* Big completion rate */}
-          <div className="mt-4 pt-4 border-t border-white/[0.06] flex items-center gap-4">
-            <div className="relative w-16 h-16">
-              <svg viewBox="0 0 36 36" className="w-16 h-16 -rotate-90">
-                <circle cx="18" cy="18" r="15.9" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="2" />
-                <circle
-                  cx="18" cy="18" r="15.9" fill="none"
-                  stroke="#3B82F6" strokeWidth="2"
-                  strokeDasharray={`${completionRate} ${100 - completionRate}`}
-                  strokeLinecap="round"
-                />
-              </svg>
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-xs font-bold text-text-primary">{completionRate}%</span>
-              </div>
-            </div>
-            <div>
-              <div className="text-text-primary font-semibold">Ümumi tamamlanma</div>
-              <div className="text-text-muted text-sm">{stats?.completedTasks}/{stats?.totalTasks} tapşırıq</div>
-            </div>
-          </div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="space-y-4">
-          <QuickStatCard
-            icon={Award}
-            label="Tamamlanan layihələr"
-            value={stats?.completedProjects ?? 0}
-            color="text-accent-green"
-            bg="bg-accent-green/10"
-            loading={loading}
-          />
-          <QuickStatCard
-            icon={Clock}
-            label="Gecikmiş tapşırıqlar"
-            value={stats?.overdueTasks ?? 0}
-            color="text-accent-red"
-            bg="bg-accent-red/10"
-            loading={loading}
-          />
-          <QuickStatCard
-            icon={CheckSquare}
-            label="Yoxlanılır"
-            value={0}
-            color="text-accent-yellow"
-            bg="bg-accent-yellow/10"
-            loading={loading}
-          />
+        {/* Donut card */}
+        <div className="cardM">
+          <div className="cardM-head">
+            <h3>
+              <span className="ico">
+                <span className="material-symbols-rounded" style={{ fontSize: 16 }}>donut_large</span>
+              </span>
+              Ümumi İrəliləyiş
+            </h3>
+            <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>Detallı</span>
+          </div>
+
+          {/* Donut */}
+          <div className="donutM">
+            <svg viewBox="0 0 168 168">
+              <defs>
+                <linearGradient id="donutGrad" x1="0" x2="1" y1="0" y2="1">
+                  <stop offset="0%" stopColor="#5B5BF5" />
+                  <stop offset="50%" stopColor="#B57BFF" />
+                  <stop offset="100%" stopColor="#FF6FB0" />
+                </linearGradient>
+              </defs>
+              <circle className="track" cx="84" cy="84" r={r} fill="none" strokeWidth="14" />
+              <circle
+                className="fill"
+                cx="84" cy="84" r={r}
+                fill="none" strokeWidth="14"
+                strokeDasharray={`${dash} ${circumference}`}
+              />
+            </svg>
+            <div className="inner">
+              <div className="pct">
+                {completionRate}
+                <span style={{ fontSize: 18, color: 'var(--muted)' }}>%</span>
+              </div>
+              <div className="lbl">Tamamlandı</div>
+            </div>
+          </div>
+
+          <div className="legend">
+            <LegendRow color="#5B5BF5" label="Tamamlandı" value={stats?.completedTasks ?? 0} />
+            <LegendRow color="#FF6A6A" label="Gecikmiş" value={stats?.overdueTasks ?? 0} />
+            <LegendRow color="#4DABF7" label="Aktiv" value={stats?.activeProjects ?? 0} />
+            <LegendRow color="#E7E9F2" label="Ümumi tapşırıq" value={stats?.totalTasks ?? 0} />
+          </div>
         </div>
       </div>
 
-      {/* Activity Feed */}
-      <div className="card p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h2 className="font-semibold text-text-primary flex items-center gap-2">
-            <Clock size={18} className="text-accent-purple" />
-            Son Aktivliklər
-          </h2>
-        </div>
-        {loading ? (
-          <div className="space-y-3">
-            {[...Array(4)].map((_, i) => (
-              <div key={i} className="flex gap-3">
-                <Skeleton className="w-7 h-7 rounded-lg flex-shrink-0" />
-                <div className="flex-1 space-y-1">
-                  <Skeleton className="h-3 w-3/4" />
-                  <Skeleton className="h-3 w-1/3" />
+      {/* ACTIVITY */}
+      {activities.length > 0 && (
+        <div className="cardM">
+          <div className="cardM-head">
+            <h3>
+              <span className="ico" style={{ background: 'var(--success-soft)', color: 'var(--success)' }}>
+                <span className="material-symbols-rounded" style={{ fontSize: 16 }}>bolt</span>
+              </span>
+              Son aktivlik
+            </h3>
+            <Link href="/activity" style={{ fontSize: 12, fontWeight: 700, color: 'var(--primary)' }}>
+              Hamısı
+            </Link>
+          </div>
+          <div className="actM">
+            {activities.slice(0, 6).map((a, i) => {
+              const [c1, c2] = avatarPaletteFor(a.userId || String(i))
+              const iconMap: Record<string, string> = {
+                create: 'add_circle', update: 'sync', delete: 'delete',
+                complete: 'check_circle',
+              }
+              const colorMap: Record<string, string> = {
+                create: 'indigo', update: 'info', delete: 'accent', complete: 'green',
+              }
+              const typeColor = colorMap[a.type] || 'muted'
+              const typeIcon = iconMap[a.type] || 'info'
+              return (
+                <div key={a.id} className="actM-row">
+                  <div
+                    className="av"
+                    style={{ background: `linear-gradient(135deg, ${c1}, ${c2})` }}
+                  >
+                    {(a.userId || 'U').charAt(0).toUpperCase()}
+                  </div>
+                  <div className="msg">
+                    <b>{a.userId}</b>{' '}{a.message}
+                    <div style={{ marginTop: 4 }}>
+                      <span className={`pill ${typeColor}`} style={{ fontSize: 10 }}>
+                        <span className="material-symbols-rounded" style={{ fontSize: 11 }}>
+                          {typeIcon}
+                        </span>
+                        {a.entityType}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="ts" style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap' }}>
+                    {new Date(a.createdAt).toLocaleTimeString('az-AZ', { hour: '2-digit', minute: '2-digit' })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
-        ) : (
-          <ActivityFeed activities={activities} />
-        )}
-      </div>
+        </div>
+      )}
     </div>
   )
 }
 
-function ProgressRow({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
-  const pct = total > 0 ? Math.round((value / total) * 100) : 0
-  return (
-    <div>
-      <div className="flex justify-between items-center mb-1.5">
-        <span className="text-text-secondary text-sm">{label}</span>
-        <span className="text-text-primary text-sm font-medium">{pct}%</span>
-      </div>
-      <div className="progress-bar">
-        <div
-          className="progress-fill"
-          style={{ width: `${pct}%`, background: color }}
-        />
-      </div>
-      <div className="text-text-muted text-xs mt-1">{value} / {total}</div>
-    </div>
-  )
-}
-
-function QuickStatCard({
-  icon: Icon, label, value, color, bg, loading
+function StatCard({
+  color, icon, label, value, total, delta, deltaDir, loading,
 }: {
-  icon: typeof Award; label: string; value: number
-  color: string; bg: string; loading: boolean
+  color: string; icon: string; label: string; value: number; total: number
+  delta: string; deltaDir: string; loading: boolean
 }) {
-  if (loading) return <Skeleton className="h-20 rounded-2xl" />
+  if (loading) {
+    return <div className="skeleton" style={{ height: 140, borderRadius: 16 }} />
+  }
+
+  const points = [6, 9, 7, 11, 8, 14, 10]
+  const max = Math.max(...points)
+  const path = points.map((p, i) =>
+    `${i === 0 ? 'M' : 'L'} ${(i / (points.length - 1)) * 100},${30 - (p / max) * 24}`
+  ).join(' ')
+  const fillPath = path + ' L 100,30 L 0,30 Z'
+  const colorVar =
+    color === 'indigo' ? 'var(--primary)' :
+    color === 'pink' ? 'var(--pink)' :
+    color === 'info' ? 'var(--info)' :
+    'var(--accent)'
+  const sparkId = `spark-${label.replace(/\s+/g, '')}`
+
   return (
-    <div className="card p-4 flex items-center gap-4 hover:border-white/[0.12] transition-all">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${bg}`}>
-        <Icon size={18} className={color} />
+    <div className={`statM color-${color}`}>
+      <div className="statM-head">
+        <div className="ico">
+          <span className="material-symbols-rounded" style={{ fontSize: 18 }}>{icon}</span>
+        </div>
+        <span className={`delta ${deltaDir === 'up' ? 'up' : 'down'}`}>{delta}</span>
       </div>
-      <div>
-        <div className="text-xl font-bold text-text-primary">{value}</div>
-        <div className="text-text-secondary text-xs">{label}</div>
+      <div className="v">{value}</div>
+      <div className="l">
+        {label}{' '}
+        <span style={{ color: 'var(--muted-2)' }}>/ {total}</span>
       </div>
+      <svg className="spark" viewBox="0 0 100 30" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id={sparkId} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={colorVar} stopOpacity="0.25" />
+            <stop offset="100%" stopColor={colorVar} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={fillPath} fill={`url(#${sparkId})`} />
+        <path d={path} fill="none" stroke={colorVar} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </div>
+  )
+}
+
+function LegendRow({ color, label, value }: { color: string; label: string; value: number }) {
+  return (
+    <div className="legend-row">
+      <span className="lk">
+        <span className="sq" style={{ background: color }} />
+        {label}
+      </span>
+      <span className="lv">{Math.max(0, value)}</span>
     </div>
   )
 }

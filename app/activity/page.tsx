@@ -130,7 +130,7 @@ export default function ActivityPage() {
 
   if (user && user.role !== 'admin') {
     return (
-      <div className="p-6 lg:p-8 flex flex-col items-center justify-center min-h-[60vh] space-y-4 animate-fade-in">
+      <div className="pageM fade-in" style={{ minHeight: '60vh', alignItems: 'center', justifyContent: 'center' }}>
         <div className="w-16 h-16 rounded-2xl bg-accent-red/10 border border-accent-red/20 flex items-center justify-center">
           <Shield size={28} className="text-accent-red" />
         </div>
@@ -143,11 +143,11 @@ export default function ActivityPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
+    <div className="pageM fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="page-headerM">
         <div>
-          <h1 className="page-title">Aktivlik Jurnalı</h1>
+          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)', margin: 0 }} className="">Aktivlik Jurnalı</h1>
           <p className="text-text-secondary text-sm mt-1">
             {filtered.length} qeyd {logs.length !== filtered.length ? `(${logs.length} ümumi)` : ''}
           </p>

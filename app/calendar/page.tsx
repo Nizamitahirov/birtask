@@ -220,7 +220,7 @@ export default function CalendarPage() {
   return (
     <div className="flex h-full overflow-hidden">
       {/* Main Calendar */}
-      <div className="flex-1 flex flex-col overflow-hidden p-6 lg:p-8 gap-4">
+      <div className="pageM fade-in">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 flex-shrink-0">
           <div className="flex items-center gap-3">

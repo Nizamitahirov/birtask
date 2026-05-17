@@ -1,8 +1,6 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import { X } from 'lucide-react'
-import { cn } from '@/lib/utils'
 
 interface ModalProps {
   open: boolean
@@ -24,35 +22,60 @@ export function Modal({ open, onClose, title, children, size = 'md' }: ModalProp
 
   if (!open) return null
 
-  const sizeClass = {
-    sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-  }[size]
+  const maxWidth = size === 'sm' ? 480 : size === 'lg' ? 720 : 560
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div style={{
+      position: 'fixed',
+      inset: 0,
+      zIndex: 50,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 16,
+    }}>
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(15,17,41,0.5)',
+          backdropFilter: 'blur(6px)',
+        }}
         onClick={onClose}
       />
       <div
         ref={ref}
-        className={cn(
-          'relative w-full bg-bg-card border border-white/[0.08] rounded-2xl shadow-2xl animate-slide-up',
-          sizeClass
-        )}
+        className="fade-in"
+        style={{
+          position: 'relative',
+          width: '100%',
+          maxWidth,
+          background: 'var(--surface)',
+          border: '1px solid var(--border)',
+          borderRadius: 20,
+          boxShadow: 'var(--shadow-lg)',
+          overflow: 'hidden',
+        }}
       >
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/[0.06]">
-          <h2 className="text-base font-semibold text-text-primary">{title}</h2>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '16px 24px',
+          borderBottom: '1px solid var(--border)',
+        }}>
+          <h2 style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)', margin: 0, letterSpacing: '-0.02em' }}>
+            {title}
+          </h2>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-white/[0.06] transition-all"
+            className="icon-btn"
+            style={{ border: 'none', background: 'var(--surface-2)' }}
           >
-            <X size={16} />
+            <span className="material-symbols-rounded" style={{ fontSize: 16 }}>close</span>
           </button>
         </div>
-        <div className="p-6">{children}</div>
+        <div style={{ padding: 24 }}>{children}</div>
       </div>
     </div>
   )

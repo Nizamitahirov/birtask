@@ -4,7 +4,6 @@ import { usePathname } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { GlobalSearch } from '@/components/ui/GlobalSearch'
-import { Loader2 } from 'lucide-react'
 
 export function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth()
@@ -13,8 +12,22 @@ export function AuthenticatedLayout({ children }: { children: React.ReactNode })
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: 'rgb(var(--bg-primary))' }}>
-        <Loader2 size={32} className="text-accent-blue animate-spin" />
+      <div style={{
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: 'var(--bg)',
+      }}>
+        <div style={{
+          width: 40,
+          height: 40,
+          borderRadius: '50%',
+          border: '3px solid var(--primary-soft)',
+          borderTopColor: 'var(--primary)',
+          animation: 'spin 0.8s linear infinite',
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     )
   }
@@ -24,11 +37,11 @@ export function AuthenticatedLayout({ children }: { children: React.ReactNode })
     return <>{children}</>
   }
 
-  // Authenticated: render with sidebar
+  // Authenticated: render with new grid shell
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="appM">
       <Sidebar />
-      <main className="flex-1 overflow-auto pt-14 md:pt-0">
+      <main className="mainM">
         {children}
       </main>
       <GlobalSearch />

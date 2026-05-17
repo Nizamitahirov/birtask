@@ -144,11 +144,11 @@ export default function TasksPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
+    <div className="pageM fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="page-headerM">
         <div>
-          <h1 className="page-title">Tapşırıqlar</h1>
+          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)', margin: 0 }} className="">Tapşırıqlar</h1>
           <p className="text-text-secondary text-sm mt-1">{tasks.length} tapşırıq</p>
         </div>
         <div className="flex items-center gap-2">

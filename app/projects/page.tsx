@@ -64,19 +64,19 @@ export default function ProjectsPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-6 animate-fade-in">
+    <div className="pageM fade-in">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="page-headerM">
         <div>
-          <h1 className="page-title">Layihələr</h1>
-          <p className="text-text-secondary text-sm mt-1">{projects.length} layihə</p>
+          <h1 className="page-headerM" style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', color: 'var(--ink)', margin: 0 }}>Layihələr</h1>
+          <p style={{ color: 'var(--muted)', fontSize: 13, marginTop: 4 }}>{projects.length} layihə</p>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={refresh} className="btn-secondary w-9 h-9 !p-0 justify-center" title="Yenilə">
-            <RefreshCw size={15} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button onClick={refresh} className="btn-ghostM" style={{ padding: '8px', width: 36, height: 36, justifyContent: 'center' }} title="Yenilə">
+            <span className="material-symbols-rounded" style={{ fontSize: 16 }}>refresh</span>
           </button>
-          <button onClick={() => setModal('create')} className="btn-primary">
-            <Plus size={15} /> Yeni Layihə
+          <button onClick={() => setModal('create')} className="btn-primaryM">
+            <span className="material-symbols-rounded" style={{ fontSize: 14 }}>add</span> Yeni Layihə
           </button>
         </div>
       </div>

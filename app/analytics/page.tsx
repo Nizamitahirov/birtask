@@ -322,7 +322,7 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="p-6 lg:p-8 space-y-8 animate-fade-in">
+    <div className="pageM fade-in">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center gap-4 justify-between">
         <div>

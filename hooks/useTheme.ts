@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react'
 
 export function useTheme() {
-  const [theme, setTheme] = useState<'dark' | 'light'>('dark')
+  const [theme, setTheme] = useState<'dark' | 'light'>('light')
 
   useEffect(() => {
-    const saved = (localStorage.getItem('birtask-theme') as 'dark' | 'light') || 'dark'
+    const saved = (localStorage.getItem('birtask-theme') as 'dark' | 'light') || 'light'
     setTheme(saved)
     document.documentElement.setAttribute('data-theme', saved)
   }, [])
