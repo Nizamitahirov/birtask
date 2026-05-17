@@ -43,20 +43,23 @@ export async function POST(req: NextRequest) {
     })
 
     const tasksSnap = await adminDb.collection('tasks').get()
-    const relinkBatch = adminDb.batch()
-    let relinked = 0
+    type RelinkUpdate = { ref: FirebaseFirestore.DocumentReference; projectId: string }
+    const relinkUpdates: RelinkUpdate[] = []
     tasksSnap.docs.forEach(doc => {
       const task = doc.data()
       const needsRelink = !task.projectId || !validIds.has(task.projectId as string)
       if (needsRelink && task.projectName) {
         const matchId = nameToId[(task.projectName as string).toLowerCase().trim()]
-        if (matchId) {
-          relinkBatch.update(doc.ref, { projectId: matchId })
-          relinked++
-        }
+        if (matchId) relinkUpdates.push({ ref: doc.ref, projectId: matchId })
       }
     })
-    await relinkBatch.commit()
+    const CHUNK = 500
+    for (let i = 0; i < relinkUpdates.length; i += CHUNK) {
+      const b = adminDb.batch()
+      relinkUpdates.slice(i, i + CHUNK).forEach(u => b.update(u.ref, { projectId: u.projectId }))
+      await b.commit()
+    }
+    const relinked = relinkUpdates.length
 
     return NextResponse.json({ success: true, imported, relinked })
   } catch (err: unknown) {

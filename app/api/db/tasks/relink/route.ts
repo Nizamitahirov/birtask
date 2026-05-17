@@ -17,8 +17,8 @@ export async function POST() {
       if (name) nameToId[name.toLowerCase().trim()] = doc.id
     })
 
-    const batch = adminDb.batch()
-    let relinked = 0
+    type BatchUpdate = { ref: FirebaseFirestore.DocumentReference; projectId: string }
+    const updates: BatchUpdate[] = []
 
     tasksSnap.docs.forEach(doc => {
       const task = doc.data()
@@ -26,13 +26,20 @@ export async function POST() {
       if (needsRelink && task.projectName) {
         const matchId = nameToId[(task.projectName as string).toLowerCase().trim()]
         if (matchId) {
-          batch.update(doc.ref, { projectId: matchId })
-          relinked++
+          updates.push({ ref: doc.ref, projectId: matchId })
         }
       }
     })
 
-    await batch.commit()
+    // Firestore batch limit is 500 — split into chunks
+    const CHUNK = 500
+    for (let i = 0; i < updates.length; i += CHUNK) {
+      const batch = adminDb.batch()
+      updates.slice(i, i + CHUNK).forEach(u => batch.update(u.ref, { projectId: u.projectId }))
+      await batch.commit()
+    }
+
+    const relinked = updates.length
     return NextResponse.json({ success: true, relinked, total: tasksSnap.size })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'
