@@ -52,6 +52,7 @@ export default function DashboardPage() {
   const { currentWorkspaceId } = useWorkspace()
   const [animate, setAnimate] = useState(false)
   const [tab, setTab] = useState('all')
+  const [page, setPage] = useState(0)
   const [matrixMap, setMatrixMap] = useState<Record<string, QuadKey>>({})
 
   useEffect(() => {
@@ -80,11 +81,14 @@ export default function DashboardPage() {
   const hour = new Date().getHours()
   const greeting = hour < 5 ? 'Gecə xeyir' : hour < 12 ? 'Sabahın xeyir' : hour < 18 ? 'Salam' : 'Axşamın xeyir'
 
+  const PAGE_SIZE = 5
   const filteredProjects = tab === 'active'
     ? projects.filter(p => (p.status as string) === 'Davam edir')
     : tab === 'review'
       ? projects.filter(p => (p.status as string) === 'Yoxlanılır' || (p.status as string) === 'Tamamlandı')
       : projects
+  const totalPages = Math.ceil(filteredProjects.length / PAGE_SIZE)
+  const pagedProjects = filteredProjects.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
 
   const r = 72
   const circumference = 2 * Math.PI * r
@@ -210,7 +214,7 @@ export default function DashboardPage() {
               }}>
                 <button
                   className={tab === 'all' ? 'on' : ''}
-                  onClick={() => setTab('all')}
+                  onClick={() => { setTab('all'); setPage(0) }}
                   style={{
                     padding: '5px 12px',
                     borderRadius: 8,
@@ -224,7 +228,7 @@ export default function DashboardPage() {
                   Hamısı
                 </button>
                 <button
-                  onClick={() => setTab('active')}
+                  onClick={() => { setTab('active'); setPage(0) }}
                   style={{
                     padding: '5px 12px',
                     borderRadius: 8,
@@ -238,7 +242,7 @@ export default function DashboardPage() {
                   Aktiv
                 </button>
                 <button
-                  onClick={() => setTab('review')}
+                  onClick={() => { setTab('review'); setPage(0) }}
                   style={{
                     padding: '5px 12px',
                     borderRadius: 8,
@@ -274,8 +278,9 @@ export default function DashboardPage() {
               ))}
             </div>
           ) : (
+            <>
             <div className="projM">
-              {filteredProjects.slice(0, 6).map(p => {
+              {pagedProjects.map(p => {
                 const [c1, c2] = avatarPaletteFor(p.id)
                 const pct = Number(p.progress) || 0
                 const statusColor = STATUS_COLORS[p.status as string] || 'muted'
@@ -381,6 +386,65 @@ export default function DashboardPage() {
                 </div>
               )}
             </div>
+
+            {totalPages > 1 && (
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                marginTop: 12, paddingTop: 12,
+                borderTop: '1px solid var(--border)',
+              }}>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 500 }}>
+                  {page * PAGE_SIZE + 1}–{Math.min((page + 1) * PAGE_SIZE, filteredProjects.length)} / {filteredProjects.length} layihə
+                </span>
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <button
+                    onClick={() => setPage(p => p - 1)}
+                    disabled={page === 0}
+                    style={{
+                      width: 28, height: 28, borderRadius: 8,
+                      border: '1px solid var(--border)',
+                      background: page === 0 ? 'var(--surface-2)' : 'var(--surface)',
+                      color: page === 0 ? 'var(--muted)' : 'var(--ink)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: page === 0 ? 'default' : 'pointer',
+                    }}
+                  >
+                    <span className="material-symbols-rounded" style={{ fontSize: 14 }}>chevron_left</span>
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setPage(i)}
+                      style={{
+                        width: 28, height: 28, borderRadius: 8,
+                        border: '1px solid var(--border)',
+                        background: page === i ? 'var(--primary)' : 'var(--surface)',
+                        color: page === i ? '#fff' : 'var(--ink)',
+                        fontSize: 11, fontWeight: 700,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {i + 1}
+                    </button>
+                  ))}
+                  <button
+                    onClick={() => setPage(p => p + 1)}
+                    disabled={page === totalPages - 1}
+                    style={{
+                      width: 28, height: 28, borderRadius: 8,
+                      border: '1px solid var(--border)',
+                      background: page === totalPages - 1 ? 'var(--surface-2)' : 'var(--surface)',
+                      color: page === totalPages - 1 ? 'var(--muted)' : 'var(--ink)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      cursor: page === totalPages - 1 ? 'default' : 'pointer',
+                    }}
+                  >
+                    <span className="material-symbols-rounded" style={{ fontSize: 14 }}>chevron_right</span>
+                  </button>
+                </div>
+              </div>
+            )}
+            </>
           )}
         </div>
 
