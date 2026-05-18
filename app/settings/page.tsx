@@ -329,18 +329,13 @@ function UsersTab() {
 
   const handleCreate = async (data: Partial<User> & { password?: string }) => {
     setSaving(true)
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-    })
-    const json = await res.json()
-    if (json.success) {
+    const res = await db.users.create(data as Omit<User, 'id' | 'createdAt' | 'updatedAt'>)
+    if (res.success) {
       toast.success('İstifadəçi yaradıldı')
       await fetchUsers()
       setModal(null)
     } else {
-      toast.error(json.error || 'Xəta baş verdi')
+      toast.error(res.error || 'Xəta baş verdi')
     }
     setSaving(false)
   }
