@@ -76,17 +76,24 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    // Trigger workflow emails for task_created
+    // Trigger workflow engine for task_created
     const wsId = data.workspaceId || ''
     if (wsId) {
-      fetch(`${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/send-email`, {
+      fetch(`${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/workflows/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          trigger: 'task_created',
+          triggerType: 'task_created',
           workspaceId: wsId,
-          data: { taskTitle: data.title || '', assignee: data.assignee || '' }
-        })
+          data: {
+            taskId: docRef.id,
+            taskTitle: data.title || '',
+            assignee: data.assignee || '',
+            projectId: data.projectId || '',
+            priority: data.priority || '',
+            status: 'Gözləyir',
+          },
+        }),
       }).catch(() => {})
     }
 

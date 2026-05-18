@@ -66,19 +66,49 @@ export async function PUT(
       } catch {}
     }
 
-    // Trigger workflow emails for task_completed
-    if (data.status === 'Tamamlandı' || data.status === 'completed') {
+    // Trigger workflow engine for various task update events
+    {
       const wsId = data.workspaceId || updated?.workspaceId || ''
+      const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
       if (wsId) {
-        fetch(`${process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/send-email`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            trigger: 'task_completed',
-            workspaceId: wsId,
-            data: { taskTitle: data.title || updated?.title || '', assignee: data.assignee || updated?.assignee || '', status: 'Tamamlandı' }
-          })
-        }).catch(() => {})
+        const taskId = params.id
+        const taskTitle = data.title || updated?.title || ''
+        const assignee = data.assignee || updated?.assignee || ''
+        const prevStatus = updated?.status || ''
+        const prevAssignee = updated?.assignee || ''
+        const prevDueDate = updated?.dueDate || ''
+        const prevPriority = updated?.priority || ''
+
+        const triggerPayload = {
+          taskId,
+          taskTitle,
+          assignee,
+          projectId: data.projectId || updated?.projectId || '',
+          priority: data.priority || updated?.priority || '',
+          status: data.status || updated?.status || '',
+          dueDate: data.dueDate || updated?.dueDate || '',
+        }
+
+        const fire = (triggerType: string) => {
+          fetch(`${baseUrl}/api/workflows/execute`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ triggerType, workspaceId: wsId, data: triggerPayload }),
+          }).catch(() => {})
+        }
+
+        // Always fire task_updated
+        fire('task_updated')
+
+        // Specific event triggers
+        if (data.status === 'Tamamlandı') fire('task_completed')
+        if (data.assignee && data.assignee !== prevAssignee) fire('task_assigned')
+
+        // Field-level triggers
+        if (data.status && data.status !== prevStatus) fire('field_status')
+        if (data.dueDate && data.dueDate !== prevDueDate) fire('field_due_date')
+        if (data.assignee && data.assignee !== prevAssignee) fire('field_assignee')
+        if (data.priority && data.priority !== prevPriority) fire('field_priority')
       }
     }
 
@@ -96,7 +126,9 @@ export async function DELETE(
   try {
     const ref = adminDb.collection('tasks').doc(params.id)
     const doc = await ref.get()
-    const title = doc.data()?.title || ''
+    const taskData = doc.data() || {}
+    const title = taskData.title || ''
+    const wsId = taskData.workspaceId || ''
     await ref.delete()
     const now = new Date().toISOString()
 
@@ -109,6 +141,20 @@ export async function DELETE(
       userDisplayName: 'System',
       createdAt: now,
     })
+
+    // Trigger workflow engine for task_deleted
+    if (wsId) {
+      const baseUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'
+      fetch(`${baseUrl}/api/workflows/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          triggerType: 'task_deleted',
+          workspaceId: wsId,
+          data: { taskId: params.id, taskTitle: title, assignee: taskData.assignee || '', projectId: taskData.projectId || '' },
+        }),
+      }).catch(() => {})
+    }
 
     return NextResponse.json({ success: true })
   } catch (err: unknown) {
