@@ -17,6 +17,7 @@ const NAV_MAIN = [
   { href: '/recurring',       label: 'Təkrarlanan',      icon: 'autorenew' },
   { href: '/analytics',       label: 'Analitika',        icon: 'analytics' },
   { href: '/priority-matrix', label: 'Prioritet Matrisi', icon: 'grid_view' },
+  { href: '/orgchart', label: 'Org Chart', icon: 'account_tree' },
 ]
 
 const NAV_ADMIN = [

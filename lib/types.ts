@@ -76,6 +76,7 @@ export interface TeamMember {
   department: string
   phone: string
   avatar: string
+  managerId?: string
   createdAt: string
 }
 

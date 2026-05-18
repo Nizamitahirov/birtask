@@ -28,6 +28,7 @@ const PAGE_META: { path: string; label: string; icon: string }[] = [
   { path: '/activity',  label: 'Aktivlik',      icon: 'bolt' },
   { path: '/settings',        label: 'Parametrlər',      icon: 'settings' },
   { path: '/priority-matrix', label: 'Prioritet Matrisi', icon: 'grid_view' },
+  { path: '/orgchart', label: 'Org Chart', icon: 'account_tree' },
   { path: '/',                label: 'İdarə Paneli',      icon: 'space_dashboard' },
 ]
 
