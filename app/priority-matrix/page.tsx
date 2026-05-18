@@ -31,44 +31,44 @@ const QUADRANTS: {
     key: 'do',
     label: 'İndi Et',
     tag: 'Do First',
-    desc: 'Yüksək təcililik · Yüksək əhəmiyyət',
+    desc: 'HIGH urgency · HIGH importance',
     tip: 'Kritik deadline, böhran, mühüm tapşırıqlar',
     color: '#EF4444',
     softBg: 'rgba(239,68,68,0.05)',
-    headerBorder: 'rgba(239,68,68,0.18)',
+    headerBorder: 'rgba(239,68,68,0.2)',
     icon: 'bolt',
   },
   {
     key: 'delegate',
     label: 'Həvalə Et',
     tag: 'Delegate',
-    desc: 'Yüksək təcililik · Aşağı əhəmiyyət',
+    desc: 'HIGH urgency · LOW importance',
     tip: 'Rutin tapşırıqlar, bəzi mesajlar, kiçik düzəlişlər',
     color: '#F59E0B',
     softBg: 'rgba(245,158,11,0.05)',
-    headerBorder: 'rgba(245,158,11,0.18)',
+    headerBorder: 'rgba(245,158,11,0.2)',
     icon: 'group',
   },
   {
     key: 'plan',
     label: 'Plan Et',
     tag: 'Schedule',
-    desc: 'Aşağı təcililik · Yüksək əhəmiyyət',
+    desc: 'LOW urgency · HIGH importance',
     tip: 'Strateji planlaşdırma, inkişaf, öyrənmə',
     color: '#5B5BF5',
     softBg: 'rgba(91,91,245,0.05)',
-    headerBorder: 'rgba(91,91,245,0.18)',
+    headerBorder: 'rgba(91,91,245,0.2)',
     icon: 'calendar_month',
   },
   {
     key: 'elim',
     label: 'Ləğv Et',
     tag: 'Eliminate',
-    desc: 'Aşağı təcililik · Aşağı əhəmiyyət',
+    desc: 'LOW urgency · LOW importance',
     tip: 'Diqqəti dağıdan, dəyər verməyən işlər',
     color: '#6B7280',
     softBg: 'rgba(107,114,128,0.05)',
-    headerBorder: 'rgba(107,114,128,0.18)',
+    headerBorder: 'rgba(107,114,128,0.2)',
     icon: 'delete_sweep',
   },
 ]
@@ -289,27 +289,47 @@ function Quadrant({
         justifyContent: 'space-between',
         gap: 8,
       }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3 }}>
-            <span className="material-symbols-rounded" style={{ fontSize: 14, color: config.color }}>
-              {config.icon}
-            </span>
-            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: config.color }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
+            <div style={{
+              width: 26, height: 26, borderRadius: 7, flexShrink: 0,
+              background: config.color + '18',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <span className="material-symbols-rounded" style={{ fontSize: 14, color: config.color }}>
+                {config.icon}
+              </span>
+            </div>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.1em', textTransform: 'uppercase', color: config.color }}>
               {config.tag}
             </span>
           </div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-0.02em' }}>
+          <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-0.02em', marginBottom: 4 }}>
             {config.label}
           </div>
-          <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 2 }}>
-            {config.desc}
+          {/* HIGH/LOW badges */}
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+            {config.desc.split(' · ').map((part, i) => {
+              const isHigh = part.startsWith('HIGH')
+              return (
+                <span key={i} style={{
+                  fontSize: 9, fontWeight: 700, padding: '2px 7px', borderRadius: 999,
+                  background: isHigh ? config.color + '18' : 'var(--surface-3)',
+                  color: isHigh ? config.color : 'var(--muted)',
+                  letterSpacing: '0.04em',
+                }}>
+                  {part}
+                </span>
+              )
+            })}
           </div>
         </div>
         <div style={{
-          fontSize: 24, fontWeight: 800, letterSpacing: '-0.04em',
+          fontSize: 28, fontWeight: 800, letterSpacing: '-0.04em',
           color: projects.length > 0 ? config.color : 'var(--border)',
           lineHeight: 1,
           flexShrink: 0,
+          paddingTop: 2,
         }}>
           {projects.length}
         </div>
@@ -317,11 +337,12 @@ function Quadrant({
 
       {/* Tip */}
       <div style={{
-        padding: '6px 16px',
+        padding: '5px 16px',
         fontSize: 10, color: 'var(--muted)',
-        borderBottom: '1px dotted var(--border)',
-        fontStyle: 'italic',
+        borderBottom: `1px solid ${config.headerBorder}`,
+        display: 'flex', alignItems: 'center', gap: 5,
       }}>
+        <span className="material-symbols-rounded" style={{ fontSize: 11, opacity: 0.5 }}>info</span>
         {config.tip}
       </div>
 
@@ -595,75 +616,119 @@ export default function PriorityMatrixPage() {
       </div>
 
       {/* Axis + Matrix wrapper */}
-      <div style={{ display: 'grid', gridTemplateColumns: '24px 1fr', gridTemplateRows: '1fr 24px', gap: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '40px 1fr', gridTemplateRows: '28px 1fr 28px', gap: 0 }}>
 
-        {/* Y-axis label */}
+        {/* Top-left: empty corner */}
+        <div style={{ gridRow: 1, gridColumn: 1 }} />
+
+        {/* Top: X-axis HIGH label */}
         <div style={{
-          gridRow: 1, gridColumn: 1,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          writingMode: 'vertical-rl',
-          transform: 'rotate(180deg)',
-          fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase',
-          color: 'var(--muted)',
+          gridRow: 1, gridColumn: 2,
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
+          paddingRight: 4, gap: 4,
+          fontSize: 9, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase',
+          color: '#EF4444',
         }}>
-          Təcililik (Urgency)
+          <span style={{ width: 24, height: 1, background: '#EF4444', opacity: 0.4, display: 'inline-block' }} />
+          HIGH Urgency
+        </div>
+
+        {/* Left: Y-axis label + HIGH/LOW */}
+        <div style={{
+          gridRow: 2, gridColumn: 1,
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'space-between',
+          paddingBottom: 4,
+          position: 'relative',
+        }}>
+          <span style={{
+            fontSize: 8, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase',
+            color: '#10B981', writingMode: 'vertical-rl', transform: 'rotate(180deg)',
+          }}>HIGH</span>
+          <div style={{
+            writingMode: 'vertical-rl', transform: 'rotate(180deg)',
+            fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase',
+            color: 'var(--muted)', flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '8px 0',
+          }}>
+            Importance
+          </div>
+          <span style={{
+            fontSize: 8, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase',
+            color: 'var(--muted-2)', writingMode: 'vertical-rl', transform: 'rotate(180deg)',
+          }}>LOW</span>
         </div>
 
         {/* 2×2 matrix grid */}
         <div style={{
-          gridRow: 1, gridColumn: 2,
+          gridRow: 2, gridColumn: 2,
           display: 'grid',
           gridTemplateColumns: '1fr 1fr',
           gridTemplateRows: '1fr 1fr',
           gap: 10,
           minHeight: 520,
         }}>
-          {/* Row 1: high urgency */}
-          {QUADRANTS.filter(q => q.key === 'do' || q.key === 'delegate').map(q => (
-            <Quadrant
-              key={q.key}
-              config={q}
-              projectIds={assignments[q.key]}
-              allProjects={projects}
-              dragOverZone={dragOver}
-              dragId={dragId}
-              dragFrom={dragFrom}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onReturn={handleReturn}
-            />
-          ))}
-          {/* Row 2: low urgency */}
-          {QUADRANTS.filter(q => q.key === 'plan' || q.key === 'elim').map(q => (
-            <Quadrant
-              key={q.key}
-              config={q}
-              projectIds={assignments[q.key]}
-              allProjects={projects}
-              dragOverZone={dragOver}
-              dragId={dragId}
-              dragFrom={dragFrom}
-              onDragStart={handleDragStart}
-              onDragOver={handleDragOver}
-              onDragLeave={handleDragLeave}
-              onDrop={handleDrop}
-              onReturn={handleReturn}
-            />
-          ))}
+          {/* Row 1 (High Importance): Schedule (left) · Do First (right) */}
+          {(['plan', 'do'] as QuadKey[]).map(key => {
+            const q = QUADRANTS.find(x => x.key === key)!
+            return (
+              <Quadrant
+                key={key}
+                config={q}
+                projectIds={assignments[key]}
+                allProjects={projects}
+                dragOverZone={dragOver}
+                dragId={dragId}
+                dragFrom={dragFrom}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onReturn={handleReturn}
+              />
+            )
+          })}
+          {/* Row 2 (Low Importance): Eliminate (left) · Delegate (right) */}
+          {(['elim', 'delegate'] as QuadKey[]).map(key => {
+            const q = QUADRANTS.find(x => x.key === key)!
+            return (
+              <Quadrant
+                key={key}
+                config={q}
+                projectIds={assignments[key]}
+                allProjects={projects}
+                dragOverZone={dragOver}
+                dragId={dragId}
+                dragFrom={dragFrom}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onReturn={handleReturn}
+              />
+            )
+          })}
         </div>
 
-        {/* X-axis label */}
+        {/* Bottom-left: empty corner */}
+        <div style={{ gridRow: 3, gridColumn: 1 }} />
+
+        {/* Bottom: X-axis label + HIGH/LOW */}
         <div style={{
-          gridRow: 2, gridColumn: 2,
+          gridRow: 3, gridColumn: 2,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 9, letterSpacing: '0.2em', textTransform: 'uppercase',
-          color: 'var(--muted)', paddingTop: 6, position: 'relative',
+          paddingTop: 6, position: 'relative',
+          fontSize: 8, letterSpacing: '0.2em', textTransform: 'uppercase',
+          color: 'var(--muted)',
         }}>
-          <span style={{ position: 'absolute', left: 8, fontSize: 8, opacity: 0.6 }}>AŞAĞI ←</span>
-          Əhəmiyyət (Importance)
-          <span style={{ position: 'absolute', right: 8, fontSize: 8, opacity: 0.6 }}>→ YÜKSƏK</span>
+          <div style={{ position: 'absolute', left: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.15em', color: 'var(--muted-2)' }}>LOW</span>
+            <span style={{ width: 16, height: 1, background: 'var(--border)', display: 'inline-block' }} />
+          </div>
+          Urgency (Təcililik)
+          <div style={{ position: 'absolute', right: 0, display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 16, height: 1, background: '#EF4444', opacity: 0.4, display: 'inline-block' }} />
+            <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.15em', color: '#EF4444' }}>HIGH</span>
+          </div>
         </div>
       </div>
 
