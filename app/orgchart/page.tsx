@@ -62,6 +62,8 @@ function OrgSubtree({
   onDrop,
   onClearManager,
 }: OrgSubtreeProps) {
+  const [hovered, setHovered] = useState(false)
+
   if (visited.has(member.id)) return null
   const nextVisited = new Set(visited).add(member.id)
   const children = allMembers.filter(
@@ -69,7 +71,6 @@ function OrgSubtree({
   )
   const [c1, c2] = avatarPaletteFor(member.id)
   const isOver = dragOverId === member.id && draggingId !== member.id
-  const [hovered, setHovered] = useState(false)
 
   return (
     <li>
