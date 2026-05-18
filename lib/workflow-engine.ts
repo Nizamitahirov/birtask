@@ -57,24 +57,49 @@ async function execAction(
 
   switch (action.type) {
     case 'send_email': {
-      const apiKey = process.env.RESEND_API_KEY
-      if (!apiKey) throw new Error('RESEND_API_KEY konfiqurasiya edilməyib')
-      const { Resend } = await import('resend')
-      const resend = new Resend(apiKey)
       const to = interpolate(String(action.emailTo || ''), vars)
       if (!to) throw new Error('E-poçt ünvanı boşdur')
-      await resend.emails.send({
-        from: process.env.RESEND_FROM_EMAIL || 'BirTask <onboarding@resend.dev>',
-        to,
-        cc: action.emailCc ? interpolate(String(action.emailCc), vars) : undefined,
-        subject: interpolate(String(action.emailSubject || ''), vars),
-        html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-          <h2 style="color:#5B5BF5;margin-bottom:16px">BirTask Bildirişi</h2>
-          <p style="white-space:pre-wrap;color:#333">${interpolate(String(action.emailBody || ''), vars)}</p>
-          <hr style="margin:24px 0;border-color:#eee"/>
-          <p style="font-size:12px;color:#999">Bu e-poçt BirTask tərəfindən avtomatik göndərilmişdir.</p>
-        </div>`,
-      })
+      const subject = interpolate(String(action.emailSubject || ''), vars)
+      const bodyText = interpolate(String(action.emailBody || ''), vars)
+      const html = `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
+        <h2 style="color:#5B5BF5;margin-bottom:16px">BirTask Bildirişi</h2>
+        <p style="white-space:pre-wrap;color:#333">${bodyText}</p>
+        <hr style="margin:24px 0;border-color:#eee"/>
+        <p style="font-size:12px;color:#999">Bu e-poçt BirTask tərəfindən avtomatik göndərilmişdir.</p>
+      </div>`
+
+      const gmailUser = process.env.GMAIL_USER
+      const gmailPass = process.env.GMAIL_APP_PASSWORD
+
+      if (gmailUser && gmailPass) {
+        // Gmail SMTP via nodemailer
+        const nodemailer = await import('nodemailer')
+        const transporter = nodemailer.default.createTransport({
+          service: 'gmail',
+          auth: { user: gmailUser, pass: gmailPass },
+        })
+        await transporter.sendMail({
+          from: `BirTask <${gmailUser}>`,
+          to,
+          cc: action.emailCc ? interpolate(String(action.emailCc), vars) : undefined,
+          subject,
+          html,
+        })
+      } else if (process.env.RESEND_API_KEY) {
+        // Resend fallback
+        const { Resend } = await import('resend')
+        const resend = new Resend(process.env.RESEND_API_KEY)
+        await resend.emails.send({
+          from: process.env.RESEND_FROM_EMAIL || 'BirTask <onboarding@resend.dev>',
+          to,
+          cc: action.emailCc ? interpolate(String(action.emailCc), vars) : undefined,
+          subject,
+          html,
+        })
+      } else {
+        throw new Error('E-poçt konfiqurasyonu yoxdur. GMAIL_USER + GMAIL_APP_PASSWORD və ya RESEND_API_KEY tələb olunur.')
+      }
+
       return `E-poçt göndərildi: ${to}`
     }
 
