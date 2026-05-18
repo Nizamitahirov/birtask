@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { executeWorkflows } from '@/lib/workflow-engine'
 
 export async function GET(req: NextRequest) {
   try {
@@ -76,24 +77,17 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
-    // Trigger workflow engine for task_created
+    // Trigger workflows for task_created (awaited — fire-and-forget fetch is unreliable in serverless)
     const wsId = data.workspaceId || ''
     if (wsId) {
-      fetch(`${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/workflows/execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          triggerType: 'task_created',
-          workspaceId: wsId,
-          data: {
-            taskId: docRef.id,
-            taskTitle: data.title || '',
-            assignee: data.assignee || '',
-            projectId: data.projectId || '',
-            priority: data.priority || '',
-            status: 'Gözləyir',
-          },
-        }),
+      await executeWorkflows('task_created', wsId, {
+        taskId: docRef.id,
+        taskTitle: data.title || '',
+        title: data.title || '',
+        assignee: data.assignee || '',
+        projectId: data.projectId || '',
+        priority: data.priority || '',
+        status: 'Gözləyir',
       }).catch(() => {})
     }
 
