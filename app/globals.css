@@ -700,10 +700,11 @@ input, select { font: inherit; color: inherit; }
 }
 .projM-row {
   display: grid;
-  grid-template-columns: 1fr auto auto auto;
-  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) 112px 110px 76px 150px;
+  gap: 12px;
   align-items: center;
-  padding: 12px;
+  justify-items: start;
+  padding: 10px 12px;
   border-radius: 12px;
   transition: background .1s;
 }
@@ -725,8 +726,8 @@ input, select { font: inherit; color: inherit; }
 .projM-progress {
   display: flex;
   align-items: center;
-  gap: 10px;
-  min-width: 180px;
+  gap: 8px;
+  width: 100%;
 }
 .progressM {
   flex: 1;

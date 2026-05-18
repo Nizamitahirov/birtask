@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useDashboard, useProjects, useTasks } from '@/hooks/useSheets'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { db } from '@/lib/db'
 import Link from 'next/link'
 
 const VIBRANT_PALETTES = [
@@ -25,6 +27,15 @@ function avatarPaletteFor(seed: string): [string, string] {
   return VIBRANT_PALETTES[(paletteIndexFor(seed) + 3) % 8] as [string, string]
 }
 
+type QuadKey = 'do' | 'plan' | 'delegate' | 'elim'
+
+const QUAD_META: Record<QuadKey, { label: string; color: string; bg: string; icon: string }> = {
+  do:       { label: 'İndi Et',   color: '#EF4444', bg: 'rgba(239,68,68,0.1)',    icon: 'bolt' },
+  plan:     { label: 'Plan Et',   color: '#5B5BF5', bg: 'rgba(91,91,245,0.1)',    icon: 'calendar_today' },
+  delegate: { label: 'Həvalə Et', color: '#F59E0B', bg: 'rgba(245,158,11,0.1)',   icon: 'person_raised_hand' },
+  elim:     { label: 'Ləğv Et',   color: '#6B7280', bg: 'rgba(107,114,128,0.1)',  icon: 'block' },
+}
+
 const STATUS_COLORS: Record<string, string> = {
   'Davam edir':     'indigo',
   'Tamamlandı':     'green',
@@ -38,13 +49,29 @@ export default function DashboardPage() {
   const { stats, activities, loading } = useDashboard()
   const { projects } = useProjects()
   const { tasks } = useTasks()
+  const { currentWorkspaceId } = useWorkspace()
   const [animate, setAnimate] = useState(false)
   const [tab, setTab] = useState('all')
+  const [matrixMap, setMatrixMap] = useState<Record<string, QuadKey>>({})
 
   useEffect(() => {
     const t = setTimeout(() => setAnimate(true), 80)
     return () => clearTimeout(t)
   }, [])
+
+  useEffect(() => {
+    if (!currentWorkspaceId) return
+    db.priorityMatrix.get(currentWorkspaceId).then(res => {
+      if (!res.success || !res.data) return
+      const map: Record<string, QuadKey> = {}
+      const d = res.data
+      ;(d.do       || []).forEach((id: string) => { map[id] = 'do' })
+      ;(d.plan     || []).forEach((id: string) => { map[id] = 'plan' })
+      ;(d.delegate || []).forEach((id: string) => { map[id] = 'delegate' })
+      ;(d.elim     || []).forEach((id: string) => { map[id] = 'elim' })
+      setMatrixMap(map)
+    })
+  }, [currentWorkspaceId])
 
   const completionRate = stats && stats.totalTasks > 0
     ? Math.round((stats.completedTasks / stats.totalTasks) * 100)
@@ -275,6 +302,28 @@ export default function DashboardPage() {
                       <span className="dot" />
                       {p.status}
                     </span>
+                    {(() => {
+                      const qk = matrixMap[p.id] as QuadKey | undefined
+                      const meta = qk ? QUAD_META[qk] : null
+                      return meta ? (
+                        <span style={{
+                          display: 'inline-flex', alignItems: 'center', gap: 4,
+                          padding: '3px 8px', borderRadius: 999,
+                          background: meta.bg, color: meta.color,
+                          fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap',
+                        }}>
+                          <span className="material-symbols-rounded" style={{ fontSize: 11 }}>{meta.icon}</span>
+                          {meta.label}
+                        </span>
+                      ) : (
+                        <span style={{
+                          fontSize: 10, color: 'var(--muted)',
+                          fontWeight: 500, whiteSpace: 'nowrap',
+                        }}>
+                          Prioritet yoxdur
+                        </span>
+                      )
+                    })()}
                     <div style={{ display: 'flex', alignItems: 'center' }}>
                       {visibleAssignees.map((name, idx) => {
                         const [a1, a2] = avatarPaletteFor(name)
