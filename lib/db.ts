@@ -163,6 +163,14 @@ export const db = {
     getById: (id: string) => callApi<WorkflowRun>(`/workflow-runs/${id}`),
     retry: (id: string) => callApi<WorkflowRun>(`/workflow-runs/${id}/retry`, 'POST'),
   },
+  priorityMatrix: {
+    get: (workspaceId: string) =>
+      callApi<{ do: string[]; plan: string[]; delegate: string[]; elim: string[] }>(
+        '/priority-matrix', 'GET', { workspaceId }
+      ),
+    save: (workspaceId: string, data: { do: string[]; plan: string[]; delegate: string[]; elim: string[] }) =>
+      callApi<void>('/priority-matrix', 'PUT', { workspaceId, ...data }),
+  },
 }
 
 // Re-export so consumers can use without extra import

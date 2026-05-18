@@ -9,13 +9,14 @@ import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { Workspace } from '@/lib/types'
 
 const NAV_MAIN = [
-  { href: '/',           label: 'İdarə Paneli', icon: 'space_dashboard' },
-  { href: '/projects',   label: 'Layihələr',    icon: 'folder' },
-  { href: '/tasks',      label: 'Tapşırıqlar',  icon: 'check_box' },
-  { href: '/calendar',   label: 'Təqvim',       icon: 'calendar_month' },
-  { href: '/roadmap',    label: 'Yol Xəritəsi', icon: 'route' },
-  { href: '/recurring',  label: 'Təkrarlanan',  icon: 'autorenew' },
-  { href: '/analytics',  label: 'Analitika',    icon: 'analytics' },
+  { href: '/',                label: 'İdarə Paneli',     icon: 'space_dashboard' },
+  { href: '/projects',        label: 'Layihələr',        icon: 'folder' },
+  { href: '/tasks',           label: 'Tapşırıqlar',      icon: 'check_box' },
+  { href: '/calendar',        label: 'Təqvim',           icon: 'calendar_month' },
+  { href: '/roadmap',         label: 'Yol Xəritəsi',     icon: 'route' },
+  { href: '/recurring',       label: 'Təkrarlanan',      icon: 'autorenew' },
+  { href: '/analytics',       label: 'Analitika',        icon: 'analytics' },
+  { href: '/priority-matrix', label: 'Prioritet Matrisi', icon: 'grid_view' },
 ]
 
 const NAV_ADMIN = [

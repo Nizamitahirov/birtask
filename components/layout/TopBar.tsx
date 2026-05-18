@@ -26,8 +26,9 @@ const PAGE_META: { path: string; label: string; icon: string }[] = [
   { path: '/analytics', label: 'Analitika',     icon: 'analytics' },
   { path: '/team',      label: 'Komanda',       icon: 'groups' },
   { path: '/activity',  label: 'Aktivlik',      icon: 'bolt' },
-  { path: '/settings',  label: 'Parametrlər',   icon: 'settings' },
-  { path: '/',          label: 'İdarə Paneli',  icon: 'space_dashboard' },
+  { path: '/settings',        label: 'Parametrlər',      icon: 'settings' },
+  { path: '/priority-matrix', label: 'Prioritet Matrisi', icon: 'grid_view' },
+  { path: '/',                label: 'İdarə Paneli',      icon: 'space_dashboard' },
 ]
 
 function usePageMeta(pathname: string) {
