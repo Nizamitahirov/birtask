@@ -7,7 +7,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TopBar } from '@/components/layout/TopBar'
 import { GlobalSearch } from '@/components/ui/GlobalSearch'
-import { Eye, EyeOff, Lock, ShieldCheck, CheckCircle2, AlertCircle, Loader2, KeyRound } from 'lucide-react'
+import { Eye, EyeOff, Lock, ShieldCheck, CheckCircle2, AlertCircle, Loader2, KeyRound, LogOut } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 // ── Workspace setup screen ────────────────────────────────────────────────────
@@ -150,7 +150,7 @@ function WorkspaceSetup() {
 // ── Force change password modal ───────────────────────────────────────────────
 
 function ForceChangePasswordModal() {
-  const { user, refresh } = useAuth()
+  const { user, refresh, logout } = useAuth()
 
   const [newPassword, setNewPassword]         = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -259,10 +259,35 @@ function ForceChangePasswordModal() {
             }}>
               <ShieldCheck size={24} style={{ color: '#F59E0B' }} />
             </div>
-            <div>
-              <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink)', margin: '0 0 5px', letterSpacing: '-0.02em' }}>
-                Daimi şifrə təyin edin
-              </h2>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink)', margin: '0 0 5px', letterSpacing: '-0.02em' }}>
+                  Daimi şifrə təyin edin
+                </h2>
+                <button
+                  onClick={logout}
+                  title="Çıxış et"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 5,
+                    fontSize: 11, fontWeight: 700, color: 'var(--muted)',
+                    background: 'none', border: '1px solid var(--border)',
+                    borderRadius: 8, padding: '4px 10px', cursor: 'pointer',
+                    whiteSpace: 'nowrap', flexShrink: 0,
+                    transition: 'color .12s, border-color .12s',
+                  }}
+                  onMouseEnter={e => {
+                    e.currentTarget.style.color = '#EF4444'
+                    e.currentTarget.style.borderColor = 'rgba(239,68,68,0.35)'
+                  }}
+                  onMouseLeave={e => {
+                    e.currentTarget.style.color = 'var(--muted)'
+                    e.currentTarget.style.borderColor = 'var(--border)'
+                  }}
+                >
+                  <LogOut size={12} />
+                  Çıxış et
+                </button>
+              </div>
               <p style={{ fontSize: 12.5, color: 'var(--muted)', margin: 0, lineHeight: 1.55 }}>
                 Salam, <strong style={{ color: 'var(--ink-2)' }}>{user?.displayName || user?.username}</strong>!
                 Hesabınıza ilk dəfə daxil oldunuz. Müvəqqəti şifrənizi dəyişdirmədən sistemdən istifadə edə bilməzsiniz.
