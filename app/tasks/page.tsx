@@ -24,6 +24,13 @@ const STATUS_COLORS: Record<TaskStatus, string> = {
   'Tamamlandı': '#10B981',
 }
 
+const PRIORITY_COLORS: Record<string, string> = {
+  'Kritik': '#EF4444',
+  'Yüksək': '#F97316',
+  'Orta': '#F59E0B',
+  'Aşağı': '#94A3B8',
+}
+
 export default function TasksPage() {
   const { tasks, loading, refresh, create, update, remove } = useTasks()
   const { projects } = useProjects()
@@ -344,8 +351,13 @@ export default function TasksPage() {
               {filtered.map(task => {
                 const daysLeft = getDaysLeft(task.dueDate)
                 const overdue = task.dueDate && daysLeft < 0 && task.status !== 'Tamamlandı'
+                const priorityColor = PRIORITY_COLORS[task.priority] || '#94A3B8'
                 return (
-                  <tr key={task.id} className="border-b border-white/[0.04] hover:bg-white/[0.02] transition-colors group">
+                  <tr
+                    key={task.id}
+                    className="hover:bg-white/[0.02] transition-colors group"
+                    style={{ borderLeft: `3px solid ${priorityColor}`, borderBottom: '1px solid var(--border)' }}
+                  >
                     <td className="px-4 py-3 max-w-[220px]">
                       <div className="font-medium text-text-primary truncate">{task.title}</div>
                       {task.description && (
@@ -356,7 +368,12 @@ export default function TasksPage() {
                       {task.projectName || '—'}
                     </td>
                     <td className="px-4 py-3"><StatusBadge status={task.status} /></td>
-                    <td className="px-4 py-3"><PriorityBadge priority={task.priority} /></td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: priorityColor }} />
+                        <PriorityBadge priority={task.priority} />
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5 text-text-secondary text-xs">
                         <User size={11} className="text-text-muted flex-shrink-0" />

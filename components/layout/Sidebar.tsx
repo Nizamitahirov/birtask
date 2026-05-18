@@ -274,6 +274,9 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="side-foot">
+        {/* Notification bell */}
+        <NotificationBell />
+
         {/* Theme toggle */}
         <button
           onClick={toggle}

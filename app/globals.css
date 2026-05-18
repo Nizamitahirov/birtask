@@ -240,11 +240,12 @@ input, select { font: inherit; color: inherit; }
 
 .sec-lbl {
   font-size: 10px;
+  font-weight: 800;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--muted-2);
-  font-weight: 700;
-  padding: 14px 10px 6px;
+  padding: 8px 8px 4px;
+  margin-top: 4px;
 }
 
 .navM {

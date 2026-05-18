@@ -2,14 +2,15 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { db } from '@/lib/db'
-import { User, UserRole, Workspace } from '@/lib/types'
+import { User, UserRole, Workspace, WorkflowRule, WorkflowTrigger } from '@/lib/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import {
   Settings, Database, CheckCircle, AlertCircle, RefreshCw,
   Users, Plus, Edit2, Trash2, KeyRound, Search, ShieldCheck,
   UserCheck, Eye, EyeOff, Loader2, X, Shield, UserCog,
-  Download, Upload, FileText, FileJson, Package, Layers
+  Download, Upload, FileText, FileJson, Package, Layers, Zap,
+  ToggleLeft, ToggleRight
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
@@ -1313,9 +1314,296 @@ function ExportImportTab() {
   )
 }
 
+// ── Workflow Tab ──────────────────────────────────────────────────────────────
+
+const TRIGGER_LABELS: Record<WorkflowTrigger, string> = {
+  task_created:      'Tapşırıq yaradıldı',
+  task_completed:    'Tapşırıq tamamlandı',
+  task_assigned:     'Tapşırıq təyin edildi',
+  project_created:   'Layihə yaradıldı',
+  project_completed: 'Layihə tamamlandı',
+}
+
+const EMPTY_RULE: Omit<WorkflowRule, 'id' | 'createdAt'> = {
+  name: '',
+  trigger: 'task_completed',
+  action: 'send_email',
+  emailTo: '',
+  emailSubject: '{{taskTitle}} tamamlandı',
+  emailBody: 'Salam,\n\n"{{taskTitle}}" tapşırığı tamamlandı.\nİcraçı: {{assignee}}\n\nBirTask',
+  workspaceId: '',
+  isActive: true,
+}
+
+function WorkflowTab() {
+  const { currentWorkspace } = useWorkspace()
+  const [rules, setRules] = useState<WorkflowRule[]>([])
+  const [loading, setLoading] = useState(true)
+  const [modal, setModal] = useState<'create' | 'edit' | null>(null)
+  const [selected, setSelected] = useState<WorkflowRule | null>(null)
+  const [form, setForm] = useState<Omit<WorkflowRule, 'id' | 'createdAt'>>(EMPTY_RULE)
+  const [saving, setSaving] = useState(false)
+  const [deleting, setDeleting] = useState<string | null>(null)
+
+  const wsId = currentWorkspace?.id || ''
+
+  const fetchRules = useCallback(async () => {
+    setLoading(true)
+    const res = await db.workflows.getAll(wsId)
+    if (res.success && res.data) setRules(res.data)
+    setLoading(false)
+  }, [wsId])
+
+  useEffect(() => { fetchRules() }, [fetchRules])
+
+  const openCreate = () => {
+    setForm({ ...EMPTY_RULE, workspaceId: wsId })
+    setSelected(null)
+    setModal('create')
+  }
+
+  const openEdit = (rule: WorkflowRule) => {
+    setSelected(rule)
+    setForm({
+      name: rule.name,
+      trigger: rule.trigger,
+      action: rule.action,
+      emailTo: rule.emailTo,
+      emailSubject: rule.emailSubject,
+      emailBody: rule.emailBody,
+      workspaceId: rule.workspaceId,
+      isActive: rule.isActive,
+    })
+    setModal('edit')
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    if (modal === 'create') {
+      const res = await db.workflows.create({ ...form, workspaceId: wsId })
+      if (res.success) { toast.success('Qayda yaradıldı'); await fetchRules(); setModal(null) }
+      else toast.error(res.error || 'Xəta')
+    } else if (modal === 'edit' && selected) {
+      const res = await db.workflows.update(selected.id, form)
+      if (res.success) { toast.success('Qayda yeniləndi'); await fetchRules(); setModal(null) }
+      else toast.error(res.error || 'Xəta')
+    }
+    setSaving(false)
+  }
+
+  const handleToggle = async (rule: WorkflowRule) => {
+    const res = await db.workflows.update(rule.id, { isActive: !rule.isActive })
+    if (res.success) {
+      setRules(prev => prev.map(r => r.id === rule.id ? { ...r, isActive: !r.isActive } : r))
+    }
+  }
+
+  const handleDelete = async (id: string) => {
+    setDeleting(id)
+    const res = await db.workflows.delete(id)
+    if (res.success) { toast.success('Silindi'); await fetchRules() }
+    else toast.error(res.error || 'Xəta')
+    setDeleting(null)
+  }
+
+  const setF = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }))
+
+  return (
+    <div className="space-y-5 max-w-3xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="font-semibold text-text-primary flex items-center gap-2">
+            <Zap size={18} className="text-accent-purple" />
+            Workflow Qaydaları
+          </h2>
+          <p className="text-text-muted text-xs mt-1">Avtomatik e-poçt bildirişləri üçün qaydalar qurun</p>
+        </div>
+        <button onClick={openCreate} className="btn-primaryM">
+          <Plus size={14} /> Yeni Qayda
+        </button>
+      </div>
+
+      {loading ? (
+        <div className="space-y-2">
+          {[...Array(3)].map((_, i) => <div key={i} className="h-16 rounded-xl bg-[var(--surface-2)] animate-pulse" />)}
+        </div>
+      ) : rules.length === 0 ? (
+        <div className="cardM text-center" style={{ padding: 40 }}>
+          <Zap size={36} className="text-text-muted mx-auto mb-3 opacity-30" />
+          <p className="text-text-secondary text-sm font-medium">Hələ heç bir qayda yoxdur</p>
+          <p className="text-text-muted text-xs mt-1">E-poçt bildirişləri üçün yeni qayda əlavə edin</p>
+          <button onClick={openCreate} className="btn-primaryM mt-4 mx-auto">
+            <Plus size={14} /> Yeni Qayda
+          </button>
+        </div>
+      ) : (
+        <div className="cardM" style={{ padding: 0, overflow: 'hidden' }}>
+          {rules.map((rule, i) => (
+            <div
+              key={rule.id}
+              className="flex items-center gap-4 px-5 py-4 hover:bg-[var(--surface-2)] transition-colors group"
+              style={{ borderBottom: i < rules.length - 1 ? '1px solid var(--border)' : 'none' }}
+            >
+              <div
+                className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: rule.isActive ? 'var(--primary-soft)' : 'var(--surface-2)' }}
+              >
+                <Zap size={15} style={{ color: rule.isActive ? 'var(--primary)' : 'var(--muted-2)' }} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-text-primary text-sm font-semibold">{rule.name}</span>
+                  <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
+                    {TRIGGER_LABELS[rule.trigger]}
+                  </span>
+                </div>
+                <div className="text-text-muted text-xs mt-0.5 truncate">
+                  → {rule.emailTo} · &ldquo;{rule.emailSubject}&rdquo;
+                </div>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => handleToggle(rule)}
+                  className="text-text-muted hover:text-text-primary transition-colors"
+                  title={rule.isActive ? 'Deaktiv et' : 'Aktiv et'}
+                >
+                  {rule.isActive
+                    ? <ToggleRight size={22} style={{ color: 'var(--primary)' }} />
+                    : <ToggleLeft size={22} />}
+                </button>
+                <button
+                  onClick={() => openEdit(rule)}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-text-primary hover:bg-[var(--surface-2)] transition-all opacity-0 group-hover:opacity-100"
+                >
+                  <Edit2 size={13} />
+                </button>
+                <button
+                  onClick={() => handleDelete(rule.id)}
+                  disabled={deleting === rule.id}
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-all opacity-0 group-hover:opacity-100 disabled:opacity-50"
+                >
+                  {deleting === rule.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Create / Edit Modal */}
+      <Modal
+        open={modal !== null}
+        onClose={() => setModal(null)}
+        title={modal === 'create' ? 'Yeni Workflow Qaydası' : 'Qaydanı Düzəlt'}
+      >
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-text-secondary text-xs mb-1.5">Qayda adı *</label>
+            <input
+              required
+              value={form.name}
+              onChange={e => setF('name', e.target.value)}
+              className="inputM w-full"
+              placeholder="Məs: Tapşırıq tamamlandıqda bildiriş"
+            />
+          </div>
+
+          <div>
+            <label className="block text-text-secondary text-xs mb-1.5">Tetikləyici *</label>
+            <select
+              value={form.trigger}
+              onChange={e => setF('trigger', e.target.value)}
+              className="inputM w-full"
+            >
+              {(Object.entries(TRIGGER_LABELS) as [WorkflowTrigger, string][]).map(([val, label]) => (
+                <option key={val} value={val}>{label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-text-secondary text-xs mb-1.5">Əməliyyat</label>
+            <div className="inputM w-full text-text-secondary text-sm cursor-not-allowed opacity-70 flex items-center gap-2">
+              E-poçt göndər
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-text-secondary text-xs mb-1.5">Kimə (e-poçt) *</label>
+            <input
+              required
+              type="email"
+              value={form.emailTo}
+              onChange={e => setF('emailTo', e.target.value)}
+              className="inputM w-full"
+              placeholder="manager@example.com"
+            />
+          </div>
+
+          <div>
+            <label className="block text-text-secondary text-xs mb-1.5">Mövzu *</label>
+            <input
+              required
+              value={form.emailSubject}
+              onChange={e => setF('emailSubject', e.target.value)}
+              className="inputM w-full"
+              placeholder="{{taskTitle}} tamamlandı"
+            />
+          </div>
+
+          <div>
+            <label className="block text-text-secondary text-xs mb-1.5">
+              Mətn *
+              <span className="text-text-muted ml-1">(&#123;&#123;taskTitle&#125;&#125;, &#123;&#123;projectName&#125;&#125;, &#123;&#123;assignee&#125;&#125; yer tutucuları istifadə edə bilərsiniz)</span>
+            </label>
+            <textarea
+              required
+              rows={4}
+              value={form.emailBody}
+              onChange={e => setF('emailBody', e.target.value)}
+              className="inputM w-full resize-none"
+              placeholder="Salam,&#10;&#10;&quot;{{taskTitle}}&quot; tapşırığı tamamlandı.&#10;İcraçı: {{assignee}}"
+            />
+          </div>
+
+          <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--surface-2)] border border-[var(--border)]">
+            <div>
+              <div className="text-text-primary text-sm font-medium">Aktiv</div>
+              <div className="text-text-muted text-xs">Bu qayda aktiv olduqda e-poçtlar göndərilir</div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setF('isActive', !form.isActive)}
+              className={cn(
+                'relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200',
+                form.isActive ? 'bg-accent-blue' : 'bg-[var(--surface-2)]'
+              )}
+            >
+              <span className={cn(
+                'pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200',
+                form.isActive ? 'translate-x-4' : 'translate-x-0'
+              )} />
+            </button>
+          </div>
+
+          <div className="flex gap-3 pt-2">
+            <button type="button" onClick={() => setModal(null)} className="btn-ghostM flex-1 justify-center">
+              Ləğv et
+            </button>
+            <button type="submit" disabled={saving} className="btn-primaryM flex-1 justify-center disabled:opacity-50">
+              {saving ? <><Loader2 size={14} className="animate-spin" /> Saxlanılır...</> : (modal === 'create' ? 'Yarat' : 'Yenilə')}
+            </button>
+          </div>
+        </form>
+      </Modal>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'workspace' | 'connection' | 'users' | 'export'
+type Tab = 'workspace' | 'connection' | 'users' | 'export' | 'workflow'
 
 export default function SettingsPage() {
   const { user } = useAuth()
@@ -1326,6 +1614,7 @@ export default function SettingsPage() {
     { id: 'connection', label: 'Əlaqə',         icon: Database },
     { id: 'users',      label: 'İstifadəçilər', icon: Users },
     { id: 'export',     label: 'Export / Import', icon: Download },
+    { id: 'workflow',   label: 'Workflow',       icon: Zap },
   ]
 
   return (
@@ -1367,6 +1656,7 @@ export default function SettingsPage() {
       {tab === 'connection' && <ConnectionTab />}
       {tab === 'users'      && <UsersTab />}
       {tab === 'export'     && <ExportImportTab />}
+      {tab === 'workflow'   && <WorkflowTab />}
     </div>
   )
 }

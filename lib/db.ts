@@ -10,6 +10,7 @@ import {
   TimeEntry,
   RecurringTask,
   Workspace,
+  WorkflowRule,
 } from './types'
 
 const API_BASE = '/api/db'
@@ -135,5 +136,14 @@ export const db = {
       callApi<RecurringTask>(`/recurring-tasks/${id}`, 'PUT', data),
     delete: (id: string) => callApi<void>(`/recurring-tasks/${id}`, 'DELETE'),
     generate: (id: string) => callApi<Task>(`/recurring-tasks/${id}/generate`, 'POST'),
+  },
+  workflows: {
+    getAll: (workspaceId?: string) =>
+      callApi<WorkflowRule[]>('/workflows', 'GET', workspaceId ? { workspaceId } : undefined),
+    create: (data: Omit<WorkflowRule, 'id' | 'createdAt'>) =>
+      callApi<WorkflowRule>('/workflows', 'POST', data),
+    update: (id: string, data: Partial<WorkflowRule>) =>
+      callApi<WorkflowRule>(`/workflows/${id}`, 'PUT', data),
+    delete: (id: string) => callApi<void>(`/workflows/${id}`, 'DELETE'),
   },
 }

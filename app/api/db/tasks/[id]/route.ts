@@ -66,6 +66,22 @@ export async function PUT(
       } catch {}
     }
 
+    // Trigger workflow emails for task_completed
+    if (data.status === 'Tamamlandı' || data.status === 'completed') {
+      const wsId = data.workspaceId || updated?.workspaceId || ''
+      if (wsId) {
+        fetch(`${process.env.NEXTAUTH_URL || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/send-email`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            trigger: 'task_completed',
+            workspaceId: wsId,
+            data: { taskTitle: data.title || updated?.title || '', assignee: data.assignee || updated?.assignee || '', status: 'Tamamlandı' }
+          })
+        }).catch(() => {})
+      }
+    }
+
     return NextResponse.json({ success: true, data: { ...updated, id: params.id } })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'

@@ -164,3 +164,19 @@ export interface RecurringTask {
   isActive: boolean
   createdAt: string
 }
+
+export type WorkflowTrigger = 'task_created' | 'task_completed' | 'task_assigned' | 'project_created' | 'project_completed'
+export type WorkflowAction = 'send_email'
+
+export interface WorkflowRule {
+  id: string
+  name: string
+  trigger: WorkflowTrigger
+  action: WorkflowAction
+  emailTo: string  // email address
+  emailSubject: string
+  emailBody: string  // template with {{taskTitle}}, {{projectName}}, {{assignee}} placeholders
+  workspaceId: string
+  isActive: boolean
+  createdAt: string
+}

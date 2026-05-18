@@ -76,6 +76,20 @@ export async function POST(req: NextRequest) {
       } catch {}
     }
 
+    // Trigger workflow emails for task_created
+    const wsId = data.workspaceId || ''
+    if (wsId) {
+      fetch(`${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}/api/send-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          trigger: 'task_created',
+          workspaceId: wsId,
+          data: { taskTitle: data.title || '', assignee: data.assignee || '' }
+        })
+      }).catch(() => {})
+    }
+
     return NextResponse.json({ success: true, data: created }, { status: 201 })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'
