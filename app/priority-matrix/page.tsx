@@ -111,6 +111,8 @@ function ProjectCard({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       style={{
+        flex: '1 1 calc(50% - 3px)',
+        minWidth: 140,
         display: 'flex',
         alignItems: 'center',
         gap: 8,
@@ -351,14 +353,15 @@ function Quadrant({
         flex: 1,
         padding: '10px 12px',
         display: 'flex',
-        flexDirection: 'column',
+        flexWrap: 'wrap',
+        alignContent: 'flex-start',
         gap: 6,
-        minHeight: 140,
+        minHeight: 120,
         overflowY: 'auto',
       }}>
         {projects.length === 0 ? (
           <div style={{
-            flex: 1,
+            flex: '0 0 100%',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -367,6 +370,7 @@ function Quadrant({
             pointerEvents: 'none',
             textAlign: 'center',
             padding: 16,
+            minHeight: 80,
           }}>
             Buraya sürükləyin
           </div>
@@ -665,7 +669,7 @@ export default function PriorityMatrixPage() {
           gridTemplateColumns: '1fr 1fr',
           gridTemplateRows: '1fr 1fr',
           gap: 10,
-          minHeight: 520,
+          minHeight: 420,
         }}>
           {/* Row 1 (High Importance): Schedule (left) · Do First (right) */}
           {(['plan', 'do'] as QuadKey[]).map(key => {
