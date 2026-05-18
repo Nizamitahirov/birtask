@@ -16,6 +16,7 @@ import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
+import { RolesTab } from '@/components/settings/RolesTab'
 
 // ── Role badge ────────────────────────────────────────────────────────────────
 
@@ -1556,7 +1557,7 @@ function WorkflowTab() {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'workspace' | 'connection' | 'users' | 'export' | 'workflow'
+type Tab = 'workspace' | 'connection' | 'users' | 'roles' | 'export' | 'workflow'
 
 export default function SettingsPage() {
   const { user } = useAuth()
@@ -1566,6 +1567,7 @@ export default function SettingsPage() {
     { id: 'workspace',  label: 'İş Sahələri',   icon: Layers },
     { id: 'connection', label: 'Əlaqə',         icon: Database },
     { id: 'users',      label: 'İstifadəçilər', icon: Users },
+    { id: 'roles',      label: 'Rollər & İcazələr', icon: Shield },
     { id: 'export',     label: 'Export / Import', icon: Download },
     { id: 'workflow',   label: 'Workflow',       icon: Zap },
   ]
@@ -1608,6 +1610,7 @@ export default function SettingsPage() {
       {tab === 'workspace'  && <WorkspaceTab />}
       {tab === 'connection' && <ConnectionTab />}
       {tab === 'users'      && <UsersTab />}
+      {tab === 'roles'      && <RolesTab />}
       {tab === 'export'     && <ExportImportTab />}
       {tab === 'workflow'   && <WorkflowTab />}
     </div>

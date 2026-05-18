@@ -1,3 +1,25 @@
+export type PermissionKey =
+  | 'projects.view' | 'projects.create' | 'projects.edit' | 'projects.delete'
+  | 'tasks.view' | 'tasks.create' | 'tasks.edit' | 'tasks.delete' | 'tasks.assign' | 'tasks.complete'
+  | 'team.view' | 'team.invite' | 'team.edit' | 'team.remove'
+  | 'analytics.view' | 'reports.export'
+  | 'time.view' | 'time.log' | 'time.manage'
+  | 'workflows.view' | 'workflows.manage'
+  | 'activity.view' | 'calendar.view' | 'roadmap.view' | 'recurring.view' | 'recurring.manage'
+  | 'settings.view' | 'settings.workspace' | 'settings.users' | 'settings.roles'
+
+export interface Role {
+  id: string
+  name: string
+  description?: string
+  color?: string
+  permissions: PermissionKey[]
+  isSystem: boolean
+  workspaceId: string
+  createdAt: string
+  updatedAt?: string
+}
+
 export interface Workspace {
   id: string
   name: string

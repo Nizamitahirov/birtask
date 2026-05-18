@@ -11,6 +11,8 @@ import {
   RecurringTask,
   Workspace,
   WorkflowRule,
+  Role,
+  PermissionKey,
 } from './types'
 
 const API_BASE = '/api/db'
@@ -146,4 +148,16 @@ export const db = {
       callApi<WorkflowRule>(`/workflows/${id}`, 'PUT', data),
     delete: (id: string) => callApi<void>(`/workflows/${id}`, 'DELETE'),
   },
+  roles: {
+    getAll: (workspaceId?: string) =>
+      callApi<Role[]>('/roles', 'GET', workspaceId ? { workspaceId } : undefined),
+    create: (data: Omit<Role, 'id' | 'createdAt'>) =>
+      callApi<Role>('/roles', 'POST', data),
+    update: (id: string, data: Partial<Omit<Role, 'id' | 'createdAt' | 'isSystem'>>) =>
+      callApi<Role>(`/roles/${id}`, 'PUT', data),
+    delete: (id: string) => callApi<void>(`/roles/${id}`, 'DELETE'),
+  },
 }
+
+// Re-export so consumers can use without extra import
+export type { PermissionKey }
