@@ -11,6 +11,7 @@ import {
   RecurringTask,
   Workspace,
   WorkflowRule,
+  WorkflowRun,
   Role,
   PermissionKey,
 } from './types'
@@ -156,6 +157,11 @@ export const db = {
     update: (id: string, data: Partial<Omit<Role, 'id' | 'createdAt' | 'isSystem'>>) =>
       callApi<Role>(`/roles/${id}`, 'PUT', data),
     delete: (id: string) => callApi<void>(`/roles/${id}`, 'DELETE'),
+  },
+  workflowRuns: {
+    getAll: (workflowId: string) => callApi<WorkflowRun[]>('/workflow-runs', 'GET', { workflowId }),
+    getById: (id: string) => callApi<WorkflowRun>(`/workflow-runs/${id}`),
+    retry: (id: string) => callApi<WorkflowRun>(`/workflow-runs/${id}/retry`, 'POST'),
   },
 }
 

@@ -187,18 +187,102 @@ export interface RecurringTask {
   createdAt: string
 }
 
-export type WorkflowTrigger = 'task_created' | 'task_completed' | 'task_assigned' | 'project_created' | 'project_completed'
-export type WorkflowAction = 'send_email'
+export type WorkflowTriggerType =
+  | 'task_created' | 'task_updated' | 'task_deleted' | 'task_completed' | 'task_assigned' | 'task_commented'
+  | 'field_status' | 'field_due_date' | 'field_assignee' | 'field_priority'
+  | 'project_created' | 'project_completed'
+  | 'scheduled_interval' | 'scheduled_cron'
+  | 'webhook_incoming'
+
+export type WorkflowConditionOperator =
+  | 'equals' | 'not_equals' | 'contains' | 'not_contains'
+  | 'is_empty' | 'is_not_empty'
+  | 'gt' | 'lt' | 'between'
+  | 'before' | 'after' | 'matches_regex'
+
+export interface WorkflowCondition {
+  id: string
+  field: string
+  operator: WorkflowConditionOperator
+  value?: string
+  value2?: string
+}
+
+export type WorkflowActionType =
+  | 'send_email' | 'in_app_notification' | 'outgoing_webhook'
+  | 'create_task' | 'update_field' | 'add_comment' | 'add_label' | 'delay'
+
+export interface WorkflowAction {
+  id: string
+  type: WorkflowActionType
+  label?: string
+  emailTo?: string; emailCc?: string; emailSubject?: string; emailBody?: string
+  notifyMessage?: string; notifyUserIds?: string[]
+  webhookUrl?: string; webhookMethod?: 'GET' | 'POST' | 'PUT' | 'PATCH'
+  webhookHeaders?: string; webhookBody?: string
+  webhookAuthType?: 'none' | 'bearer' | 'api_key' | 'basic'; webhookAuthValue?: string
+  newTaskName?: string; newTaskProjectId?: string; newTaskAssignee?: string
+  newTaskPriority?: string; newTaskDueDate?: string; newTaskDescription?: string
+  updateField?: string; updateValue?: string
+  commentText?: string
+  labelName?: string
+  delayAmount?: number; delayUnit?: 'minutes' | 'hours' | 'days'
+}
 
 export interface WorkflowRule {
   id: string
   name: string
-  trigger: WorkflowTrigger
-  action: WorkflowAction
-  emailTo: string  // email address
-  emailSubject: string
-  emailBody: string  // template with {{taskTitle}}, {{projectName}}, {{assignee}} placeholders
+  description?: string
   workspaceId: string
   isActive: boolean
+  triggerType: WorkflowTriggerType
+  triggerConfig?: {
+    scheduledInterval?: 'hourly' | 'daily' | 'weekly' | 'monthly'
+    cronExpression?: string
+    webhookSecret?: string
+    fieldName?: string
+    projectId?: string
+  }
+  conditions: WorkflowCondition[]
+  conditionLogic: 'AND' | 'OR'
+  actions: WorkflowAction[]
+  runCount?: number
+  successCount?: number
+  failureCount?: number
+  lastRunAt?: string
+  lastRunStatus?: 'success' | 'failure' | 'partial'
+  // Legacy fields kept for backward compat
+  trigger?: string; action?: string
+  emailTo?: string; emailSubject?: string; emailBody?: string
   createdAt: string
+  updatedAt?: string
+}
+
+export type WorkflowRunStatus = 'running' | 'success' | 'failure' | 'partial' | 'skipped'
+
+export interface WorkflowRunStep {
+  actionId: string
+  type: string
+  status: 'success' | 'failure' | 'skipped'
+  startedAt: string
+  finishedAt: string
+  durationMs: number
+  result?: string
+  error?: string
+}
+
+export interface WorkflowRun {
+  id: string
+  workflowId: string
+  workflowName: string
+  workspaceId: string
+  status: WorkflowRunStatus
+  triggerType: string
+  triggerData: Record<string, unknown>
+  steps: WorkflowRunStep[]
+  startedAt: string
+  finishedAt?: string
+  durationMs?: number
+  error?: string
+  retriedFromRunId?: string
 }

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { db } from '@/lib/db'
-import { User, UserRole, Workspace, WorkflowRule, WorkflowTrigger } from '@/lib/types'
+import { User, UserRole, Workspace, WorkflowRule, WorkflowTriggerType } from '@/lib/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import {
@@ -1270,7 +1270,7 @@ function ExportImportTab() {
 
 // ── Workflow Tab ──────────────────────────────────────────────────────────────
 
-const TRIGGER_LABELS: Record<WorkflowTrigger, string> = {
+const TRIGGER_LABELS: Partial<Record<WorkflowTriggerType, string>> = {
   task_created:      'Tapşırıq yaradıldı',
   task_completed:    'Tapşırıq tamamlandı',
   task_assigned:     'Tapşırıq təyin edildi',
@@ -1280,6 +1280,10 @@ const TRIGGER_LABELS: Record<WorkflowTrigger, string> = {
 
 const EMPTY_RULE: Omit<WorkflowRule, 'id' | 'createdAt'> = {
   name: '',
+  triggerType: 'task_completed',
+  conditions: [],
+  conditionLogic: 'AND',
+  actions: [],
   trigger: 'task_completed',
   action: 'send_email',
   emailTo: '',
@@ -1320,6 +1324,10 @@ function WorkflowTab() {
     setSelected(rule)
     setForm({
       name: rule.name,
+      triggerType: rule.triggerType || 'task_completed',
+      conditions: rule.conditions || [],
+      conditionLogic: rule.conditionLogic || 'AND',
+      actions: rule.actions || [],
       trigger: rule.trigger,
       action: rule.action,
       emailTo: rule.emailTo,
@@ -1409,7 +1417,7 @@ function WorkflowTab() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="text-text-primary text-sm font-semibold">{rule.name}</span>
                   <span className="text-[10px] font-medium px-2 py-0.5 rounded-full" style={{ background: 'var(--primary-soft)', color: 'var(--primary)' }}>
-                    {TRIGGER_LABELS[rule.trigger]}
+                    {TRIGGER_LABELS[rule.triggerType || rule.trigger as WorkflowTriggerType] || rule.triggerType || rule.trigger}
                   </span>
                 </div>
                 <div className="text-text-muted text-xs mt-0.5 truncate">
@@ -1470,7 +1478,7 @@ function WorkflowTab() {
               onChange={e => setF('trigger', e.target.value)}
               className="inputM w-full"
             >
-              {(Object.entries(TRIGGER_LABELS) as [WorkflowTrigger, string][]).map(([val, label]) => (
+              {(Object.entries(TRIGGER_LABELS) as [WorkflowTriggerType, string][]).map(([val, label]) => (
                 <option key={val} value={val}>{label}</option>
               ))}
             </select>
