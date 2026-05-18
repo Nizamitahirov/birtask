@@ -64,7 +64,7 @@ async function execAction(
       const to = interpolate(String(action.emailTo || ''), vars)
       if (!to) throw new Error('E-poçt ünvanı boşdur')
       await resend.emails.send({
-        from: 'BirTask <noreply@birtask.app>',
+        from: process.env.RESEND_FROM_EMAIL || 'BirTask <onboarding@resend.dev>',
         to,
         cc: action.emailCc ? interpolate(String(action.emailCc), vars) : undefined,
         subject: interpolate(String(action.emailSubject || ''), vars),
