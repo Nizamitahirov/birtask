@@ -5,6 +5,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { Sidebar } from '@/components/layout/Sidebar'
+import { TopBar } from '@/components/layout/TopBar'
 import { GlobalSearch } from '@/components/ui/GlobalSearch'
 import toast from 'react-hot-toast'
 
@@ -186,6 +187,7 @@ export function AuthenticatedLayout({ children }: { children: React.ReactNode })
     <div className="appM">
       <Sidebar />
       <main className="mainM">
+        <TopBar />
         {children}
       </main>
       <GlobalSearch />

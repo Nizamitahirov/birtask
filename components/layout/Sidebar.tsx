@@ -7,7 +7,6 @@ import { useTheme } from '@/hooks/useTheme'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { Workspace } from '@/lib/types'
-import { NotificationBell } from '@/components/ui/NotificationBell'
 
 const NAV_MAIN = [
   { href: '/',           label: 'İdarə Paneli', icon: 'space_dashboard' },
@@ -274,9 +273,6 @@ export function Sidebar() {
 
       {/* Footer */}
       <div className="side-foot">
-        {/* Notification bell */}
-        <NotificationBell />
-
         {/* Theme toggle */}
         <button
           onClick={toggle}
