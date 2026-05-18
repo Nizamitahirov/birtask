@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useDashboard } from '@/hooks/useSheets'
-import { useProjects } from '@/hooks/useSheets'
+import { useDashboard, useProjects, useTasks } from '@/hooks/useSheets'
 import Link from 'next/link'
 
 const VIBRANT_PALETTES = [
@@ -38,6 +37,7 @@ const STATUS_COLORS: Record<string, string> = {
 export default function DashboardPage() {
   const { stats, activities, loading } = useDashboard()
   const { projects } = useProjects()
+  const { tasks } = useTasks()
   const [animate, setAnimate] = useState(false)
   const [tab, setTab] = useState('all')
 
@@ -252,6 +252,11 @@ export default function DashboardPage() {
                 const [c1, c2] = avatarPaletteFor(p.id)
                 const pct = Number(p.progress) || 0
                 const statusColor = STATUS_COLORS[p.status as string] || 'muted'
+                const assignees = Array.from(new Set(
+                  tasks.filter(t => t.projectId === p.id && t.assignee).map(t => t.assignee)
+                ))
+                const visibleAssignees = assignees.slice(0, 3)
+                const overflow = assignees.length - visibleAssignees.length
                 return (
                   <div className="projM-row" key={p.id}>
                     <div className="projM-head">
@@ -270,6 +275,41 @@ export default function DashboardPage() {
                       <span className="dot" />
                       {p.status}
                     </span>
+                    {assignees.length > 0 && (
+                      <div style={{ display: 'flex', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', flexDirection: 'row-reverse' }}>
+                          {overflow > 0 && (
+                            <div style={{
+                              width: 26, height: 26, borderRadius: '50%',
+                              background: 'var(--surface-3)',
+                              border: '2px solid var(--surface)',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                              fontSize: 9, fontWeight: 800, color: 'var(--muted)',
+                              marginLeft: -6, flexShrink: 0,
+                            }}>
+                              +{overflow}
+                            </div>
+                          )}
+                          {[...visibleAssignees].reverse().map((name, idx) => {
+                            const [a1, a2] = avatarPaletteFor(name)
+                            const initials = name.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()
+                            return (
+                              <div key={idx} title={name} style={{
+                                width: 26, height: 26, borderRadius: '50%',
+                                background: `linear-gradient(135deg, ${a1}, ${a2})`,
+                                border: '2px solid var(--surface)',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 9, fontWeight: 800, color: '#fff',
+                                marginLeft: idx === visibleAssignees.length - 1 ? 0 : -6,
+                                flexShrink: 0,
+                              }}>
+                                {initials}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                     <div className="projM-progress">
                       <div className="progressM">
                         <div
