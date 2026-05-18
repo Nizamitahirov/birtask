@@ -1149,6 +1149,15 @@ input:-webkit-autofill:active {
   caret-color: var(--ink);
   transition: background-color 5000s ease-in-out 0s;
 }
+/* Hide placeholder text when browser autofill is applied */
+input:-webkit-autofill::placeholder {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+/* Ensure placeholder disappears when input has a value (extra safety) */
+input:not(:placeholder-shown)::placeholder {
+  color: transparent;
+}
 
 /* Legacy btn compat */
 .btn-primary {

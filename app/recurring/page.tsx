@@ -8,10 +8,11 @@ import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { cn } from '@/lib/utils'
 import {
   Repeat, Plus, Edit2, Trash2, Play, RefreshCw,
-  Loader2, X, ChevronDown, ToggleLeft, ToggleRight,
+  Loader2, ChevronDown, ToggleLeft, ToggleRight,
   Calendar, FolderKanban, AlertCircle
 } from 'lucide-react'
 import toast from 'react-hot-toast'
+import { Modal } from '@/components/ui/Modal'
 
 const PRIORITIES: Priority[] = ['Aşağı', 'Orta', 'Yüksək', 'Kritik']
 const RECURRENCES: { value: RecurringTask['recurrence']; label: string }[] = [
@@ -191,32 +192,6 @@ function RecurringForm({ initial, projects, teamNames, onSubmit, onCancel, loadi
         </button>
       </div>
     </form>
-  )
-}
-
-// ── Inline Modal ──────────────────────────────────────────────────────────────
-
-function Modal({ open, onClose, title, children }: {
-  open: boolean; onClose: () => void; title: string; children: React.ReactNode
-}) {
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div
-        className="relative w-full max-w-lg rounded-2xl shadow-2xl max-h-[90vh] overflow-y-auto"
-        style={{ background: 'rgb(var(--bg-card))', border: '1px solid var(--border)' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b sticky top-0 z-10" style={{ borderColor: 'var(--border)', background: 'rgb(var(--bg-card))' }}>
-          <h3 className="font-semibold text-text-primary text-sm">{title}</h3>
-          <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-[var(--surface-2)] transition-all">
-            <X size={14} />
-          </button>
-        </div>
-        <div className="px-6 py-5">{children}</div>
-      </div>
-    </div>
   )
 }
 

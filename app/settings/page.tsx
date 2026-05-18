@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import toast from 'react-hot-toast'
+import { Modal } from '@/components/ui/Modal'
+import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 
 // ── Role badge ────────────────────────────────────────────────────────────────
 
@@ -294,35 +296,6 @@ function ResetPasswordForm({
         </button>
       </div>
     </form>
-  )
-}
-
-// ── Inline modal ──────────────────────────────────────────────────────────────
-
-function Modal({
-  open, onClose, title, children,
-}: { open: boolean; onClose: () => void; title: string; children: React.ReactNode }) {
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
-      <div
-        className="relative w-full max-w-md rounded-2xl shadow-2xl"
-        style={{ background: 'rgb(var(--bg-card))', border: '1px solid var(--border)' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between px-6 py-4 border-b" style={{ borderColor: 'var(--border)' }}>
-          <h3 className="font-semibold text-text-primary text-sm">{title}</h3>
-          <button
-            onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-text-primary hover:bg-[var(--surface-2)] transition-all"
-          >
-            <X size={14} />
-          </button>
-        </div>
-        <div className="px-6 py-5">{children}</div>
-      </div>
-    </div>
   )
 }
 
@@ -774,29 +747,14 @@ function WorkspaceTab() {
       </div>
 
       {/* Delete confirmation */}
-      {deleteId && (
-        <div style={{ padding: 16, borderRadius: 12, background: '#FEE2E2', border: '1px solid #FECACA', display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-            <AlertCircle size={16} style={{ color: '#EF4444', flexShrink: 0, marginTop: 2 }} />
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: '#991B1B' }}>Bu iş sahəsini silmək istəyirsiniz?</div>
-              <div style={{ fontSize: 12, color: '#B91C1C', marginTop: 4 }}>
-                Bu əməliyyat geri qaytarıla bilməz. Daxilindəki məlumatlar silinməyəcək, lakin iş sahəsi bağlantısı kəsiləcək.
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-            <button onClick={() => setDeleteId(null)} className="btn-ghostM">Ləğv et</button>
-            <button
-              onClick={handleDelete}
-              disabled={deleting}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13, borderRadius: 8, background: '#EF4444', color: '#fff', border: 'none', cursor: deleting ? 'not-allowed' : 'pointer', opacity: deleting ? 0.7 : 1, fontWeight: 700 }}
-            >
-              {deleting ? <><Loader2 size={13} className="animate-spin" /> Silinir...</> : <><Trash2 size={13} /> Sil</>}
-            </button>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={!!deleteId}
+        onClose={() => setDeleteId(null)}
+        onConfirm={handleDelete}
+        title="İş sahəsini sil"
+        message="Bu iş sahəsini silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz."
+        loading={deleting}
+      />
     </div>
   )
 }
