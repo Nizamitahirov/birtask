@@ -255,7 +255,7 @@ export default function LoginPage() {
           </div>
 
           <p style={{ textAlign: 'center', color: 'var(--muted)', fontSize: 11, marginTop: 16 }}>
-            BirTask v1.0 — Firebase ilə işləyir
+            © 2025 BirTask v1.6 — Created by Nizami Tahir. All rights reserved.
           </p>
         </div>
       </div>
