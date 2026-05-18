@@ -166,7 +166,7 @@ function GroupAccordion({
       borderRadius: 12,
       border: `1.5px solid ${hasAny ? group.color + '45' : 'var(--border)'}`,
       background: hasAny ? group.color + '05' : 'var(--surface)',
-      overflow: 'hidden',
+      flexShrink: 0,
       transition: 'border-color .15s, background .15s',
     }}>
       {/* Header — always visible, click to expand/collapse */}
@@ -646,9 +646,9 @@ export function RolesTab() {
           </div>
 
           {/* Accordion groups */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px' }}>
             {/* Expand/collapse all controls */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
               <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--muted)' }}>
                 İcazə Qrupları
               </span>
@@ -672,19 +672,21 @@ export function RolesTab() {
               </div>
             </div>
 
-            {PERMISSION_GROUPS.map(group => (
-              <GroupAccordion
-                key={group.key}
-                group={group}
-                active={editPerms}
-                impliedByMap={impliedByMap}
-                expanded={expandedGroups.has(group.key)}
-                editable
-                onTogglePerm={togglePerm}
-                onSetGroupMode={setGroupMode}
-                onToggleExpand={() => toggleGroup(group.key)}
-              />
-            ))}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {PERMISSION_GROUPS.map(group => (
+                <GroupAccordion
+                  key={group.key}
+                  group={group}
+                  active={editPerms}
+                  impliedByMap={impliedByMap}
+                  expanded={expandedGroups.has(group.key)}
+                  editable
+                  onTogglePerm={togglePerm}
+                  onSetGroupMode={setGroupMode}
+                  onToggleExpand={() => toggleGroup(group.key)}
+                />
+              ))}
+            </div>
           </div>
 
           {/* Save bar */}
