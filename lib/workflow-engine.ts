@@ -71,7 +71,17 @@ async function execAction(
       const gmailUser = process.env.GMAIL_USER
       const gmailPass = process.env.GMAIL_APP_PASSWORD
 
-      if (gmailUser && gmailPass) {
+      if (process.env.RESEND_API_KEY) {
+        const { Resend } = await import('resend')
+        const resend = new Resend(process.env.RESEND_API_KEY)
+        await resend.emails.send({
+          from: process.env.RESEND_FROM_EMAIL || 'BirTask <onboarding@resend.dev>',
+          to,
+          cc: action.emailCc ? interpolate(String(action.emailCc), vars) : undefined,
+          subject,
+          html,
+        })
+      } else if (gmailUser && gmailPass) {
         // Gmail SMTP via nodemailer
         const nodemailer = await import('nodemailer')
         const transporter = nodemailer.default.createTransport({
