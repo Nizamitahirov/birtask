@@ -674,7 +674,7 @@ export function RolesTab() {
             <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)' }}>Rol seçin</div>
             <div style={{ fontSize: 12, marginTop: 6, maxWidth: 240, lineHeight: 1.6 }}>
               Soldan bir rol seçin və icazələrini idarə edin,
-              ya da "Yeni" düyməsi ilə xüsusi rol yaradın.
+              ya da &ldquo;Yeni&rdquo; düyməsi ilə xüsusi rol yaradın.
             </div>
           </div>
         </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useState, useMemo, useCallback } from 'react'
 import { db } from '@/lib/db'
 import { ActivityLog } from '@/lib/types'
 import { useAuth } from '@/contexts/AuthContext'
@@ -92,15 +92,15 @@ export default function ActivityPage() {
   const [selectedYear, setSelectedYear] = useState(currentYear)
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
 
-  const fetchLogs = async () => {
+  const fetchLogs = useCallback(async () => {
     setLoading(true)
     const res = await db.activity.getAll(currentWorkspaceId || undefined)
     if (res.success && res.data) setLogs(res.data)
     else toast.error(res.error || 'Aktivlik məlumatları yüklənmədi')
     setLoading(false)
-  }
+  }, [currentWorkspaceId])
 
-  useEffect(() => { fetchLogs() }, [currentWorkspaceId])
+  useEffect(() => { fetchLogs() }, [fetchLogs])
 
   // Derive available years from logs
   const availableYears = useMemo(() => {
