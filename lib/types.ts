@@ -77,6 +77,7 @@ export interface TeamMember {
   phone: string
   avatar: string
   managerId?: string
+  functionalManagerId?: string
   createdAt: string
 }
 
