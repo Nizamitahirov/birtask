@@ -550,7 +550,12 @@ export function AuthenticatedLayout({ children }: { children: React.ReactNode })
     )
   }
 
-  if (isLoginPage || !user) return <>{children}</>
+  if (isLoginPage) return <>{children}</>
+
+  if (!user) {
+    // User just logged out — show blank while router navigates to /login
+    return <div style={{ minHeight: '100vh', background: 'var(--bg)' }} />
+  }
 
   if (needsSetup) return <WorkspaceSetup />
 
