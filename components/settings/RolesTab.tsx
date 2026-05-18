@@ -8,7 +8,7 @@ import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import {
   Plus, Trash2, Shield, Lock, Link2, Loader2, Save,
-  Check, ShieldCheck, ChevronDown, ChevronRight,
+  Check, ShieldCheck, ChevronDown, ChevronUp, Edit3,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -17,141 +17,123 @@ import toast from 'react-hot-toast'
 const ROLE_COLORS = [
   '#5B5BF5', '#E85C7A', '#0EA5E9', '#10B981',
   '#F59E0B', '#8B5CF6', '#EF4444', '#06B6D4',
-  '#84CC16', '#EC4899',
+  '#EC4899', '#84CC16',
 ]
 
 type GroupMode = 'none' | 'all' | 'custom'
 
 function deriveGroupMode(groupKeys: PermissionKey[], active: Set<PermissionKey>): GroupMode {
-  const has = groupKeys.filter(k => active.has(k)).length
-  if (has === 0) return 'none'
-  if (has === groupKeys.length) return 'all'
+  const count = groupKeys.filter(k => active.has(k)).length
+  if (count === 0) return 'none'
+  if (count === groupKeys.length) return 'all'
   return 'custom'
 }
 
-// ── Permission Checkbox ───────────────────────────────────────────────────────
+// ── Permission Item ───────────────────────────────────────────────────────────
 
-function PermissionItem({
-  permKey, label, description, impliesKeys, active, impliedBy, isSystem, color, onToggle,
+function PermItem({
+  perm, active, impliedBy, color, editable, onToggle,
 }: {
-  permKey: PermissionKey
-  label: string
-  description: string
-  impliesKeys?: PermissionKey[]
+  perm: typeof PERMISSION_GROUPS[0]['permissions'][0]
   active: boolean
   impliedBy: string[]
-  isSystem: boolean
   color: string
+  editable: boolean
   onToggle: () => void
 }) {
-  const locked = isSystem || impliedBy.length > 0
+  const blocked = !editable || impliedBy.length > 0
 
   return (
     <button
       type="button"
-      onClick={locked ? undefined : onToggle}
-      title={impliedBy.length > 0 ? `Bu icazə "${impliedBy.join(', ')}" tərəfindən aktivdir` : undefined}
+      onClick={blocked ? (impliedBy.length > 0 ? () => toast(`Əvvəl bu icazəni tələb edən icazəni söndür`, { icon: '🔗' }) : undefined) : onToggle}
       style={{
-        display: 'flex', alignItems: 'flex-start', gap: 8, width: '100%',
-        padding: '8px 10px', borderRadius: 10, textAlign: 'left',
-        border: `1.5px solid ${active ? color + '55' : 'var(--border)'}`,
-        background: active ? color + '0D' : 'var(--surface)',
-        cursor: locked ? 'default' : 'pointer',
-        transition: 'all .15s',
-        opacity: isSystem && !active ? 0.38 : 1,
+        display: 'flex', alignItems: 'center', gap: 10,
+        width: '100%', padding: '9px 12px', borderRadius: 10,
+        textAlign: 'left', transition: 'all .12s',
+        border: `1.5px solid ${active ? color + '50' : 'var(--border)'}`,
+        background: active ? color + '0C' : 'var(--surface)',
+        cursor: blocked ? (impliedBy.length > 0 ? 'not-allowed' : 'default') : 'pointer',
       }}
     >
-      {/* Custom checkbox */}
+      {/* Checkbox */}
       <div style={{
-        width: 16, height: 16, borderRadius: 4, flexShrink: 0, marginTop: 2,
-        border: `1.5px solid ${active ? color : 'var(--border)'}`,
+        width: 17, height: 17, borderRadius: 5, flexShrink: 0,
+        border: `2px solid ${active ? color : 'var(--border)'}`,
         background: active ? color : 'transparent',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        transition: 'all .15s',
+        transition: 'all .12s',
       }}>
         {active && <Check size={10} color="#fff" strokeWidth={3} />}
       </div>
 
+      {/* Label + meta */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, fontWeight: 600, color: active ? 'var(--ink)' : 'var(--muted-2)' }}>
-            {label}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            fontSize: 12, fontWeight: 600,
+            color: active ? 'var(--ink)' : 'var(--muted-2)',
+          }}>
+            {perm.label}
           </span>
           {impliedBy.length > 0 && (
-            <span
-              style={{
-                display: 'inline-flex', alignItems: 'center', gap: 2,
-                fontSize: 9, color: color, fontWeight: 700,
-                background: color + '18', padding: '1px 5px', borderRadius: 4,
-              }}
-            >
-              <Link2 size={8} />
-              avtomatik
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              fontSize: 9, fontWeight: 700, color: color,
+              background: color + '15', padding: '1px 6px', borderRadius: 999,
+            }}>
+              <Link2 size={7} /> auto
+            </span>
+          )}
+          {perm.implies && perm.implies.length > 0 && !impliedBy.length && (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 3,
+              fontSize: 9, color: 'var(--muted)', background: 'var(--surface-2)',
+              padding: '1px 6px', borderRadius: 999,
+            }}>
+              <Link2 size={7} /> {perm.implies.length} tələb
             </span>
           )}
         </div>
-        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1, lineHeight: 1.4 }}>
-          {description}
+        <div style={{ fontSize: 10, color: 'var(--muted)', marginTop: 1 }}>
+          {perm.description}
         </div>
-        {impliesKeys && impliesKeys.length > 0 && (
-          <div style={{
-            fontSize: 9, color: color, marginTop: 3,
-            display: 'flex', alignItems: 'center', gap: 3, flexWrap: 'wrap',
-          }}>
-            <Link2 size={8} />
-            <span style={{ opacity: 0.8 }}>əlavə olaraq aktivləşdirir:</span>
-            {impliesKeys.map(k => (
-              <span key={k} style={{
-                background: color + '18', padding: '0 4px', borderRadius: 3, fontWeight: 700,
-              }}>
-                {k}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </button>
   )
 }
 
-// ── Group Mode Selector (radio-style) ─────────────────────────────────────────
+// ── Group Mode Pill ───────────────────────────────────────────────────────────
 
-function GroupModeSelector({
+function ModePills({
   mode, onChange, color,
 }: {
   mode: GroupMode; onChange: (m: GroupMode) => void; color: string
 }) {
-  const options: { value: GroupMode; label: string }[] = [
-    { value: 'none',   label: 'Yox' },
-    { value: 'custom', label: 'Seçim' },
-    { value: 'all',    label: 'Hamısı' },
-  ]
-
   return (
-    <div style={{
-      display: 'flex', background: 'var(--surface-2)',
-      borderRadius: 8, padding: 3, gap: 2,
-    }}>
-      {options.map(opt => {
-        const active = mode === opt.value
+    <div
+      style={{ display: 'flex', background: 'var(--surface-3, var(--surface-2))', borderRadius: 8, padding: 2, gap: 1 }}
+      onClick={e => e.stopPropagation()}
+    >
+      {(['none', 'custom', 'all'] as GroupMode[]).map(v => {
+        const labels = { none: 'Yox', custom: 'Seçim', all: 'Hamısı' }
+        const on = mode === v
         return (
           <button
-            key={opt.value}
+            key={v}
             type="button"
-            onClick={() => onChange(opt.value)}
+            onClick={() => onChange(v)}
             style={{
-              padding: '4px 11px', borderRadius: 6, fontSize: 11, fontWeight: 700,
-              border: 'none', cursor: 'pointer', transition: 'all .15s',
-              background: active ? 'var(--surface)' : 'transparent',
-              color: active
-                ? opt.value === 'all' ? '#10B981'
-                : opt.value === 'none' ? '#EF4444'
-                : color
+              padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,
+              border: 'none', cursor: 'pointer', transition: 'all .12s',
+              background: on ? 'var(--surface)' : 'transparent',
+              color: on
+                ? v === 'all' ? '#10B981' : v === 'none' ? '#EF4444' : color
                 : 'var(--muted)',
-              boxShadow: active ? 'var(--shadow-sm)' : 'none',
+              boxShadow: on ? '0 1px 4px rgba(0,0,0,.08)' : 'none',
             }}
           >
-            {opt.label}
+            {labels[v]}
           </button>
         )
       })}
@@ -159,89 +141,122 @@ function GroupModeSelector({
   )
 }
 
-// ── Permission Group Card ─────────────────────────────────────────────────────
+// ── Permission Group Accordion ────────────────────────────────────────────────
 
-function PermissionGroup({
-  group, active, impliedByMap, isSystem, onTogglePerm, onSetGroupMode,
+function GroupAccordion({
+  group, active, impliedByMap, expanded, editable,
+  onTogglePerm, onSetGroupMode, onToggleExpand,
 }: {
-  group: typeof PERMISSION_GROUPS[number]
+  group: typeof PERMISSION_GROUPS[0]
   active: Set<PermissionKey>
   impliedByMap: Map<PermissionKey, PermissionKey[]>
-  isSystem: boolean
-  onTogglePerm: (key: PermissionKey) => void
+  expanded: boolean
+  editable: boolean
+  onTogglePerm: (k: PermissionKey) => void
   onSetGroupMode: (keys: PermissionKey[], mode: GroupMode) => void
+  onToggleExpand: () => void
 }) {
-  const groupKeys = group.permissions.map(p => p.key)
-  const mode = deriveGroupMode(groupKeys, active)
-  const activeCount = groupKeys.filter(k => active.has(k)).length
+  const keys = group.permissions.map(p => p.key)
+  const activeCount = keys.filter(k => active.has(k)).length
+  const mode = deriveGroupMode(keys, active)
+  const hasAny = activeCount > 0
 
   return (
     <div style={{
-      borderRadius: 14, border: `1.5px solid ${activeCount > 0 ? group.color + '35' : 'var(--border)'}`,
-      background: activeCount > 0 ? group.color + '06' : 'var(--surface)',
-      overflow: 'hidden', transition: 'all .2s',
+      borderRadius: 12,
+      border: `1.5px solid ${hasAny ? group.color + '45' : 'var(--border)'}`,
+      background: hasAny ? group.color + '05' : 'var(--surface)',
+      overflow: 'hidden',
+      transition: 'border-color .15s, background .15s',
     }}>
-      {/* Group header */}
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 10, padding: '12px 16px',
-        borderBottom: `1px solid ${activeCount > 0 ? group.color + '25' : 'var(--border)'}`,
-      }}>
+      {/* Header — always visible, click to expand/collapse */}
+      <div
+        onClick={onToggleExpand}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 12,
+          padding: '11px 14px', cursor: 'pointer',
+          borderBottom: expanded ? `1px solid ${hasAny ? group.color + '25' : 'var(--border)'}` : 'none',
+          transition: 'background .12s',
+        }}
+      >
+        {/* Group icon */}
         <div style={{
-          width: 34, height: 34, borderRadius: 9, flexShrink: 0,
-          background: activeCount > 0 ? group.color + '20' : 'var(--surface-2)',
+          width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+          background: hasAny ? group.color + '20' : 'var(--surface-2)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
-          transition: 'all .2s',
+          transition: 'all .15s',
         }}>
-          <span
-            className="material-symbols-rounded"
-            style={{ fontSize: 17, color: activeCount > 0 ? group.color : 'var(--muted)' }}
-          >
+          <span className="material-symbols-rounded" style={{ fontSize: 16, color: hasAny ? group.color : 'var(--muted)' }}>
             {group.icon}
           </span>
         </div>
 
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{group.label}</div>
+        {/* Name + count */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
+            {group.label}
+          </div>
           <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 1 }}>
-            {activeCount === 0 ? 'İcazə yoxdur' : `${activeCount} / ${groupKeys.length} icazə aktiv`}
+            {activeCount === 0
+              ? 'Heç bir icazə yox'
+              : `${activeCount} / ${keys.length} icazə aktiv`}
           </div>
         </div>
 
-        {!isSystem && (
-          <GroupModeSelector
+        {/* Active permission pills (compact preview) */}
+        {!expanded && hasAny && (
+          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', maxWidth: 180 }}>
+            {group.permissions.filter(p => active.has(p.key)).map(p => (
+              <span key={p.key} style={{
+                fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 999,
+                background: group.color + '18', color: group.color,
+              }}>
+                {p.label}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {/* Mode pills (only when editing) */}
+        {editable && (
+          <ModePills
             mode={mode}
             color={group.color}
-            onChange={m => onSetGroupMode(groupKeys, m)}
+            onChange={m => onSetGroupMode(keys, m)}
           />
         )}
+
+        {/* Chevron */}
+        <div style={{ color: 'var(--muted)', flexShrink: 0, marginLeft: 4 }}>
+          {expanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+        </div>
       </div>
 
-      {/* Individual permissions grid */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
-        gap: 8, padding: 12,
-      }}>
-        {group.permissions.map(perm => (
-          <PermissionItem
-            key={perm.key}
-            permKey={perm.key}
-            label={perm.label}
-            description={perm.description}
-            impliesKeys={perm.implies}
-            active={active.has(perm.key)}
-            impliedBy={impliedByMap.get(perm.key) || []}
-            isSystem={isSystem}
-            color={group.color}
-            onToggle={() => onTogglePerm(perm.key)}
-          />
-        ))}
-      </div>
+      {/* Permissions grid (expanded) */}
+      {expanded && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))',
+          gap: 8, padding: '12px 14px',
+        }}>
+          {group.permissions.map(perm => (
+            <PermItem
+              key={perm.key}
+              perm={perm}
+              active={active.has(perm.key)}
+              impliedBy={impliedByMap.get(perm.key) || []}
+              color={group.color}
+              editable={editable}
+              onToggle={() => onTogglePerm(perm.key)}
+            />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
-// ── Main Component ────────────────────────────────────────────────────────────
+// ── Main ─────────────────────────────────────────────────────────────────────
 
 export function RolesTab() {
   const { currentWorkspaceId } = useWorkspace()
@@ -249,7 +264,6 @@ export function RolesTab() {
   const [loading, setLoading] = useState(true)
   const [selected, setSelected] = useState<Role | null>(null)
 
-  // Edit state
   const [editPerms, setEditPerms] = useState<Set<PermissionKey>>(new Set())
   const [editName, setEditName] = useState('')
   const [editDesc, setEditDesc] = useState('')
@@ -257,14 +271,15 @@ export function RolesTab() {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
 
-  // Create state
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
-  const [newCreating, setNewCreating] = useState(false)
+  const [newSaving, setNewSaving] = useState(false)
 
-  // Delete state
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [deleting, setDeleting] = useState(false)
+
+  // Expand/collapse per group
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   const fetchRoles = useCallback(async () => {
     setLoading(true)
@@ -282,6 +297,22 @@ export function RolesTab() {
     setEditDesc(role.description || '')
     setEditColor(role.color || '#5B5BF5')
     setDirty(false)
+    // Auto-expand groups that have active permissions
+    const expanded = new Set<string>()
+    PERMISSION_GROUPS.forEach(g => {
+      if (g.permissions.some(p => role.permissions.includes(p.key))) {
+        expanded.add(g.key)
+      }
+    })
+    setExpandedGroups(expanded)
+  }
+
+  const toggleGroup = (key: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) next.delete(key); else next.add(key)
+      return next
+    })
   }
 
   const togglePerm = (key: PermissionKey) => {
@@ -289,9 +320,7 @@ export function RolesTab() {
     setEditPerms(prev => {
       const next = new Set(prev)
       if (next.has(key)) {
-        // Only remove if no other active permission implies this one
-        const impliedByMap = getImpliedBy(next)
-        if ((impliedByMap.get(key) || []).length > 0) {
+        if ((getImpliedBy(next).get(key) || []).length > 0) {
           toast('Bu icazə başqa bir icazə tərəfindən tələb olunur', { icon: '🔗' })
           return prev
         }
@@ -310,11 +339,10 @@ export function RolesTab() {
       const next = new Set(prev)
       if (mode === 'none') {
         groupKeys.forEach(k => {
-          const impliedByMap = getImpliedBy(next)
-          const externalImpliers = (impliedByMap.get(k) || []).filter(
+          const extImpliers = (getImpliedBy(next).get(k) || []).filter(
             imp => !groupKeys.includes(imp as PermissionKey)
           )
-          if (externalImpliers.length === 0) next.delete(k)
+          if (extImpliers.length === 0) next.delete(k)
         })
       } else if (mode === 'all') {
         groupKeys.forEach(k => next.add(k))
@@ -325,10 +353,10 @@ export function RolesTab() {
   }
 
   const handleSave = async () => {
-    if (!selected) return
+    if (!selected || !editName.trim()) return
     setSaving(true)
     const res = await db.roles.update(selected.id, {
-      name: editName.trim() || selected.name,
+      name: editName.trim(),
       description: editDesc,
       color: editColor,
       permissions: Array.from(editPerms),
@@ -346,7 +374,7 @@ export function RolesTab() {
 
   const handleCreate = async () => {
     if (!newName.trim()) return
-    setNewCreating(true)
+    setNewSaving(true)
     const res = await db.roles.create({
       name: newName.trim(),
       description: '',
@@ -357,14 +385,13 @@ export function RolesTab() {
     })
     if (res.success && res.data) {
       toast.success('Rol yaradıldı')
-      setNewName('')
-      setCreating(false)
+      setNewName(''); setCreating(false)
       await fetchRoles()
       selectRole(res.data)
     } else {
       toast.error(res.error || 'Xəta')
     }
-    setNewCreating(false)
+    setNewSaving(false)
   }
 
   const handleDelete = async () => {
@@ -383,35 +410,31 @@ export function RolesTab() {
   }
 
   const impliedByMap = getImpliedBy(editPerms)
-  const totalActive = editPerms.size
 
   return (
-    <div style={{ display: 'flex', gap: 20, height: 'calc(100vh - 240px)', minHeight: 560 }}>
+    <div style={{ display: 'flex', gap: 16, height: 'calc(100vh - 220px)', minHeight: 580 }}>
 
-      {/* ── Left: Role List ── */}
+      {/* ── Left panel: role list ──────────────────────────────── */}
       <div className="cardM" style={{
-        width: 220, flexShrink: 0, padding: 0,
+        width: 256, flexShrink: 0, padding: 0,
         display: 'flex', flexDirection: 'column', overflow: 'hidden',
       }}>
+        {/* Header */}
         <div style={{
-          padding: '12px 14px', borderBottom: '1px solid var(--border)',
+          padding: '14px 16px', borderBottom: '1px solid var(--border)',
           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          flexShrink: 0,
         }}>
-          <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)' }}>
+          <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--muted)' }}>
             Rollər
           </span>
-          <button
-            onClick={() => setCreating(c => !c)}
-            className="btn-primaryM"
-            style={{ padding: '4px 10px', fontSize: 11 }}
-          >
-            <Plus size={12} /> Yeni
+          <button onClick={() => setCreating(c => !c)} className="btn-primaryM" style={{ padding: '5px 12px', fontSize: 12 }}>
+            <Plus size={13} /> Yeni Rol
           </button>
         </div>
 
+        {/* Inline create */}
         {creating && (
-          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)', flexShrink: 0 }}>
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', background: 'var(--surface-2)' }}>
             <div style={{ display: 'flex', gap: 6 }}>
               <input
                 autoFocus
@@ -423,258 +446,282 @@ export function RolesTab() {
                 }}
                 placeholder="Rol adı..."
                 className="inputM"
-                style={{ flex: 1, fontSize: 12, padding: '6px 10px' }}
+                style={{ flex: 1, fontSize: 12, padding: '7px 10px' }}
               />
               <button
                 onClick={handleCreate}
-                disabled={newCreating || !newName.trim()}
+                disabled={newSaving || !newName.trim()}
                 className="btn-primaryM"
-                style={{ padding: '6px 10px', fontSize: 12, flexShrink: 0 }}
+                style={{ padding: '7px 11px', flexShrink: 0 }}
               >
-                {newCreating ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
+                {newSaving ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
               </button>
             </div>
           </div>
         )}
 
+        {/* Role list */}
         <div style={{ flex: 1, overflowY: 'auto' }}>
-          {loading ? (
-            [...Array(4)].map((_, i) => (
-              <div key={i} className="skeleton" style={{ height: 52, margin: '6px 10px', borderRadius: 10 }} />
-            ))
-          ) : roles.map(role => {
-            const isSelected = selected?.id === role.id
-            return (
-              <button
-                key={role.id}
-                onClick={() => selectRole(role)}
-                style={{
-                  display: 'flex', alignItems: 'center', gap: 10,
-                  width: '100%', padding: '10px 14px', textAlign: 'left',
-                  background: isSelected ? 'var(--primary-soft)' : 'transparent',
-                  border: 'none', cursor: 'pointer',
-                  borderLeft: `3px solid ${isSelected ? (role.color || '#5B5BF5') : 'transparent'}`,
-                  transition: 'all .12s',
-                }}
-              >
-                <div style={{
-                  width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-                  background: role.color || '#5B5BF5',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
-                  {role.isSystem
-                    ? <Lock size={12} color="#fff" />
-                    : <Shield size={12} color="#fff" />
-                  }
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{
-                    fontSize: 13, fontWeight: 700, color: 'var(--ink)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                  }}>
-                    {role.name}
-                  </div>
-                  <div style={{ fontSize: 10, color: 'var(--muted)' }}>
-                    {role.permissions.length} icazə
-                  </div>
-                </div>
-                {role.isSystem && (
-                  <span style={{
-                    fontSize: 8, fontWeight: 800, color: 'var(--primary)',
-                    background: 'var(--primary-soft)', padding: '2px 5px',
-                    borderRadius: 4, flexShrink: 0, textTransform: 'uppercase',
-                  }}>
-                    sys
-                  </span>
-                )}
-              </button>
-            )
-          })}
+          {loading
+            ? [...Array(4)].map((_, i) => (
+                <div key={i} className="skeleton" style={{ height: 58, margin: '6px 10px', borderRadius: 10 }} />
+              ))
+            : roles.map(role => {
+                const isSel = selected?.id === role.id
+                const permPct = Math.round((role.permissions.length / 28) * 100)
+                return (
+                  <button
+                    key={role.id}
+                    onClick={() => selectRole(role)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10,
+                      width: '100%', padding: '10px 14px 10px 12px', textAlign: 'left',
+                      background: isSel ? 'var(--primary-soft)' : 'transparent',
+                      border: 'none', cursor: 'pointer',
+                      borderLeft: `3px solid ${isSel ? (role.color || '#5B5BF5') : 'transparent'}`,
+                      transition: 'all .1s',
+                    }}
+                  >
+                    <div style={{
+                      width: 34, height: 34, borderRadius: 9, flexShrink: 0,
+                      background: role.color || '#5B5BF5',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      boxShadow: isSel ? `0 3px 10px ${role.color || '#5B5BF5'}55` : 'none',
+                      transition: 'box-shadow .15s',
+                    }}>
+                      {role.isSystem ? <Lock size={14} color="#fff" /> : <Shield size={14} color="#fff" />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{
+                        fontSize: 13, fontWeight: 700, color: 'var(--ink)',
+                        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        display: 'flex', alignItems: 'center', gap: 6,
+                      }}>
+                        {role.name}
+                        {role.isSystem && (
+                          <span style={{
+                            fontSize: 8, fontWeight: 800, textTransform: 'uppercase',
+                            color: 'var(--primary)', background: 'var(--primary-soft)',
+                            padding: '1px 5px', borderRadius: 4, letterSpacing: '0.05em',
+                          }}>
+                            sys
+                          </span>
+                        )}
+                      </div>
+                      {/* Permission progress bar */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4 }}>
+                        <div style={{ flex: 1, height: 3, borderRadius: 3, background: 'var(--surface-2)' }}>
+                          <div style={{
+                            height: '100%', borderRadius: 3,
+                            width: `${permPct}%`,
+                            background: role.color || '#5B5BF5',
+                            transition: 'width .3s',
+                          }} />
+                        </div>
+                        <span style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600 }}>
+                          {role.permissions.length}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })
+          }
         </div>
       </div>
 
-      {/* ── Right: Editor ── */}
+      {/* ── Right panel: editor ────────────────────────────────── */}
       {selected ? (
         <div className="cardM" style={{
           flex: 1, padding: 0, overflow: 'hidden',
           display: 'flex', flexDirection: 'column',
         }}>
-          {/* Header */}
+
+          {/* Role header */}
           <div style={{
-            padding: '14px 20px', borderBottom: '1px solid var(--border)',
-            display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0,
-            flexWrap: 'wrap',
+            padding: '16px 20px', borderBottom: '1px solid var(--border)',
+            flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap',
           }}>
+            {/* Avatar */}
             <div style={{
-              width: 44, height: 44, borderRadius: 12, flexShrink: 0,
+              width: 48, height: 48, borderRadius: 14, flexShrink: 0,
               background: editColor,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              boxShadow: `0 4px 14px ${editColor}55`,
+              boxShadow: `0 4px 16px ${editColor}55`,
             }}>
-              {selected.isSystem
-                ? <Lock size={18} color="#fff" />
-                : <Shield size={18} color="#fff" />
-              }
+              {selected.isSystem ? <Lock size={20} color="#fff" /> : <Shield size={20} color="#fff" />}
             </div>
 
-            {selected.isSystem ? (
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)' }}>{selected.name}</span>
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, color: '#fff',
-                    background: '#64748B', padding: '2px 8px', borderRadius: 999,
-                  }}>
-                    Sistem Rolu
-                  </span>
-                </div>
-                <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                  {selected.description || 'Bu rol sistem tərəfindən idarə olunur'} · {totalActive} icazə
-                </div>
-              </div>
-            ) : (
-              <div style={{ flex: 1, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', minWidth: 0 }}>
+            {/* Name + description editable */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 6 }}>
                 <input
                   value={editName}
                   onChange={e => { setEditName(e.target.value); setDirty(true) }}
                   className="inputM"
-                  style={{ fontSize: 15, fontWeight: 800, padding: '6px 12px', minWidth: 140, maxWidth: 220 }}
+                  style={{ fontSize: 16, fontWeight: 800, padding: '5px 12px', maxWidth: 240 }}
                   placeholder="Rol adı"
                 />
-                <input
-                  value={editDesc}
-                  onChange={e => { setEditDesc(e.target.value); setDirty(true) }}
-                  className="inputM"
-                  style={{ fontSize: 12, padding: '6px 12px', flex: 1, minWidth: 140 }}
-                  placeholder="Açıqlama (isteğe bağlı)"
-                />
+                {selected.isSystem && (
+                  <span style={{
+                    fontSize: 10, fontWeight: 700, color: '#fff',
+                    background: '#64748B', padding: '3px 9px', borderRadius: 999,
+                  }}>
+                    Sistem rolu
+                  </span>
+                )}
               </div>
-            )}
+              <input
+                value={editDesc}
+                onChange={e => { setEditDesc(e.target.value); setDirty(true) }}
+                className="inputM"
+                style={{ fontSize: 12, padding: '5px 12px', maxWidth: 360 }}
+                placeholder="Açıqlama (isteğe bağlı)"
+              />
+            </div>
 
-            {/* Color picker + actions */}
-            {!selected.isSystem && (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0, flexWrap: 'wrap' }}>
+            {/* Color + delete */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end', flexShrink: 0 }}>
+              <div style={{ display: 'flex', gap: 5, alignItems: 'center' }}>
                 {ROLE_COLORS.map(c => (
                   <button
                     key={c}
                     type="button"
                     onClick={() => { setEditColor(c); setDirty(true) }}
                     style={{
-                      width: 18, height: 18, borderRadius: 5, background: c,
+                      width: 20, height: 20, borderRadius: 5, background: c,
                       border: 'none', cursor: 'pointer',
                       outline: editColor === c ? `2.5px solid ${c}` : '2px solid transparent',
                       outlineOffset: 2,
-                      transform: editColor === c ? 'scale(1.25)' : 'scale(1)',
-                      transition: 'transform .15s',
+                      transform: editColor === c ? 'scale(1.3)' : 'scale(1)',
+                      transition: 'transform .12s',
                     }}
                   />
                 ))}
-                <div style={{ width: 1, height: 20, background: 'var(--border)', flexShrink: 0 }} />
+                <div style={{ width: 1, height: 18, background: 'var(--border)', marginLeft: 2 }} />
                 <button
                   onClick={() => setDeleteId(selected.id)}
                   className="btn-ghostM"
-                  style={{ padding: '5px 9px', color: '#EF4444' }}
+                  style={{ padding: '4px 9px', color: '#EF4444', fontSize: 12 }}
                   title="Rolu sil"
                 >
                   <Trash2 size={14} />
                 </button>
               </div>
-            )}
+            </div>
           </div>
 
-          {/* Stats bar */}
+          {/* Stats chips */}
           <div style={{
             padding: '8px 20px', borderBottom: '1px solid var(--border)',
-            display: 'flex', gap: 16, alignItems: 'center', flexShrink: 0,
-            background: 'var(--surface-2)',
+            background: 'var(--surface-2)', display: 'flex', gap: 8,
+            alignItems: 'center', flexWrap: 'wrap', flexShrink: 0,
           }}>
-            <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--muted)' }}>
-              İcazə xülasəsi:
+            <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600, marginRight: 4 }}>
+              Aktiv icazələr:
             </span>
             {PERMISSION_GROUPS.map(g => {
-              const gKeys = g.permissions.map(p => p.key)
-              const count = gKeys.filter(k => editPerms.has(k)).length
-              if (count === 0) return null
+              const n = g.permissions.filter(p => editPerms.has(p.key)).length
+              if (!n) return null
               return (
                 <span key={g.key} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 4,
                   fontSize: 11, fontWeight: 700,
                   color: g.color, background: g.color + '18',
-                  padding: '2px 8px', borderRadius: 999,
+                  padding: '3px 9px', borderRadius: 999,
                 }}>
                   <span className="material-symbols-rounded" style={{ fontSize: 12 }}>{g.icon}</span>
-                  {count}/{gKeys.length}
+                  {n}/{g.permissions.length}
                 </span>
               )
             })}
-            {totalActive === 0 && (
-              <span style={{ fontSize: 11, color: 'var(--muted)', fontStyle: 'italic' }}>Heç bir icazə seçilməyib</span>
+            {editPerms.size === 0 && (
+              <span style={{ fontSize: 11, color: 'var(--muted)', fontStyle: 'italic' }}>
+                Heç bir icazə seçilməyib
+              </span>
             )}
+            <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>
+              Cəmi: {editPerms.size} icazə
+            </span>
           </div>
 
-          {/* Permission groups */}
-          <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px', display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--muted)' }}>
-              İcazə Qrupları
+          {/* Accordion groups */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {/* Expand/collapse all controls */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--muted)' }}>
+                İcazə Qrupları
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={() => setExpandedGroups(new Set(PERMISSION_GROUPS.map(g => g.key)))}
+                  className="btn-ghostM"
+                  style={{ fontSize: 11, padding: '3px 10px' }}
+                >
+                  Hamısını aç
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExpandedGroups(new Set())}
+                  className="btn-ghostM"
+                  style={{ fontSize: 11, padding: '3px 10px' }}
+                >
+                  Hamısını bağla
+                </button>
+              </div>
             </div>
 
             {PERMISSION_GROUPS.map(group => (
-              <PermissionGroup
+              <GroupAccordion
                 key={group.key}
                 group={group}
                 active={editPerms}
                 impliedByMap={impliedByMap}
-                isSystem={selected.isSystem}
+                expanded={expandedGroups.has(group.key)}
+                editable
                 onTogglePerm={togglePerm}
                 onSetGroupMode={setGroupMode}
+                onToggleExpand={() => toggleGroup(group.key)}
               />
             ))}
           </div>
 
           {/* Save bar */}
-          {dirty && !selected.isSystem && (
+          {dirty && (
             <div style={{
-              padding: '12px 20px', borderTop: '1px solid var(--border)',
+              padding: '11px 20px', borderTop: '1px solid var(--border)',
               background: 'var(--surface)', flexShrink: 0,
-              display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
             }}>
-              <div style={{ fontSize: 12, color: 'var(--muted)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                <div style={{ width: 6, height: 6, borderRadius: 3, background: '#F59E0B' }} />
-                Yadda saxlanmamış dəyişikliklər var
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 12, color: 'var(--muted)' }}>
+                <div style={{ width: 7, height: 7, borderRadius: '50%', background: '#F59E0B' }} />
+                Saxlanmamış dəyişikliklər
               </div>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={() => selectRole(selected)}
-                  className="btn-ghostM"
-                  style={{ fontSize: 12 }}
-                >
+                <button onClick={() => selectRole(selected)} className="btn-ghostM" style={{ fontSize: 12 }}>
                   Ləğv et
                 </button>
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="btn-primaryM"
-                  style={{ fontSize: 12 }}
-                >
+                <button onClick={handleSave} disabled={saving} className="btn-primaryM" style={{ fontSize: 12 }}>
                   {saving
                     ? <><Loader2 size={13} className="animate-spin" /> Saxlanılır...</>
-                    : <><Save size={13} /> Dəyişiklikləri saxla</>
-                  }
+                    : <><Save size={13} /> Saxla</>}
                 </button>
               </div>
             </div>
           )}
         </div>
       ) : (
-        <div className="cardM" style={{
-          flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
-          <div style={{ textAlign: 'center', color: 'var(--muted)' }}>
-            <ShieldCheck size={44} style={{ margin: '0 auto 14px', opacity: 0.2 }} />
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)' }}>Rol seçin</div>
-            <div style={{ fontSize: 12, marginTop: 6, maxWidth: 240, lineHeight: 1.6 }}>
-              Soldan bir rol seçin və icazələrini idarə edin,
-              ya da &ldquo;Yeni&rdquo; düyməsi ilə xüsusi rol yaradın.
+        /* Empty state */
+        <div className="cardM" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ textAlign: 'center' }}>
+            <ShieldCheck size={48} style={{ margin: '0 auto 16px', color: 'var(--muted)', opacity: 0.25 }} />
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)', marginBottom: 8 }}>
+              Rol seçin
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.7, maxWidth: 260 }}>
+              Sol paneldən bir rol seçin və icazələrini idarə edin.
+              Yeni xüsusi rol yaratmaq üçün <strong>Yeni Rol</strong> düyməsini basın.
             </div>
           </div>
         </div>
@@ -685,7 +732,7 @@ export function RolesTab() {
         onClose={() => setDeleteId(null)}
         onConfirm={handleDelete}
         title="Rolu sil"
-        message="Bu rolu silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz. Sistem rolları silinə bilməz."
+        message="Bu rolu silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz."
         loading={deleting}
       />
     </div>
