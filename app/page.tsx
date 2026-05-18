@@ -275,41 +275,37 @@ export default function DashboardPage() {
                       <span className="dot" />
                       {p.status}
                     </span>
-                    {assignees.length > 0 && (
-                      <div style={{ display: 'flex', alignItems: 'center' }}>
-                        <div style={{ display: 'flex', flexDirection: 'row-reverse' }}>
-                          {overflow > 0 && (
-                            <div style={{
-                              width: 26, height: 26, borderRadius: '50%',
-                              background: 'var(--surface-3)',
-                              border: '2px solid var(--surface)',
-                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                              fontSize: 9, fontWeight: 800, color: 'var(--muted)',
-                              marginLeft: -6, flexShrink: 0,
-                            }}>
-                              +{overflow}
-                            </div>
-                          )}
-                          {[...visibleAssignees].reverse().map((name, idx) => {
-                            const [a1, a2] = avatarPaletteFor(name)
-                            const initials = name.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()
-                            return (
-                              <div key={idx} title={name} style={{
-                                width: 26, height: 26, borderRadius: '50%',
-                                background: `linear-gradient(135deg, ${a1}, ${a2})`,
-                                border: '2px solid var(--surface)',
-                                display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                fontSize: 9, fontWeight: 800, color: '#fff',
-                                marginLeft: idx === visibleAssignees.length - 1 ? 0 : -6,
-                                flexShrink: 0,
-                              }}>
-                                {initials}
-                              </div>
-                            )
-                          })}
+                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                      {visibleAssignees.map((name, idx) => {
+                        const [a1, a2] = avatarPaletteFor(name)
+                        const initials = name.split(' ').map((w: string) => w[0]).join('').substring(0, 2).toUpperCase()
+                        return (
+                          <div key={idx} title={name} style={{
+                            width: 26, height: 26, borderRadius: '50%',
+                            background: `linear-gradient(135deg, ${a1}, ${a2})`,
+                            border: '2px solid var(--surface)',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: 9, fontWeight: 800, color: '#fff',
+                            marginLeft: idx === 0 ? 0 : -7,
+                            flexShrink: 0, position: 'relative', zIndex: visibleAssignees.length - idx,
+                          }}>
+                            {initials}
+                          </div>
+                        )
+                      })}
+                      {overflow > 0 && (
+                        <div style={{
+                          width: 26, height: 26, borderRadius: '50%',
+                          background: 'var(--surface-3)',
+                          border: '2px solid var(--surface)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          fontSize: 9, fontWeight: 800, color: 'var(--muted)',
+                          marginLeft: -7, flexShrink: 0,
+                        }}>
+                          +{overflow}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
                     <div className="projM-progress">
                       <div className="progressM">
                         <div
