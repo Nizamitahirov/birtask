@@ -77,14 +77,21 @@ async function execAction(
         const transporter = nodemailer.default.createTransport({
           service: 'gmail',
           auth: { user: gmailUser, pass: gmailPass },
+          connectionTimeout: 10000,
+          greetingTimeout: 10000,
+          socketTimeout: 15000,
         })
-        await transporter.sendMail({
+        const sendPromise = transporter.sendMail({
           from: `BirTask <${gmailUser}>`,
           to,
           cc: action.emailCc ? interpolate(String(action.emailCc), vars) : undefined,
           subject,
           html,
         })
+        const timeout = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Gmail SMTP timeout (15s)')), 15000)
+        )
+        await Promise.race([sendPromise, timeout])
       } else if (process.env.RESEND_API_KEY) {
         // Resend fallback
         const { Resend } = await import('resend')
@@ -258,29 +265,38 @@ export async function executeWorkflows(
       })
     }
 
-    for (const action of actions) {
-      const stepStart = Date.now()
-      const step: Record<string, unknown> = {
-        actionId: action.id,
-        type: action.type,
-        status: 'success',
-        startedAt: new Date().toISOString(),
-        finishedAt: '',
+    try {
+      for (const action of actions) {
+        const stepStart = Date.now()
+        const step: Record<string, unknown> = {
+          actionId: action.id,
+          type: action.type,
+          status: 'success',
+          startedAt: new Date().toISOString(),
+          finishedAt: '',
+          durationMs: 0,
+        }
+        try {
+          step.result = await execAction(action, triggerData, workspaceId)
+        } catch (err) {
+          step.status = 'failure'
+          step.error = err instanceof Error ? err.message : 'Xəta'
+          overallStatus = 'partial'
+        }
+        step.finishedAt = new Date().toISOString()
+        step.durationMs = Date.now() - stepStart
+        steps.push(step)
+      }
+      if (steps.length && steps.every(s => s.status === 'failure')) overallStatus = 'failure'
+    } catch (fatalErr) {
+      overallStatus = 'failure'
+      steps.push({
+        actionId: 'fatal', type: 'unknown', status: 'failure',
+        startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(),
         durationMs: 0,
-      }
-      try {
-        step.result = await execAction(action, triggerData, workspaceId)
-      } catch (err) {
-        step.status = 'failure'
-        step.error = err instanceof Error ? err.message : 'Xəta'
-        overallStatus = 'partial'
-      }
-      step.finishedAt = new Date().toISOString()
-      step.durationMs = Date.now() - stepStart
-      steps.push(step)
+        error: fatalErr instanceof Error ? fatalErr.message : 'Gözlənilməz xəta',
+      })
     }
-
-    if (steps.length && steps.every(s => s.status === 'failure')) overallStatus = 'failure'
 
     const finishedAt = new Date().toISOString()
     const durationMs = Date.now() - new Date(startedAt).getTime()
