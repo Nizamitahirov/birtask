@@ -1,70 +1,215 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import ReactDOM from 'react-dom'
 import { useTeam, useTasks } from '@/hooks/useSheets'
-import { TeamMember, Task } from '@/lib/types'
+import { TeamMember } from '@/lib/types'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { EmptyState } from '@/components/ui/EmptyState'
-import { Plus, Users } from 'lucide-react'
-import { getDaysLeft } from '@/lib/utils'
+import { Icon } from '@/components/ui/Icon'
+import { avatarPaletteFor, initialsM, fmtDateM } from '@/lib/design-utils'
 
-/* ── Palette helpers ─────────────────────────────────────────── */
+/* ── Company color helpers ───────────────────────────────────── */
 
-const PASTEL_PALETTES: [string, string][] = [
-  ['#FFD6E0', '#FFC9B0'],
-  ['#C5F5E0', '#BFE6FF'],
-  ['#E5DCFF', '#FFD6E0'],
-  ['#FFF0B8', '#FFD9B0'],
-  ['#F0D5FF', '#C5F5E0'],
-  ['#C9E6FF', '#DCD3FF'],
-  ['#FFCABA', '#FFF0B8'],
-  ['#D8EFC8', '#C9E6FF'],
-]
-
-const VIBRANT_PALETTES: [string, string][] = [
-  ['#5B5BF5', '#B57BFF'],
-  ['#FF8B7B', '#FFD466'],
-  ['#16C098', '#67E8C5'],
-  ['#4DABF7', '#A78BFA'],
-  ['#E879C8', '#FF8FB1'],
-  ['#F5A524', '#FF8B7B'],
-  ['#7C5BF7', '#E879C8'],
-  ['#16C098', '#5B5BF5'],
-]
-
-function paletteIndexFor(seed: string) {
-  let h = 0
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0
-  return Math.abs(h) % 8
+function companyColor(company: string | undefined): string {
+  if (company === 'Birbank') return 'var(--primary)'
+  if (company === 'Pashapay') return 'var(--success)'
+  if (company === 'Birmarket') return 'var(--warn)'
+  return 'var(--muted)'
 }
 
-function paletteFor(seed: string): [string, string] {
-  return PASTEL_PALETTES[paletteIndexFor(seed)]
+/* ── Stat chip ───────────────────────────────────────────────── */
+
+function Stat({ label, value, sub }: { label: string; value: number; sub: string }) {
+  return (
+    <div className="tm2-stat">
+      <div className="tm2-stat-l">{label}</div>
+      <div className="tm2-stat-v">{value}</div>
+      <div className="tm2-stat-s">{sub}</div>
+    </div>
+  )
 }
 
-function avatarPaletteFor(seed: string): [string, string] {
-  return VIBRANT_PALETTES[(paletteIndexFor(seed) + 3) % 8]
+/* ── DrField ─────────────────────────────────────────────────── */
+
+function DrField({ k, v }: { k: string; v: React.ReactNode }) {
+  return (
+    <div style={{
+      display: 'grid',
+      gridTemplateColumns: '110px 1fr',
+      gap: 10,
+      padding: '9px 0',
+      borderBottom: '1px solid var(--border-2)',
+      fontSize: 12,
+    }}>
+      <span style={{ fontSize: 10, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.08em', fontWeight: 700 }}>{k}</span>
+      <span style={{ fontWeight: 600, color: 'var(--ink)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{v || '—'}</span>
+    </div>
+  )
 }
 
-function initials(name: string) {
-  return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
-}
+/* ── Member drawer ───────────────────────────────────────────── */
 
-const ROLE_LABELS: Record<string, string> = {
-  admin: 'Admin', manager: 'Menecer', member: 'Üzv', viewer: 'İzləyici',
-}
+function MemberDrawer({
+  member,
+  memberTasks,
+  memberDone,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  member: TeamMember
+  memberTasks: number
+  memberDone: number
+  onClose: () => void
+  onEdit: (m: TeamMember) => void
+  onDelete: (m: TeamMember) => void
+}) {
+  const [a1, a2] = avatarPaletteFor(member.id)
+  const roleColor = companyColor(member.company)
+  const isActive = !!member.email
 
-const COMPANY_ICONS: Record<string, { ico: string; bg: string; fg: string }> = {
-  'Birbank':    { ico: 'account_balance', bg: 'var(--primary-soft)', fg: 'var(--primary)' },
-  'Pashapay':   { ico: 'payments',        bg: 'var(--success-soft)', fg: 'var(--success)' },
-  'Birmarket':  { ico: 'storefront',      bg: 'var(--warn-soft)',    fg: 'var(--warn)' },
+  return ReactDOM.createPortal(
+    <div className="task-drawer-bg" onClick={onClose}>
+      <div className="task-drawer fade-in" onClick={(e) => e.stopPropagation()} style={{ width: 400 }}>
+
+        {/* Header */}
+        <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid var(--border)' }}>
+          <button
+            onClick={onClose}
+            className="icon-btn"
+            style={{ position: 'absolute', top: 14, right: 14, background: 'var(--surface-2)' }}
+          >
+            <Icon name="close" size={13} />
+          </button>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+            <div
+              className="tm2-av"
+              style={{
+                background: `linear-gradient(135deg, ${a1}, ${a2})`,
+                width: 56,
+                height: 56,
+                fontSize: 18,
+                borderRadius: 14,
+                flexShrink: 0,
+              }}
+            >
+              {initialsM(member.name)}
+              {isActive && <span className="tm2-online"></span>}
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.2 }}>
+                {member.name}
+              </h2>
+              <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 3 }}>
+                {member.personalCode ? `#${member.personalCode}` : member.email || ''}
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, marginTop: 14, fontSize: 11, color: 'var(--muted)', flexWrap: 'wrap' }}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, color: roleColor, fontWeight: 700 }}>
+              <span style={{ width: 5, height: 5, borderRadius: '50%', background: roleColor, flexShrink: 0 }}></span>
+              {member.company || member.position || member.role || '—'}
+            </span>
+            <span style={{ color: 'var(--muted-2)' }}>·</span>
+            <span style={{ fontWeight: 600 }}>{member.department}</span>
+            <span style={{ color: 'var(--muted-2)' }}>·</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontWeight: 700, color: isActive ? 'var(--success)' : 'var(--muted)' }}>
+              <span style={{ width: 6, height: 6, borderRadius: '50%', background: isActive ? 'var(--success)' : 'var(--muted-2)', flexShrink: 0 }}></span>
+              {isActive ? 'Aktiv' : 'Deaktiv'}
+            </span>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: '16px 22px 22px', overflowY: 'auto', flex: 1 }}>
+
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 6 }}>
+            {member.email ? (
+              <a
+                href={`mailto:${member.email}`}
+                className="btn-ghostM"
+                style={{ flex: 1, justifyContent: 'center', padding: '7px 8px', fontSize: 12 }}
+              >
+                <Icon name="mail" size={13} /> Email
+              </a>
+            ) : (
+              <button className="btn-ghostM" style={{ flex: 1, justifyContent: 'center', padding: '7px 8px', fontSize: 12 }} disabled>
+                <Icon name="mail" size={13} /> Email
+              </button>
+            )}
+            <button
+              className="btn-ghostM"
+              style={{ flex: 1, justifyContent: 'center', padding: '7px 8px', fontSize: 12 }}
+              onClick={() => onEdit(member)}
+            >
+              <Icon name="edit" size={13} /> Düzəlt
+            </button>
+            <button
+              className="btn-primaryM"
+              style={{ flex: 1, justifyContent: 'center', padding: '7px 8px', fontSize: 12 }}
+            >
+              <Icon name="folder_shared" size={13} /> Layihələr
+            </button>
+          </div>
+
+          {/* Stats */}
+          <div className="tm2-drawer-stats">
+            <div>
+              <div className="tm2-k">Tapşırıq</div>
+              <div className="tm2-v lg">{memberTasks}</div>
+            </div>
+            <div>
+              <div className="tm2-k">Tamamlandı</div>
+              <div className="tm2-v lg" style={{ color: 'var(--success)' }}>{memberDone}</div>
+            </div>
+            <div>
+              <div className="tm2-k">Personal</div>
+              <div className="tm2-v lg" style={{ fontSize: 12 }}>{member.personalCode || '—'}</div>
+            </div>
+          </div>
+
+          {/* Fields */}
+          <div className="tm2-drawer-fields">
+            <DrField k="Email" v={member.email} />
+            <DrField k="Vəzifə" v={member.position || member.role} />
+            <DrField k="Şirkət" v={member.company} />
+            <DrField k="Personal kod" v={member.personalCode} />
+            <DrField k="FIN kod" v={member.finCode} />
+            <DrField k="Departament" v={member.department} />
+            <DrField k="Funksional sahə" v={member.division} />
+            {member.section && <DrField k="Bölmə" v={member.section} />}
+            {member.phone && <DrField k="Telefon" v={member.phone} />}
+            <DrField k="Qoşulub" v={member.createdAt ? fmtDateM(member.createdAt) : undefined} />
+          </div>
+
+          {/* Delete */}
+          <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
+            <button
+              className="btn-ghostM"
+              style={{ flex: 1, justifyContent: 'center', padding: '7px 8px', fontSize: 12, color: 'var(--accent)' }}
+              onClick={() => onDelete(member)}
+            >
+              <Icon name="delete_outline" size={12} /> Sil
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
 }
 
 /* ── Member form ─────────────────────────────────────────────── */
 
 function MemberForm({
-  initial, onSubmit, onCancel, loading,
+  initial,
+  onSubmit,
+  onCancel,
+  loading,
 }: {
   initial?: Partial<TeamMember>
   onSubmit: (data: Omit<TeamMember, 'id' | 'createdAt'>) => Promise<void>
@@ -75,9 +220,18 @@ function MemberForm({
     name: initial?.name || '',
     email: initial?.email || '',
     role: initial?.role || '',
+    position: initial?.position || '',
     department: initial?.department || '',
+    company: initial?.company || '',
     phone: initial?.phone || '',
     avatar: initial?.avatar || '',
+    workspaceId: initial?.workspaceId || '',
+    division: initial?.division || '',
+    section: initial?.section || '',
+    personalCode: initial?.personalCode || '',
+    finCode: initial?.finCode || '',
+    managerId: initial?.managerId || '',
+    functionalManagerId: initial?.functionalManagerId || '',
   })
   const set = (k: string, v: string) => setForm(f => ({ ...f, [k]: v }))
 
@@ -86,36 +240,55 @@ function MemberForm({
     await onSubmit({ ...form } as Omit<TeamMember, 'id' | 'createdAt'>)
   }
 
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontSize: 11,
+    color: 'var(--muted)',
+    marginBottom: 6,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
+  }
+
   return (
-    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <div>
-        <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-          Ad Soyad *
-        </label>
+        <label style={labelStyle}>Ad Soyad *</label>
         <input required value={form.name} onChange={e => set('name', e.target.value)} className="inputM" placeholder="Ad Soyad" />
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Email</label>
+          <label style={labelStyle}>Email</label>
           <input type="email" value={form.email} onChange={e => set('email', e.target.value)} className="inputM" placeholder="email@example.com" />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Telefon</label>
+          <label style={labelStyle}>Telefon</label>
           <input value={form.phone} onChange={e => set('phone', e.target.value)} className="inputM" placeholder="+994 50 xxx xx xx" />
         </div>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Vəzifə</label>
-          <input value={form.role} onChange={e => set('role', e.target.value)} className="inputM" placeholder="Developer, Manager..." />
+          <label style={labelStyle}>Vəzifə</label>
+          <input value={form.position} onChange={e => set('position', e.target.value)} className="inputM" placeholder="Funksional lider..." />
         </div>
         <div>
-          <label style={{ display: 'block', fontSize: 11, color: 'var(--muted)', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>Şöbə</label>
-          <input value={form.department} onChange={e => set('department', e.target.value)} className="inputM" placeholder="Texnologiya, Dizayn..." />
+          <label style={labelStyle}>Şöbə</label>
+          <input value={form.department} onChange={e => set('department', e.target.value)} className="inputM" placeholder="Texnologiya..." />
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 10, paddingTop: 8 }}>
-        <button type="button" onClick={onCancel} className="btn-ghostM" style={{ flex: 1, justifyContent: 'center' }}>Ləğv et</button>
+      <div>
+        <label style={labelStyle}>Şirkət</label>
+        <select value={form.company} onChange={e => set('company', e.target.value)} className="inputM">
+          <option value="">Seçin...</option>
+          <option value="Birbank">Birbank</option>
+          <option value="Pashapay">Pashapay</option>
+          <option value="Birmarket">Birmarket</option>
+        </select>
+      </div>
+      <div style={{ display: 'flex', gap: 10, paddingTop: 6 }}>
+        <button type="button" onClick={onCancel} className="btn-ghostM" style={{ flex: 1, justifyContent: 'center' }}>
+          Ləğv et
+        </button>
         <button type="submit" disabled={loading} className="btn-primaryM" style={{ flex: 1, justifyContent: 'center', opacity: loading ? 0.5 : 1 }}>
           {loading ? 'Saxlanılır...' : (initial?.id ? 'Yenilə' : 'Əlavə et')}
         </button>
@@ -129,8 +302,11 @@ function MemberForm({
 export default function TeamPage() {
   const { members, loading, refresh, create, update, remove } = useTeam()
   const { tasks } = useTasks()
-  const [search, setSearch] = useState('')
-  const [roleFilter, setRoleFilter] = useState('all')
+
+  const [query, setQuery] = useState('')
+  const [company, setCompany] = useState('all')
+  const [dept, setDept] = useState('all')
+  const [view, setView] = useState<'list' | 'card'>('list')
   const [selected, setSelected] = useState<string | null>(null)
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [editMember, setEditMember] = useState<TeamMember | null>(null)
@@ -138,37 +314,58 @@ export default function TeamPage() {
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  const departments = useMemo(
-    () => Array.from(new Set(members.map(m => m.department).filter(Boolean))),
-    [members]
-  )
+  const searchRef = useRef<HTMLInputElement>(null)
 
-  const companies = useMemo(
-    () => Array.from(new Set(members.map(m => m.company).filter(Boolean))) as string[],
-    [members]
-  )
+  /* keyboard shortcuts */
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+      if (e.key === 'Escape') setSelected(null)
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [])
 
+  /* derived data */
   const byCompany = useMemo(() => {
     const r: Record<string, number> = {}
     members.forEach(m => { const c = m.company || 'Digər'; r[c] = (r[c] || 0) + 1 })
     return r
   }, [members])
 
+  const departments = useMemo(
+    () => Array.from(new Set(members.map(m => m.department).filter(Boolean))).sort() as string[],
+    [members]
+  )
+
   const filtered = useMemo(() => members.filter(m => {
-    if (roleFilter !== 'all' && (m.company || 'Digər') !== roleFilter) return false
-    if (search) {
-      const q = search.toLowerCase()
-      return m.name.toLowerCase().includes(q) ||
-        m.email?.toLowerCase().includes(q) ||
-        m.department?.toLowerCase().includes(q) ||
-        m.position?.toLowerCase().includes(q) ||
-        m.company?.toLowerCase().includes(q) ||
-        m.personalCode?.toLowerCase().includes(q) ||
-        m.finCode?.toLowerCase().includes(q)
+    if (company !== 'all' && (m.company || 'Digər') !== company) return false
+    if (dept !== 'all' && m.department !== dept) return false
+    if (query) {
+      const q = query.toLowerCase()
+      return (
+        m.name.toLowerCase().includes(q) ||
+        (m.email || '').toLowerCase().includes(q) ||
+        (m.department || '').toLowerCase().includes(q) ||
+        (m.position || '').toLowerCase().includes(q) ||
+        (m.company || '').toLowerCase().includes(q) ||
+        (m.personalCode || '').toLowerCase().includes(q) ||
+        (m.finCode || '').toLowerCase().includes(q)
+      )
     }
     return true
-  }), [members, search, roleFilter])
+  }), [members, query, company, dept])
 
+  const birbank  = byCompany['Birbank']  || 0
+  const pashapay = byCompany['Pashapay'] || 0
+  const birmarket = byCompany['Birmarket'] || 0
+
+  const selectedMember = selected ? members.find(m => m.id === selected) ?? null : null
+
+  /* handlers */
   const handleCreate = async (data: Omit<TeamMember, 'id' | 'createdAt'>) => {
     setSaving(true)
     await create(data)
@@ -194,203 +391,231 @@ export default function TeamPage() {
     setSelected(null)
   }
 
-  const selectedMember = selected ? members.find(m => m.id === selected) : null
+  const openEdit = (m: TeamMember) => {
+    setEditMember(m)
+    setModal('edit')
+    setSelected(null)
+  }
+
+  const openDeleteConfirm = (m: TeamMember) => {
+    setConfirmDelete(m)
+    setSelected(null)
+  }
 
   return (
     <div className="pageM fade-in">
 
       {/* Header */}
-      <div className="team-headM">
+      <div className="tm2-head">
         <div>
-          <h1>
-            Komanda
-            <span className="cnt">{members.length}</span>
-          </h1>
-          <div className="sub">
-            {members.length} üzv · {companies.length} şirkət · {departments.length} departament
+          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            İdarəetmə
           </div>
+          <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em', margin: '4px 0 0' }}>
+            Komanda
+            <span style={{ color: 'var(--muted)', fontWeight: 600, marginLeft: 10 }}>{members.length}</span>
+          </h1>
         </div>
-        <div className="actions">
+        <div style={{ display: 'flex', gap: 8 }}>
           <button className="btn-ghostM" onClick={refresh}>
-            <span className="material-symbols-rounded" style={{ fontSize: 14 }}>refresh</span>
-            Yenilə
+            <Icon name="refresh" size={13} /> Yenilə
           </button>
           <button className="btn-ghostM">
-            <span className="material-symbols-rounded" style={{ fontSize: 14 }}>filter_list</span>
-            Süzgəc
+            <Icon name="file_download" size={13} /> İxrac
           </button>
           <button className="btn-primaryM" onClick={() => setModal('create')}>
-            <span className="material-symbols-rounded" style={{ fontSize: 14 }}>person_add</span>
-            Yeni üzv
+            <Icon name="person_add" size={13} /> Yeni üzv
           </button>
         </div>
       </div>
 
-      {/* Company cards */}
-      {companies.length > 0 && (
-        <div className="deptM stagger">
-          {companies.map(company => {
-            const companyMembers = members.filter(m => m.company === company)
-            const cInfo = COMPANY_ICONS[company] || { ico: 'apartment', bg: 'var(--surface-2)', fg: 'var(--muted)' }
-            return (
-              <div
-                className={'deptCard' + (roleFilter === company ? ' active' : '')}
-                key={company}
-                onClick={() => setRoleFilter(roleFilter === company ? 'all' : company)}
-                style={{ cursor: 'pointer' }}
-              >
-                <div className="hdr">
-                  <div className="nm">{company}</div>
-                  <div className="ico" style={{ background: cInfo.bg, color: cInfo.fg }}>
-                    <span className="material-symbols-rounded" style={{ fontSize: 14 }}>{cInfo.ico}</span>
-                  </div>
-                </div>
-                <div className="cnt">
-                  {companyMembers.length}
-                  <small>üzv</small>
-                </div>
-                <div className="avstack">
-                  {companyMembers.slice(0, 5).map(m => {
-                    const [av1, av2] = avatarPaletteFor(m.id)
-                    return (
-                      <div
-                        key={m.id}
-                        className="av"
-                        style={{ background: `linear-gradient(135deg, ${av1}, ${av2})` }}
-                      >
-                        {initials(m.name)}
-                      </div>
-                    )
-                  })}
-                  {companyMembers.length > 5 && (
-                    <div className="av more">+{companyMembers.length - 5}</div>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+      {/* Stat row */}
+      <div className="tm2-stats">
+        <Stat label="Birbank"  value={birbank}         sub="üzv" />
+        <Stat label="Pashapay" value={pashapay}        sub="üzv" />
+        <Stat label="Birmarket" value={birmarket}      sub="üzv" />
+        <Stat label="Ümumi"    value={members.length}  sub="üzv" />
+      </div>
 
-      {/* Filters */}
-      <div className="team-filters">
-        <div className="searchM" style={{ maxWidth: 480 }}>
-          <span className="ico">
-            <span className="material-symbols-rounded" style={{ fontSize: 16 }}>search</span>
-          </span>
+      {/* Toolbar */}
+      <div className="tm2-toolbar">
+        <div className="tm2-search">
+          <Icon name="search" size={15} />
           <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Ad, email, şöbə üzrə axtar..."
+            ref={searchRef}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Ad, email, ya da şöbə..."
           />
-          <span className="kbd">⌘ K</span>
+          <span className="kbd">⌘K</span>
         </div>
-        <div className="team-chips">
+
+        <div className="tm2-chips">
           {[
-            { id: 'all', label: 'Hamısı', count: members.length },
-            ...companies.map(c => ({ id: c, label: c, count: byCompany[c] || 0 })),
+            { id: 'all',        label: 'Hamısı',   count: members.length },
+            { id: 'Birbank',    label: 'Birbank',   count: birbank },
+            { id: 'Pashapay',   label: 'Pashapay',  count: pashapay },
+            { id: 'Birmarket',  label: 'Birmarket', count: birmarket },
           ].map(c => (
             <button
               key={c.id}
-              className={roleFilter === c.id ? 'on' : ''}
-              onClick={() => setRoleFilter(c.id)}
+              className={'tm2-chip' + (company === c.id ? ' on' : '')}
+              onClick={() => setCompany(c.id)}
             >
-              {c.label}
-              <span className="cnt">{c.count}</span>
+              {c.label}<span className="cnt">{c.count}</span>
             </button>
           ))}
         </div>
-        <button className="btn-ghostM">
-          <span className="material-symbols-rounded" style={{ fontSize: 14 }}>sort</span>
-          Ad ↓
-        </button>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginLeft: 'auto' }}>
+          <select
+            className="task-select"
+            value={dept}
+            onChange={e => setDept(e.target.value)}
+            style={{ minWidth: 140, fontSize: 12 }}
+          >
+            <option value="all">Bütün şöbələr</option>
+            {departments.map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+
+          <div className="tm2-viewtog">
+            <button className={view === 'list' ? 'on' : ''} onClick={() => setView('list')} title="Siyahı">
+              <Icon name="sort" size={14} />
+            </button>
+            <button className={view === 'card' ? 'on' : ''} onClick={() => setView('card')} title="Kartlar">
+              <Icon name="space_dashboard" size={14} />
+            </button>
+          </div>
+        </div>
       </div>
 
-      {/* Member grid */}
+      {/* Body */}
       {loading ? (
-        <div className="team-grid">
-          {[...Array(6)].map((_, i) => (
-            <div key={i} className="skeleton" style={{ height: 200, borderRadius: 16 }} />
+        <div className="tm2-grid">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="skeleton" style={{ height: 180, borderRadius: 14 }} />
           ))}
         </div>
       ) : filtered.length === 0 ? (
-        <EmptyState
-          icon={Users}
-          title="Üzv tapılmadı"
-          description="Komandanıza ilk üzvü əlavə edin"
-          action={
-            <button onClick={() => setModal('create')} className="btn-primaryM">
-              <Plus size={15} /> Üzv əlavə et
-            </button>
-          }
-        />
-      ) : (
-        <div className="team-grid">
-          {filtered.map(m => {
-            const [c1, c2] = paletteFor(m.id)
-            const [ac1, ac2] = avatarPaletteFor(m.id)
-            const companyPill =
-              m.company === 'Birbank' ? 'indigo' :
-              m.company === 'Pashapay' ? 'info' :
-              m.company === 'Birmarket' ? 'warn' : 'muted'
-
-            const myTasks = tasks.filter(t => t.assignee === m.name)
-            const doneTasks = myTasks.filter(t => t.status === 'Tamamlandı').length
+        <div className="tm2-empty">
+          <Icon name="person_search" size={36} />
+          <div style={{ marginTop: 12, fontWeight: 700 }}>Heç nə tapılmadı</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Başqa axtarış sözü yoxlayın.</div>
+        </div>
+      ) : view === 'list' ? (
+        /* ── List view ── */
+        <div className="tm2-list">
+          <div className="tm2-lhead">
+            <span>№</span>
+            <span>Üzv</span>
+            <span>Rol</span>
+            <span>Şöbə</span>
+            <span>Email</span>
+            <span>Tapş.</span>
+            <span>Şirkət</span>
+            <span></span>
+          </div>
+          {filtered.map((m, i) => {
+            const [a1, a2] = avatarPaletteFor(m.id)
+            const roleColor = companyColor(m.company)
+            const memberTasks = tasks.filter(t => t.assignee === m.name)
+            const doneTasks = memberTasks.filter(t => t.status === 'Tamamlandı').length
 
             return (
-              <div
-                key={m.id}
-                className={'memberM' + (selected === m.id ? ' selected' : '')}
-                onClick={() => setSelected(selected === m.id ? null : m.id)}
-                style={{
-                  '--g1': c1,
-                  '--g2': c2,
-                  '--ag1': ac1,
-                  '--ag2': ac2,
-                } as React.CSSProperties}
-              >
-                <div className="cover" style={{ position: 'relative' }}>
-                  <div className="av">{initials(m.name)}</div>
+              <div key={m.id} className="tm2-lrow" onClick={() => setSelected(m.id)}>
+                <span style={{ fontSize: 11, color: 'var(--muted-2)', fontWeight: 700, fontFeatureSettings: '"tnum"' }}>
+                  {String(i + 1).padStart(2, '0')}
+                </span>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
+                  <div
+                    className="tm2-av"
+                    style={{ background: `linear-gradient(135deg, ${a1}, ${a2})`, flexShrink: 0 }}
+                  >
+                    {initialsM(m.name)}
+                    {m.email && <span className="tm2-online"></span>}
+                  </div>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="tm2-name">{m.name}</div>
+                    <div className="tm2-un">{m.personalCode ? `#${m.personalCode}` : ''}</div>
+                  </div>
                 </div>
-                <div className="body">
-                  <div className="name-row">
-                    <div>
-                      <div className="name">{m.name}</div>
-                      <div className="un" style={{ fontSize: 10 }}>{m.personalCode ? `#${m.personalCode}` : (m.email?.split('@')[0] || '')}</div>
-                    </div>
-                    <span
-                      className="status-bullet"
-                      style={{
-                        background: (m as any).isActive !== false ? 'var(--success)' : 'var(--muted-2)',
-                        boxShadow: (m as any).isActive !== false
-                          ? '0 0 0 3px var(--success-soft)'
-                          : '0 0 0 3px var(--surface-2)',
-                      }}
-                    />
-                  </div>
 
-                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {m.company && <span className={`pill ${companyPill}`}>{m.company}</span>}
-                    {m.position && (
-                      <span className="dept" style={{ fontSize: 10 }}>
-                        {m.position}
-                      </span>
-                    )}
-                  </div>
+                <span className="tm2-role" style={{ color: roleColor }}>
+                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: roleColor, flexShrink: 0 }}></span>
+                  {m.position || m.role || '—'}
+                </span>
 
-                  <div className="meta-row">
-                    <div>
-                      <div className="k">Tapş.</div>
-                      <div className="v">{myTasks.length}</div>
-                    </div>
-                    <div>
-                      <div className="k">Bitib</div>
-                      <div className="v" style={{ color: 'var(--success)' }}>{doneTasks}</div>
-                    </div>
-                    <div>
-                      <div className="k">FIN</div>
-                      <div className="v" style={{ fontSize: 10, fontFamily: 'monospace' }}>{m.finCode || '—'}</div>
-                    </div>
+                <span style={{ fontSize: 12, color: 'var(--ink-2)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {m.department}
+                </span>
+
+                <span style={{ fontSize: 11, color: 'var(--muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {m.email}
+                </span>
+
+                <span style={{ fontSize: 12, fontWeight: 700, fontFeatureSettings: '"tnum"' }}>
+                  {doneTasks}<span style={{ color: 'var(--muted)', fontWeight: 500 }}>/{memberTasks.length}</span>
+                </span>
+
+                <span style={{ fontSize: 11, color: roleColor, fontWeight: 700 }}>
+                  {m.company || '—'}
+                </span>
+
+                <button className="tm2-icbtn" onClick={(e) => { e.stopPropagation(); setSelected(m.id) }}>
+                  <Icon name="arrow_forward" size={12} />
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        /* ── Card view ── */
+        <div className="tm2-grid">
+          {filtered.map((m) => {
+            const [a1, a2] = avatarPaletteFor(m.id)
+            const roleColor = companyColor(m.company)
+            const memberTasks = tasks.filter(t => t.assignee === m.name)
+            const doneTasks = memberTasks.filter(t => t.status === 'Tamamlandı').length
+
+            return (
+              <div key={m.id} className="tm2-card" onClick={() => setSelected(m.id)}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div
+                    className="tm2-av lg"
+                    style={{ background: `linear-gradient(135deg, ${a1}, ${a2})`, flexShrink: 0 }}
+                  >
+                    {initialsM(m.name)}
+                    {m.email && <span className="tm2-online lg"></span>}
+                  </div>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div className="tm2-name lg">{m.name}</div>
+                    <div className="tm2-un">{m.personalCode ? `#${m.personalCode}` : (m.email?.split('@')[0] || '')}</div>
+                  </div>
+                </div>
+
+                <div className="tm2-card-meta">
+                  <span className="tm2-role" style={{ color: roleColor }}>
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: roleColor, flexShrink: 0 }}></span>
+                    {m.position || m.role || '—'}
+                  </span>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>
+                    {m.department}
+                  </span>
+                </div>
+
+                <div className="tm2-card-stats">
+                  <div>
+                    <div className="tm2-k">Tapşırıq</div>
+                    <div className="tm2-v">{memberTasks.length}</div>
+                  </div>
+                  <div>
+                    <div className="tm2-k">Bitirilib</div>
+                    <div className="tm2-v" style={{ color: 'var(--success)' }}>{doneTasks}</div>
+                  </div>
+                  <div>
+                    <div className="tm2-k">Şirkət</div>
+                    <div className="tm2-v" style={{ fontSize: 10, color: roleColor }}>{m.company || '—'}</div>
                   </div>
                 </div>
               </div>
@@ -399,218 +624,27 @@ export default function TeamPage() {
         </div>
       )}
 
-      {/* Detail drawer */}
-      {selectedMember && (
-        <div
-          onClick={() => setSelected(null)}
-          style={{
-            position: 'fixed',
-            inset: 0,
-            zIndex: 50,
-            background: 'rgba(15,17,41,0.45)',
-            backdropFilter: 'blur(6px)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-end',
-            padding: 24,
-            animation: 'fadeIn .2s both',
-          }}
-        >
-          <div
-            onClick={e => e.stopPropagation()}
-            className="fade-in"
-            style={{
-              width: 420,
-              background: 'var(--surface)',
-              borderRadius: 20,
-              boxShadow: 'var(--shadow-lg)',
-              overflow: 'hidden',
-              display: 'flex',
-              flexDirection: 'column',
-            }}
-          >
-            {(() => {
-              const m = selectedMember
-              const [c1, c2] = paletteFor(m.id)
-              const [ac1, ac2] = avatarPaletteFor(m.id)
-              const companyPill =
-                m.company === 'Birbank' ? 'indigo' :
-                m.company === 'Pashapay' ? 'info' :
-                m.company === 'Birmarket' ? 'warn' : 'muted'
-              const myTasks = tasks.filter(t => t.assignee === m.name)
-              const doneTasks = myTasks.filter(t => t.status === 'Tamamlandı').length
-
-              return (
-                <>
-                  <div style={{
-                    height: 100,
-                    background: `linear-gradient(135deg, ${c1}, ${c2})`,
-                    position: 'relative',
-                  }}>
-                    <button
-                      onClick={() => setSelected(null)}
-                      className="icon-btn"
-                      style={{
-                        position: 'absolute',
-                        top: 10,
-                        right: 10,
-                        background: 'rgba(15,17,41,0.10)',
-                        borderColor: 'transparent',
-                        backdropFilter: 'blur(8px)',
-                      }}
-                    >
-                      <span className="material-symbols-rounded" style={{ fontSize: 16 }}>close</span>
-                    </button>
-                    <div style={{
-                      position: 'absolute',
-                      left: 22,
-                      bottom: 14,
-                      width: 68, height: 68,
-                      borderRadius: 18,
-                      background: `linear-gradient(135deg, ${ac1}, ${ac2})`,
-                      color: 'white',
-                      fontSize: 22,
-                      fontWeight: 800,
-                      letterSpacing: '-0.03em',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      border: '3px solid var(--surface)',
-                      boxShadow: '0 10px 24px -8px rgba(15,17,41,0.35)',
-                    }}>
-                      {initials(m.name)}
-                    </div>
-                  </div>
-
-                  <div style={{ padding: '14px 22px 18px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                      <div style={{ minWidth: 0 }}>
-                        <h2 style={{ margin: 0, fontSize: 19, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.15, color: 'var(--ink)' }}>
-                          {m.name}
-                        </h2>
-                        <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>
-                          {m.email}
-                        </div>
-                      </div>
-                      {m.company && (
-                        <span className={`pill ${companyPill}`} style={{ flexShrink: 0 }}>
-                          {m.company}
-                        </span>
-                      )}
-                    </div>
-
-                    <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
-                      {m.email && (
-                        <a
-                          href={`mailto:${m.email}`}
-                          className="btn-ghostM"
-                          style={{ flex: 1, justifyContent: 'center', padding: '7px 8px', fontSize: 12 }}
-                        >
-                          <span className="material-symbols-rounded" style={{ fontSize: 13 }}>mail</span>
-                          Email
-                        </a>
-                      )}
-                      <button
-                        className="btn-ghostM"
-                        style={{ flex: 1, justifyContent: 'center', padding: '7px 8px', fontSize: 12 }}
-                        onClick={() => { setEditMember(m); setModal('edit') }}
-                      >
-                        <span className="material-symbols-rounded" style={{ fontSize: 13 }}>edit</span>
-                        Düzəlt
-                      </button>
-                      <button
-                        className="btn-primaryM"
-                        style={{ flex: 1, justifyContent: 'center', padding: '7px 8px', fontSize: 12 }}
-                      >
-                        <span className="material-symbols-rounded" style={{ fontSize: 13 }}>folder_shared</span>
-                        Layihələr
-                      </button>
-                    </div>
-
-                    <div style={{
-                      marginTop: 14,
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(3, 1fr)',
-                      gap: 6,
-                    }}>
-                      {[
-                        { k: 'Tapşırıq', v: myTasks.length, ico: 'task' },
-                        { k: 'Tamamlandı', v: doneTasks, ico: 'check_circle' },
-                        { k: 'Personal', v: m.personalCode || '—', ico: 'badge' },
-                      ].map(s => (
-                        <div key={s.k} style={{
-                          padding: '10px 8px',
-                          background: 'var(--surface-2)',
-                          borderRadius: 10,
-                          textAlign: 'center',
-                        }}>
-                          <div style={{
-                            margin: '0 auto 4px',
-                            width: 22, height: 22,
-                            borderRadius: 6,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            background: 'var(--surface)',
-                          }}>
-                            <span className="material-symbols-rounded" style={{ fontSize: 12 }}>{s.ico}</span>
-                          </div>
-                          <div style={{
-                            fontFamily: 'Montserrat, sans-serif',
-                            fontSize: typeof s.v === 'number' ? 18 : 11,
-                            fontWeight: 800,
-                            letterSpacing: '-0.02em',
-                            lineHeight: 1,
-                            color: 'var(--ink)',
-                          }}>{s.v}</div>
-                          <div style={{ fontSize: 9, color: 'var(--muted)', marginTop: 2, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.k}</div>
-                        </div>
-                      ))}
-                    </div>
-
-                    <div style={{
-                      marginTop: 14,
-                      padding: '12px 14px',
-                      background: 'var(--surface-2)',
-                      borderRadius: 12,
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      rowGap: 8,
-                      columnGap: 16,
-                    }}>
-                      <CompactField k="Vəzifə" v={m.position || m.role || '—'} />
-                      <CompactField k="Şirkət" v={m.company || '—'} />
-                      <CompactField k="Personal kod" v={m.personalCode || '—'} />
-                      <CompactField k="FIN kod" v={m.finCode || '—'} />
-                      <CompactField k="Departament" v={m.department || '—'} />
-                      <CompactField k="Funksional sahə" v={m.division || '—'} />
-                      {m.section && <CompactField k="Bölmə" v={m.section} />}
-                      {m.email && <CompactField k="Email" v={m.email} />}
-                      {m.phone && <CompactField k="Telefon" v={m.phone} />}
-                    </div>
-
-                    <div style={{ marginTop: 12, display: 'flex', gap: 6 }}>
-                      <button
-                        className="btn-ghostM"
-                        style={{ flex: 1, justifyContent: 'center', padding: '7px 8px', fontSize: 12, color: 'var(--accent)' }}
-                        onClick={() => setConfirmDelete(m)}
-                      >
-                        <span className="material-symbols-rounded" style={{ fontSize: 12 }}>delete_outline</span>
-                        Sil
-                      </button>
-                    </div>
-                  </div>
-                </>
-              )
-            })()}
-          </div>
-        </div>
-      )}
+      {/* Member drawer — portal */}
+      {selectedMember && (() => {
+        const memberTasks = tasks.filter(t => t.assignee === selectedMember.name)
+        const memberDone  = memberTasks.filter(t => t.status === 'Tamamlandı').length
+        return (
+          <MemberDrawer
+            member={selectedMember}
+            memberTasks={memberTasks.length}
+            memberDone={memberDone}
+            onClose={() => setSelected(null)}
+            onEdit={openEdit}
+            onDelete={openDeleteConfirm}
+          />
+        )
+      })()}
 
       {/* Modals */}
       <Modal open={modal === 'create'} onClose={() => setModal(null)} title="Üzv əlavə et">
         <MemberForm onSubmit={handleCreate} onCancel={() => setModal(null)} loading={saving} />
       </Modal>
+
       <Modal
         open={modal === 'edit'}
         onClose={() => { setModal(null); setEditMember(null) }}
@@ -625,6 +659,7 @@ export default function TeamPage() {
           />
         )}
       </Modal>
+
       <ConfirmDialog
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
@@ -633,29 +668,6 @@ export default function TeamPage() {
         message={`"${confirmDelete?.name}" üzvünü komandadan silmək istədiyinizə əminsiniz?`}
         loading={deleting}
       />
-    </div>
-  )
-}
-
-function CompactField({ k, v }: { k: string; v: React.ReactNode }) {
-  return (
-    <div style={{ minWidth: 0 }}>
-      <div style={{
-        fontSize: 9,
-        color: 'var(--muted)',
-        textTransform: 'uppercase',
-        letterSpacing: '0.08em',
-        fontWeight: 700,
-        marginBottom: 2,
-      }}>{k}</div>
-      <div style={{
-        fontSize: 12,
-        fontWeight: 700,
-        color: 'var(--ink)',
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-      }}>{v}</div>
     </div>
   )
 }

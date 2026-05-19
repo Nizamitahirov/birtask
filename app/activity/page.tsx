@@ -1,96 +1,202 @@
 'use client'
 
-import { useEffect, useState, useMemo, useCallback } from 'react'
+import { useEffect, useState, useMemo, useRef, useCallback } from 'react'
 import { db } from '@/lib/db'
-import { ActivityLog } from '@/lib/types'
+import { ActivityLog, TeamMember } from '@/lib/types'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
-import {
-  Activity, Plus, Edit2, Trash2, CheckCircle2, LogIn, LogOut,
-  MessageSquare, Filter, RefreshCw, Shield, ChevronDown
-} from 'lucide-react'
-import { cn } from '@/lib/utils'
+import { useTeam } from '@/hooks/useSheets'
+import { Icon } from '@/components/ui/Icon'
+import { avatarPaletteFor, initialsM, fmtDateM, fmtTimeM, relTimeAz } from '@/lib/design-utils'
+import { Shield } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const MONTH_NAMES_AZ = [
-  'Yanvar', 'Fevral', 'Mart', 'Aprel', 'May', 'İyun',
-  'İyul', 'Avqust', 'Sentyabr', 'Oktyabr', 'Noyabr', 'Dekabr',
-]
+// ─── Config ──────────────────────────────────────────────────────────────────
 
-const ACTION_LABELS: Record<ActivityLog['action'], string> = {
-  create:  'Yaradıldı',
-  update:  'Yeniləndi',
-  delete:  'Silindi',
-  login:   'Daxil oldu',
-  logout:  'Çıxdı',
-  complete: 'Tamamlandı',
-  comment: 'Şərh yazıldı',
+const AV_ACTION_CONFIG: Record<
+  ActivityLog['action'],
+  { label: string; ico: string; color: string; soft: string; verb: string }
+> = {
+  create:   { label: 'Yaradıldı',  ico: 'add_circle',     color: 'var(--primary)',  soft: 'var(--primary-soft)',  verb: 'yaratdı' },
+  update:   { label: 'Yeniləndi',  ico: 'edit',           color: 'var(--info)',     soft: 'var(--info-soft)',     verb: 'yenilədi' },
+  delete:   { label: 'Silindi',    ico: 'delete_outline', color: 'var(--accent)',   soft: 'var(--accent-soft)',   verb: 'sildi' },
+  complete: { label: 'Tamamlandı', ico: 'check_circle',   color: 'var(--success)',  soft: 'var(--success-soft)',  verb: 'tamamladı' },
+  login:    { label: 'Daxil oldu', ico: 'login',          color: 'var(--pink)',     soft: 'var(--pink-soft)',     verb: 'daxil oldu' },
+  logout:   { label: 'Çıxdı',     ico: 'logout',         color: 'var(--muted)',    soft: 'var(--surface-2)',     verb: 'çıxış etdi' },
+  comment:  { label: 'Şərh',      ico: 'chat_bubble',    color: 'var(--warn)',     soft: 'var(--warn-soft)',     verb: 'şərh yazdı' },
 }
 
-const ENTITY_LABELS: Record<ActivityLog['entityType'], string> = {
-  project: 'Layihə',
-  task:    'Tapşırıq',
-  team:    'Komanda',
-  user:    'İstifadəçi',
-  comment: 'Şərh',
+const AV_ENTITY_CONFIG: Record<
+  ActivityLog['entityType'],
+  { label: string; ico: string; color: string }
+> = {
+  project: { label: 'Layihə',     ico: 'folder',    color: 'var(--primary)' },
+  task:    { label: 'Tapşırıq',   ico: 'check_box', color: 'var(--info)' },
+  team:    { label: 'Komanda',    ico: 'groups',    color: 'var(--success)' },
+  user:    { label: 'İstifadəçi', ico: 'person',    color: 'var(--pink)' },
+  comment: { label: 'Şərh',      ico: 'chat',      color: 'var(--warn)' },
 }
 
-const ENTITY_COLORS: Record<ActivityLog['entityType'], string> = {
-  project: 'text-accent-blue bg-accent-blue/10 border-accent-blue/20',
-  task:    'text-accent-purple bg-accent-purple/10 border-accent-purple/20',
-  team:    'text-accent-green bg-accent-green/10 border-accent-green/20',
-  user:    'text-accent-cyan bg-accent-cyan/10 border-accent-cyan/20',
-  comment: 'text-accent-yellow bg-accent-yellow/10 border-accent-yellow/20',
+const AV_FIELD_LABELS: Record<string, string> = {
+  status:     'Status',
+  priority:   'Prioritet',
+  assignee:   'İcraçı',
+  dueDate:    'Son tarix',
+  progress:   'İrəliləyiş',
+  department: 'Şöbə',
 }
 
-const ACTION_COLORS: Record<ActivityLog['action'], string> = {
-  create:  'text-accent-green',
-  update:  'text-accent-blue',
-  delete:  'text-accent-red',
-  login:   'text-accent-cyan',
-  logout:  'text-text-muted',
-  complete: 'text-accent-green',
-  comment: 'text-accent-purple',
+// ─── Sub-components ──────────────────────────────────────────────────────────
+
+function AvStat({
+  ico,
+  color,
+  label,
+  value,
+  sub,
+}: {
+  ico: string
+  color: 'indigo' | 'info' | 'green' | 'accent'
+  label: string
+  value: number
+  sub: string
+}) {
+  const colorVar =
+    color === 'indigo' ? 'var(--primary)'
+    : color === 'info' ? 'var(--info)'
+    : color === 'green' ? 'var(--success)'
+    : 'var(--accent)'
+  const softVar =
+    color === 'indigo' ? 'var(--primary-soft)'
+    : color === 'info' ? 'var(--info-soft)'
+    : color === 'green' ? 'var(--success-soft)'
+    : 'var(--accent-soft)'
+  return (
+    <div className="av-stat">
+      <div className="av-stat-l">{label}</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 6 }}>
+        <div style={{
+          width: 30, height: 30, borderRadius: 8,
+          background: softVar, color: colorVar,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          flexShrink: 0,
+        }}>
+          <Icon name={ico} size={15} />
+        </div>
+        <div style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.03em', lineHeight: 1, fontFeatureSettings: '"tnum"' }}>
+          {value}
+        </div>
+        <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{sub}</span>
+      </div>
+    </div>
+  )
 }
 
-function ActionIcon({ action }: { action: ActivityLog['action'] }) {
-  const cls = cn('flex-shrink-0', ACTION_COLORS[action])
-  switch (action) {
-    case 'create':   return <Plus size={14} className={cls} />
-    case 'update':   return <Edit2 size={14} className={cls} />
-    case 'delete':   return <Trash2 size={14} className={cls} />
-    case 'complete': return <CheckCircle2 size={14} className={cls} />
-    case 'login':    return <LogIn size={14} className={cls} />
-    case 'logout':   return <LogOut size={14} className={cls} />
-    case 'comment':  return <MessageSquare size={14} className={cls} />
-    default:         return <Activity size={14} className={cls} />
-  }
+function TopUserAvatar({ member }: { member: TeamMember }) {
+  const [a1, a2] = avatarPaletteFor(member.id)
+  return (
+    <div style={{
+      width: 36, height: 36, borderRadius: 11,
+      background: `linear-gradient(135deg, ${a1}, ${a2})`,
+      color: 'white', fontSize: 13, fontWeight: 700,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      flexShrink: 0,
+    }}>
+      {initialsM(member.name)}
+    </div>
+  )
 }
 
-function getRelativeTime(dateStr: string): string {
-  const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000)
-  if (diff < 60) return 'İndi'
-  if (diff < 3600) return `${Math.floor(diff / 60)} dəq əvvəl`
-  if (diff < 86400) return `${Math.floor(diff / 3600)} saat əvvəl`
-  if (diff < 604800) return `${Math.floor(diff / 86400)} gün əvvəl`
-  return new Date(dateStr).toLocaleDateString('az-AZ', { day: '2-digit', month: 'short', year: 'numeric' })
+function ActivityRow({ log, members }: { log: ActivityLog; members: TeamMember[] }) {
+  const cfg = AV_ACTION_CONFIG[log.action]
+  const entCfg = AV_ENTITY_CONFIG[log.entityType]
+  const member =
+    members.find(m => m.id === log.userId) ??
+    members.find(m => m.name === log.userDisplayName) ??
+    null
+  const [a1, a2] = member ? avatarPaletteFor(member.id) : ['#ccc', '#aaa']
+  const displayName = member?.name ?? log.userDisplayName
+  const initials = member ? initialsM(member.name) : initialsM(log.userDisplayName)
+  const time = fmtTimeM(log.createdAt)
+  const changes = log.changes ? Object.entries(log.changes) : []
+
+  return (
+    <div className="av-row">
+      {/* Time gutter */}
+      <div className="av-time">
+        <span>{time}</span>
+        <span className="av-time-rel">{relTimeAz(log.createdAt)}</span>
+      </div>
+
+      {/* Action icon — timeline node */}
+      <div className="av-node">
+        <div className="av-node-ico" style={{ background: cfg.soft, color: cfg.color }}>
+          <Icon name={cfg.ico} size={14} />
+        </div>
+      </div>
+
+      {/* Card */}
+      <div className="av-card">
+        <div className="av-card-head">
+          <div className="av-card-user">
+            <div
+              className="av-card-av"
+              style={{ background: `linear-gradient(135deg, ${a1}, ${a2})` }}
+            >
+              {initials}
+            </div>
+            <span style={{ fontWeight: 700 }}>{displayName}</span>
+          </div>
+          <span style={{ color: 'var(--muted)', fontWeight: 500 }}>{cfg.verb}</span>
+          {entCfg && (
+            <span className="av-entity-pill" style={{ color: entCfg.color, background: 'var(--surface-2)' }}>
+              <Icon name={entCfg.ico} size={10} />
+              {entCfg.label}
+            </span>
+          )}
+          {log.entityName && (
+            <span className="av-entname">«{log.entityName}»</span>
+          )}
+        </div>
+
+        {changes.length > 0 && (
+          <div className="av-changes">
+            {changes.map(([key, val]) => {
+              const v = val as { from: unknown; to: unknown }
+              return (
+                <div key={key} className="av-change">
+                  <span className="av-change-k">{AV_FIELD_LABELS[key] ?? key}</span>
+                  <span className="av-change-from">{String(v.from)}</span>
+                  <Icon name="arrow_forward" size={11} />
+                  <span className="av-change-to">{String(v.to)}</span>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
 }
 
-const ALL_ACTIONS = ['Hamısı', 'create', 'update', 'delete', 'complete', 'comment', 'login', 'logout'] as const
-const ALL_ENTITY_TYPES = ['Hamısı', 'project', 'task', 'team', 'user', 'comment'] as const
+// ─── Page ────────────────────────────────────────────────────────────────────
 
 export default function ActivityPage() {
   const { user } = useAuth()
   const { currentWorkspaceId } = useWorkspace()
+  const { members } = useTeam()
+
   const [logs, setLogs] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(true)
 
-  const [actionFilter, setActionFilter] = useState<string>('Hamısı')
-  const [entityFilter, setEntityFilter] = useState<string>('Hamısı')
+  const [actionFilter, setActionFilter] = useState('all')
+  const [entityFilter, setEntityFilter] = useState('all')
+  const [userFilter, setUserFilter] = useState('all')
+  const [period, setPeriod] = useState('all')
+  const [query, setQuery] = useState('')
+  const searchRef = useRef<HTMLInputElement>(null)
 
-  const currentYear = new Date().getFullYear()
-  const [selectedYear, setSelectedYear] = useState(currentYear)
-  const [selectedMonth, setSelectedMonth] = useState<number | null>(null)
+  const today = useMemo(() => new Date(), [])
 
   const fetchLogs = useCallback(async () => {
     setLoading(true)
@@ -102,42 +208,129 @@ export default function ActivityPage() {
 
   useEffect(() => { fetchLogs() }, [fetchLogs])
 
-  // Derive available years from logs
-  const availableYears = useMemo(() => {
-    const years = new Set<number>()
-    logs.forEach(l => years.add(new Date(l.createdAt).getFullYear()))
-    years.add(currentYear)
-    return Array.from(years).sort((a, b) => b - a)
-  }, [logs, currentYear])
+  // Ctrl/Cmd+K focuses search
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [])
 
+  // Stats across all logs
+  const stats = useMemo(() => {
+    const todayStart = new Date(today); todayStart.setHours(0, 0, 0, 0)
+    const weekStart  = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7)
+    let todayCount = 0, weekCount = 0
+    const byAction: Record<string, number> = {}
+    const byUser:   Record<string, number> = {}
+    logs.forEach(l => {
+      const d = new Date(l.createdAt)
+      if (d >= todayStart) todayCount++
+      if (d >= weekStart)  weekCount++
+      byAction[l.action] = (byAction[l.action] ?? 0) + 1
+      byUser[l.userId]   = (byUser[l.userId]   ?? 0) + 1
+    })
+    const topUserId = Object.entries(byUser).sort((a, b) => b[1] - a[1])[0]?.[0]
+    const topUser = topUserId
+      ? (members.find(m => m.id === topUserId) ?? null)
+      : null
+    return {
+      total: logs.length,
+      todayCount,
+      weekCount,
+      byAction,
+      topUser,
+      topUserCount: topUserId ? (byUser[topUserId] ?? 0) : 0,
+    }
+  }, [logs, members, today])
+
+  // Unique users for dropdown (prefer members list, supplement with display names)
+  const userOptions = useMemo(() => {
+    if (members.length > 0) return members.map(m => ({ id: m.id, name: m.name }))
+    const seen = new Set<string>()
+    const opts: { id: string; name: string }[] = []
+    logs.forEach(l => {
+      if (!seen.has(l.userId)) {
+        seen.add(l.userId)
+        opts.push({ id: l.userId, name: l.userDisplayName })
+      }
+    })
+    return opts
+  }, [members, logs])
+
+  // Filter
   const filtered = useMemo(() => {
     return logs.filter(l => {
-      const d = new Date(l.createdAt)
-      const matchAction = actionFilter === 'Hamısı' || l.action === actionFilter
-      const matchEntity = entityFilter === 'Hamısı' || l.entityType === entityFilter
-      const matchYear = d.getFullYear() === selectedYear
-      const matchMonth = selectedMonth === null || d.getMonth() === selectedMonth
-      return matchAction && matchEntity && matchYear && matchMonth
+      if (actionFilter !== 'all' && l.action     !== actionFilter) return false
+      if (entityFilter !== 'all' && l.entityType !== entityFilter) return false
+      if (userFilter   !== 'all' && l.userId     !== userFilter)   return false
+      if (period !== 'all') {
+        const d = new Date(l.createdAt)
+        const cutoff = new Date(today)
+        if (period === 'today') cutoff.setHours(0, 0, 0, 0)
+        else cutoff.setDate(cutoff.getDate() - parseInt(period, 10))
+        if (d < cutoff) return false
+      }
+      if (query) {
+        const q = query.toLowerCase()
+        const member =
+          members.find(m => m.id === l.userId) ??
+          members.find(m => m.name === l.userDisplayName)
+        return (
+          (l.entityName ?? '').toLowerCase().includes(q) ||
+          (member?.name ?? l.userDisplayName).toLowerCase().includes(q) ||
+          l.action.toLowerCase().includes(q)
+        )
+      }
+      return true
     })
-  }, [logs, actionFilter, entityFilter, selectedYear, selectedMonth])
+  }, [logs, actionFilter, entityFilter, userFilter, period, query, members, today])
 
-  const hasFilters = actionFilter !== 'Hamısı' || entityFilter !== 'Hamısı' || selectedMonth !== null
+  // Group by day (descending)
+  const grouped = useMemo(() => {
+    const map: Record<string, ActivityLog[]> = {}
+    filtered.forEach(l => {
+      const d = new Date(l.createdAt); d.setHours(0, 0, 0, 0)
+      const k = d.toISOString();
+      (map[k] = map[k] ?? []).push(l)
+    })
+    return Object.entries(map)
+      .sort((a, b) => new Date(b[0]).getTime() - new Date(a[0]).getTime())
+      .map(([k, items]) => ({ date: new Date(k), items }))
+  }, [filtered])
 
-  const resetFilters = () => {
-    setActionFilter('Hamısı')
-    setEntityFilter('Hamısı')
-    setSelectedYear(currentYear)
-    setSelectedMonth(null)
+  const groupLabel = (date: Date) => {
+    const dayStart = new Date(today); dayStart.setHours(0, 0, 0, 0)
+    const diff = Math.round((dayStart.getTime() - date.getTime()) / 86400000)
+    if (diff === 0) return 'Bu gün'
+    if (diff === 1) return 'Dünən'
+    if (diff < 7)  return diff + ' gün əvvəl'
+    return fmtDateM(date.toISOString())
   }
 
+  const hasFilters = actionFilter !== 'all' || entityFilter !== 'all' || userFilter !== 'all' || period !== 'all' || query !== ''
+  const resetFilters = () => {
+    setActionFilter('all'); setEntityFilter('all'); setUserFilter('all')
+    setPeriod('all'); setQuery('')
+  }
+
+  // Access denied for non-admins
   if (user && user.role !== 'admin') {
     return (
-      <div className="pageM fade-in" style={{ minHeight: '60vh', alignItems: 'center', justifyContent: 'center' }}>
-        <div className="w-16 h-16 rounded-2xl bg-accent-red/10 border border-accent-red/20 flex items-center justify-center">
-          <Shield size={28} className="text-accent-red" />
+      <div className="pageM fade-in" style={{ minHeight: '60vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+        <div style={{
+          width: 64, height: 64, borderRadius: 18,
+          background: 'var(--accent-soft)', border: '1px solid var(--accent)',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+        }}>
+          <Shield size={28} color="var(--accent)" />
         </div>
-        <h2 className="text-xl font-bold text-text-primary">Giriş qadağandır</h2>
-        <p className="text-text-secondary text-sm text-center max-w-sm">
+        <h2 style={{ fontSize: 20, fontWeight: 800, margin: 0 }}>Giriş qadağandır</h2>
+        <p style={{ fontSize: 13, color: 'var(--muted)', textAlign: 'center', maxWidth: 340, margin: 0 }}>
           Bu səhifə yalnız admin üçündür. Lazımi icazəyə malik deyilsiniz.
         </p>
       </div>
@@ -146,194 +339,197 @@ export default function ActivityPage() {
 
   return (
     <div className="pageM fade-in">
+
       {/* Header */}
-      <div className="page-headerM">
+      <div className="tm2-head">
         <div>
-          <h1>Aktivlik Jurnalı</h1>
-          <p className="sub">
-            {filtered.length} qeyd {logs.length !== filtered.length ? `(${logs.length} ümumi)` : ''}
-          </p>
+          <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+            İdarəetmə · Audit
+          </div>
+          <h1 style={{ fontSize: 32, fontWeight: 800, letterSpacing: '-0.03em', margin: '4px 0 0' }}>
+            Aktivlik Jurnalı
+            <span style={{ color: 'var(--muted)', fontWeight: 600, marginLeft: 10 }}>{stats.total}</span>
+          </h1>
         </div>
-        <button onClick={fetchLogs} className="btn-ghostM" style={{ width: 36, height: 36, padding: 0, justifyContent: 'center', flexShrink: 0 }}>
-          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn-ghostM"><Icon name="file_download" size={13} /> İxrac</button>
+          <button className="btn-ghostM" onClick={fetchLogs}><Icon name="autorenew" size={13} /> Yenilə</button>
+        </div>
       </div>
 
-      {/* Filters */}
-      <div className="cardM space-y-4">
-        <div className="flex items-center gap-2">
-          <Filter size={14} className="text-text-muted" />
-          <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">Filtrlər</span>
-          {hasFilters && (
-            <button
-              onClick={resetFilters}
-              className="ml-auto text-xs text-accent-red hover:underline transition-all"
-            >
-              Filtrləri sıfırla
-            </button>
+      {/* Stats row */}
+      {!loading && (
+        <div className="av-stats">
+          <AvStat ico="bolt"         color="indigo" label="Bu gün"    value={stats.todayCount}              sub="hadisə" />
+          <AvStat ico="schedule"     color="info"   label="Bu həftə"  value={stats.weekCount}               sub="hadisə" />
+          <AvStat ico="check_circle" color="green"  label="Tamamlanan" value={stats.byAction.complete ?? 0} sub="tapşırıq" />
+          {stats.topUser && (
+            <div className="av-stat av-top">
+              <div className="av-stat-l">Ən aktiv</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 6 }}>
+                <TopUserAvatar member={stats.topUser} />
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, letterSpacing: '-0.02em', lineHeight: 1.2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {stats.topUser.name}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>{stats.topUserCount} hadisə</div>
+                </div>
+              </div>
+            </div>
           )}
         </div>
+      )}
 
-        <div className="flex flex-wrap gap-3">
-          {/* Action filter */}
-          <div className="relative">
-            <select
-              value={actionFilter}
-              onChange={e => setActionFilter(e.target.value)}
-              className="inputM pr-8 min-w-[140px] appearance-none"
+      {/* Action chips */}
+      <div className="av-actions">
+        <button
+          className={'av-actchip' + (actionFilter === 'all' ? ' on' : '')}
+          onClick={() => setActionFilter('all')}
+        >
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ink)' }} />
+          Hamısı
+          <span className="cnt">{stats.total}</span>
+        </button>
+        {(Object.keys(AV_ACTION_CONFIG) as ActivityLog['action'][]).map(a => {
+          const cfg = AV_ACTION_CONFIG[a]
+          const count = stats.byAction[a] ?? 0
+          if (count === 0) return null
+          return (
+            <button
+              key={a}
+              className={'av-actchip' + (actionFilter === a ? ' on' : '')}
+              onClick={() => setActionFilter(a)}
+              style={
+                actionFilter === a
+                  ? { background: cfg.color, color: 'white', borderColor: cfg.color }
+                  : { color: cfg.color }
+              }
             >
-              {ALL_ACTIONS.map(a => (
-                <option key={a} value={a}>
-                  {a === 'Hamısı' ? 'Bütün əməliyyatlar' : ACTION_LABELS[a as ActivityLog['action']]}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-          </div>
-
-          {/* Entity filter */}
-          <div className="relative">
-            <select
-              value={entityFilter}
-              onChange={e => setEntityFilter(e.target.value)}
-              className="inputM pr-8 min-w-[140px] appearance-none"
-            >
-              {ALL_ENTITY_TYPES.map(e => (
-                <option key={e} value={e}>
-                  {e === 'Hamısı' ? 'Bütün növlər' : ENTITY_LABELS[e as ActivityLog['entityType']]}
-                </option>
-              ))}
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-          </div>
-
-          {/* Year filter */}
-          <div className="relative">
-            <select
-              value={selectedYear}
-              onChange={e => setSelectedYear(Number(e.target.value))}
-              className="inputM pr-8 min-w-[100px] appearance-none"
-            >
-              {availableYears.map(y => (
-                <option key={y} value={y}>{y}</option>
-              ))}
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-          </div>
-
-          {/* Month filter */}
-          <div className="relative">
-            <select
-              value={selectedMonth ?? ''}
-              onChange={e => setSelectedMonth(e.target.value === '' ? null : Number(e.target.value))}
-              className="inputM pr-8 min-w-[140px] appearance-none"
-            >
-              <option value="">Bütün aylar</option>
-              {MONTH_NAMES_AZ.map((m, i) => (
-                <option key={i} value={i}>{m}</option>
-              ))}
-            </select>
-            <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-text-muted pointer-events-none" />
-          </div>
-        </div>
+              <Icon name={cfg.ico} size={12} />
+              {cfg.label}
+              <span className="cnt" style={actionFilter === a ? { color: 'rgba(255,255,255,0.85)' } : {}}>
+                {count}
+              </span>
+            </button>
+          )
+        })}
       </div>
 
-      {/* Activity List */}
+      {/* Filter toolbar */}
+      <div className="av-toolbar">
+        <div className="tm2-search" style={{ flex: 1, maxWidth: 320 }}>
+          <Icon name="search" size={15} />
+          <input
+            ref={searchRef}
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+            placeholder="Hadisə, istifadəçi, obyekt..."
+          />
+          <span className="kbd">⌘K</span>
+        </div>
+
+        <select
+          className="task-select"
+          value={entityFilter}
+          onChange={e => setEntityFilter(e.target.value)}
+          style={{ minWidth: 140, fontSize: 12 }}
+        >
+          <option value="all">Bütün növlər</option>
+          {(Object.entries(AV_ENTITY_CONFIG) as [ActivityLog['entityType'], { label: string; ico: string; color: string }][]).map(([k, v]) => (
+            <option key={k} value={k}>{v.label}</option>
+          ))}
+        </select>
+
+        <select
+          className="task-select"
+          value={userFilter}
+          onChange={e => setUserFilter(e.target.value)}
+          style={{ minWidth: 160, fontSize: 12 }}
+        >
+          <option value="all">Bütün istifadəçilər</option>
+          {userOptions.map(m => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+        </select>
+
+        <div className="av-periodtog">
+          {([
+            { v: 'all',   l: 'Hamısı' },
+            { v: 'today', l: 'Bu gün' },
+            { v: '7',     l: '7g' },
+            { v: '30',    l: '30g' },
+          ] as const).map(p => (
+            <button key={p.v} className={period === p.v ? 'on' : ''} onClick={() => setPeriod(p.v)}>
+              {p.l}
+            </button>
+          ))}
+        </div>
+
+        {hasFilters && (
+          <button
+            onClick={resetFilters}
+            style={{
+              fontSize: 11, color: 'var(--accent)', fontWeight: 700,
+              padding: '6px 10px', display: 'inline-flex', gap: 4, alignItems: 'center', cursor: 'pointer',
+            }}
+          >
+            <Icon name="close" size={11} /> Sıfırla
+          </button>
+        )}
+      </div>
+
+      {/* Result info */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '4px 4px', fontSize: 11, color: 'var(--muted)' }}>
+        <span>
+          <b style={{ color: 'var(--ink)', fontWeight: 800 }}>{filtered.length}</b> hadisə · {grouped.length} gün
+        </span>
+        <span style={{ fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}>
+          {new Date().toLocaleString('az-AZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+        </span>
+      </div>
+
+      {/* Loading skeleton */}
       {loading ? (
-        <div className="space-y-2">
-          {[...Array(8)].map((_, i) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {Array.from({ length: 6 }).map((_, i) => (
             <div
               key={i}
-              className="cardM flex items-center gap-4 px-4 py-3 animate-pulse"
+              className="cardM"
+              style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 20px', opacity: 0.6 }}
             >
-              <div className="w-8 h-8 rounded-lg bg-[var(--surface-2)] flex-shrink-0" />
-              <div className="flex-1 space-y-2">
-                <div className="h-3 w-1/3 rounded bg-[var(--surface-2)]" />
-                <div className="h-3 w-1/2 rounded bg-[var(--surface-2)]" />
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'var(--surface-2)', flexShrink: 0 }} />
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ height: 12, width: '35%', borderRadius: 4, background: 'var(--surface-2)' }} />
+                <div style={{ height: 12, width: '55%', borderRadius: 4, background: 'var(--surface-2)' }} />
               </div>
-              <div className="h-3 w-20 rounded bg-[var(--surface-2)]" />
+              <div style={{ height: 12, width: 64, borderRadius: 4, background: 'var(--surface-2)', flexShrink: 0 }} />
             </div>
           ))}
         </div>
+
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-20 space-y-3">
-          <div
-            className="w-14 h-14 rounded-2xl flex items-center justify-center"
-            style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
-          >
-            <Activity size={22} className="text-text-muted opacity-60" />
-          </div>
-          <p className="text-text-secondary text-sm font-medium">Aktivlik tapılmadı</p>
-          <p className="text-text-muted text-xs">Seçilmiş filtrə uyğun qeyd yoxdur</p>
-          {hasFilters && (
-            <button onClick={resetFilters} className="text-xs text-accent-blue hover:underline mt-1">
-              Filtrləri sıfırla
-            </button>
-          )}
+        <div className="tm2-empty">
+          <Icon name="bolt" size={36} />
+          <div style={{ marginTop: 12, fontWeight: 700 }}>Hadisə tapılmadı</div>
+          <div style={{ fontSize: 12, marginTop: 4 }}>Süzgəcləri yumşaldın.</div>
         </div>
+
       ) : (
-        <div className="cardM" style={{ padding: 0, overflow: 'hidden' }}>
-          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {filtered.map((log, i) => (
-              <div
-                key={log.id}
-                className={cn(
-                  'flex items-start gap-4 px-5 py-4 transition-colors',
-                  'hover:bg-[var(--surface-2)]'
-                )}
-              >
-                {/* Action icon */}
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
-                  style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}
-                >
-                  <ActionIcon action={log.action} />
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex flex-wrap items-center gap-2 mb-1">
-                    {/* Action badge */}
-                    <span className={cn('text-xs font-semibold', ACTION_COLORS[log.action])}>
-                      {ACTION_LABELS[log.action]}
-                    </span>
-
-                    {/* Entity type badge */}
-                    <span className={cn('badge text-[10px]', ENTITY_COLORS[log.entityType])}>
-                      {ENTITY_LABELS[log.entityType]}
-                    </span>
-
-                    {/* Entity name */}
-                    {log.entityName && (
-                      <span className="text-xs text-text-primary font-medium truncate max-w-[200px]">
-                        &ldquo;{log.entityName}&rdquo;
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-3 text-xs text-text-muted">
-                    <span className="font-medium text-text-secondary">{log.userDisplayName}</span>
-                    {log.changes && Object.keys(log.changes).length > 0 && (
-                      <span className="opacity-70">
-                        {Object.entries(log.changes).slice(0, 2).map(([key, val]) => (
-                          <span key={key} className="mr-1">
-                            {key}: <span className="line-through opacity-60">{String((val as { from: unknown; to: unknown }).from)}</span>
-                            {' → '}
-                            <span className="text-text-secondary">{String((val as { from: unknown; to: unknown }).to)}</span>
-                          </span>
-                        ))}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                {/* Timestamp */}
-                <div className="text-[11px] text-text-muted whitespace-nowrap flex-shrink-0 mt-0.5" title={new Date(log.createdAt).toLocaleString('az-AZ')}>
-                  {getRelativeTime(log.createdAt)}
-                </div>
+        <div className="av-timeline">
+          {grouped.map(({ date, items }) => (
+            <div key={date.toISOString()} className="av-group">
+              <div className="av-group-head">
+                <span className="av-group-label">{groupLabel(date)}</span>
+                <span className="av-group-rule" />
+                <span className="av-group-count">{items.length}</span>
               </div>
-            ))}
-          </div>
+              <div className="av-list">
+                {items.map(l => (
+                  <ActivityRow key={l.id} log={l} members={members} />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
       )}
     </div>
