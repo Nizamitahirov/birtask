@@ -74,8 +74,14 @@ export interface TeamMember {
   email: string
   role: string
   department: string
+  division?: string
+  section?: string
+  position?: string
   phone: string
   avatar: string
+  personalCode?: string
+  finCode?: string
+  company?: string
   managerId?: string
   functionalManagerId?: string
   createdAt: string

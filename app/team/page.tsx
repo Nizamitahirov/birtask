@@ -55,13 +55,10 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Admin', manager: 'Menecer', member: 'Üzv', viewer: 'İzləyici',
 }
 
-const DEPT_ICONS: Record<string, { ico: string; bg: string; fg: string }> = {
-  'Texnologiya': { ico: 'code',         bg: 'var(--primary-soft)', fg: 'var(--primary)' },
-  'HR':          { ico: 'diversity_3',  bg: 'var(--pink-soft)',    fg: 'var(--pink)' },
-  'Maliyyə':     { ico: 'payments',     bg: 'var(--success-soft)', fg: 'var(--success)' },
-  'Marketinq':   { ico: 'campaign',     bg: 'var(--warn-soft)',    fg: 'var(--warn)' },
-  'Hüquq':       { ico: 'gavel',        bg: 'var(--info-soft)',    fg: 'var(--info)' },
-  'Əməliyyat':   { ico: 'engineering',  bg: 'var(--accent-soft)',  fg: 'var(--accent)' },
+const COMPANY_ICONS: Record<string, { ico: string; bg: string; fg: string }> = {
+  'Birbank':    { ico: 'account_balance', bg: 'var(--primary-soft)', fg: 'var(--primary)' },
+  'Pashapay':   { ico: 'payments',        bg: 'var(--success-soft)', fg: 'var(--success)' },
+  'Birmarket':  { ico: 'storefront',      bg: 'var(--warn-soft)',    fg: 'var(--warn)' },
 }
 
 /* ── Member form ─────────────────────────────────────────────── */
@@ -146,19 +143,28 @@ export default function TeamPage() {
     [members]
   )
 
-  const byRole = useMemo(() => {
-    const r = { admin: 0, manager: 0, member: 0, viewer: 0 } as Record<string, number>
-    members.forEach(m => { r[m.role as string] = (r[m.role as string] || 0) + 1 })
+  const companies = useMemo(
+    () => Array.from(new Set(members.map(m => m.company).filter(Boolean))) as string[],
+    [members]
+  )
+
+  const byCompany = useMemo(() => {
+    const r: Record<string, number> = {}
+    members.forEach(m => { const c = m.company || 'Digər'; r[c] = (r[c] || 0) + 1 })
     return r
   }, [members])
 
   const filtered = useMemo(() => members.filter(m => {
-    if (roleFilter !== 'all' && m.role !== roleFilter) return false
+    if (roleFilter !== 'all' && (m.company || 'Digər') !== roleFilter) return false
     if (search) {
       const q = search.toLowerCase()
       return m.name.toLowerCase().includes(q) ||
         m.email?.toLowerCase().includes(q) ||
-        m.department?.toLowerCase().includes(q)
+        m.department?.toLowerCase().includes(q) ||
+        m.position?.toLowerCase().includes(q) ||
+        m.company?.toLowerCase().includes(q) ||
+        m.personalCode?.toLowerCase().includes(q) ||
+        m.finCode?.toLowerCase().includes(q)
     }
     return true
   }), [members, search, roleFilter])
@@ -201,8 +207,7 @@ export default function TeamPage() {
             <span className="cnt">{members.length}</span>
           </h1>
           <div className="sub">
-            {members.filter(m => (m as any).isActive !== false).length} aktiv ·{' '}
-            {departments.length} şöbə
+            {members.length} üzv · {companies.length} şirkət · {departments.length} departament
           </div>
         </div>
         <div className="actions">
@@ -221,27 +226,31 @@ export default function TeamPage() {
         </div>
       </div>
 
-      {/* Department cards */}
-      {departments.length > 0 && (
+      {/* Company cards */}
+      {companies.length > 0 && (
         <div className="deptM stagger">
-          {departments.map(dept => {
-            const deptMembers = members.filter(m => m.department === dept)
-            const dInfo = DEPT_ICONS[dept] || { ico: 'apartment', bg: 'var(--surface-2)', fg: 'var(--muted)' }
-            const [a1, a2] = avatarPaletteFor(dept)
+          {companies.map(company => {
+            const companyMembers = members.filter(m => m.company === company)
+            const cInfo = COMPANY_ICONS[company] || { ico: 'apartment', bg: 'var(--surface-2)', fg: 'var(--muted)' }
             return (
-              <div className="deptCard" key={dept}>
+              <div
+                className={'deptCard' + (roleFilter === company ? ' active' : '')}
+                key={company}
+                onClick={() => setRoleFilter(roleFilter === company ? 'all' : company)}
+                style={{ cursor: 'pointer' }}
+              >
                 <div className="hdr">
-                  <div className="nm">{dept}</div>
-                  <div className="ico" style={{ background: dInfo.bg, color: dInfo.fg }}>
-                    <span className="material-symbols-rounded" style={{ fontSize: 14 }}>{dInfo.ico}</span>
+                  <div className="nm">{company}</div>
+                  <div className="ico" style={{ background: cInfo.bg, color: cInfo.fg }}>
+                    <span className="material-symbols-rounded" style={{ fontSize: 14 }}>{cInfo.ico}</span>
                   </div>
                 </div>
                 <div className="cnt">
-                  {deptMembers.length}
+                  {companyMembers.length}
                   <small>üzv</small>
                 </div>
                 <div className="avstack">
-                  {deptMembers.slice(0, 5).map(m => {
+                  {companyMembers.slice(0, 5).map(m => {
                     const [av1, av2] = avatarPaletteFor(m.id)
                     return (
                       <div
@@ -253,8 +262,8 @@ export default function TeamPage() {
                       </div>
                     )
                   })}
-                  {deptMembers.length > 5 && (
-                    <div className="av more">+{deptMembers.length - 5}</div>
+                  {companyMembers.length > 5 && (
+                    <div className="av more">+{companyMembers.length - 5}</div>
                   )}
                 </div>
               </div>
@@ -278,11 +287,8 @@ export default function TeamPage() {
         </div>
         <div className="team-chips">
           {[
-            { id: 'all',     label: 'Hamısı',   count: members.length },
-            { id: 'admin',   label: 'Admin',    count: byRole.admin || 0 },
-            { id: 'manager', label: 'Menecer',  count: byRole.manager || 0 },
-            { id: 'member',  label: 'Üzv',      count: byRole.member || 0 },
-            { id: 'viewer',  label: 'İzləyici', count: byRole.viewer || 0 },
+            { id: 'all', label: 'Hamısı', count: members.length },
+            ...companies.map(c => ({ id: c, label: c, count: byCompany[c] || 0 })),
           ].map(c => (
             <button
               key={c.id}
@@ -323,10 +329,10 @@ export default function TeamPage() {
           {filtered.map(m => {
             const [c1, c2] = paletteFor(m.id)
             const [ac1, ac2] = avatarPaletteFor(m.id)
-            const rolePill =
-              m.role === 'admin' ? 'indigo' :
-              m.role === 'manager' ? 'pink' :
-              m.role === 'member' ? 'info' : 'muted'
+            const companyPill =
+              m.company === 'Birbank' ? 'indigo' :
+              m.company === 'Pashapay' ? 'info' :
+              m.company === 'Birmarket' ? 'warn' : 'muted'
 
             const myTasks = tasks.filter(t => t.assignee === m.name)
             const doneTasks = myTasks.filter(t => t.status === 'Tamamlandı').length
@@ -350,7 +356,7 @@ export default function TeamPage() {
                   <div className="name-row">
                     <div>
                       <div className="name">{m.name}</div>
-                      <div className="un">@{m.email?.split('@')[0] || m.name.toLowerCase().replace(' ', '.')}</div>
+                      <div className="un" style={{ fontSize: 10 }}>{m.personalCode ? `#${m.personalCode}` : (m.email?.split('@')[0] || '')}</div>
                     </div>
                     <span
                       className="status-bullet"
@@ -364,11 +370,10 @@ export default function TeamPage() {
                   </div>
 
                   <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <span className={`pill ${rolePill}`}>{ROLE_LABELS[m.role] || m.role}</span>
-                    {m.department && (
-                      <span className="dept">
-                        <span className="material-symbols-rounded" style={{ fontSize: 12 }}>apartment</span>
-                        {m.department}
+                    {m.company && <span className={`pill ${companyPill}`}>{m.company}</span>}
+                    {m.position && (
+                      <span className="dept" style={{ fontSize: 10 }}>
+                        {m.position}
                       </span>
                     )}
                   </div>
@@ -383,8 +388,8 @@ export default function TeamPage() {
                       <div className="v" style={{ color: 'var(--success)' }}>{doneTasks}</div>
                     </div>
                     <div>
-                      <div className="k">Rol</div>
-                      <div className="v" style={{ fontSize: 12 }}>{ROLE_LABELS[m.role] || m.role}</div>
+                      <div className="k">FIN</div>
+                      <div className="v" style={{ fontSize: 10, fontFamily: 'monospace' }}>{m.finCode || '—'}</div>
                     </div>
                   </div>
                 </div>
@@ -428,10 +433,10 @@ export default function TeamPage() {
               const m = selectedMember
               const [c1, c2] = paletteFor(m.id)
               const [ac1, ac2] = avatarPaletteFor(m.id)
-              const rolePill =
-                m.role === 'admin' ? 'indigo' :
-                m.role === 'manager' ? 'pink' :
-                m.role === 'member' ? 'info' : 'muted'
+              const companyPill =
+                m.company === 'Birbank' ? 'indigo' :
+                m.company === 'Pashapay' ? 'info' :
+                m.company === 'Birmarket' ? 'warn' : 'muted'
               const myTasks = tasks.filter(t => t.assignee === m.name)
               const doneTasks = myTasks.filter(t => t.status === 'Tamamlandı').length
 
@@ -487,9 +492,11 @@ export default function TeamPage() {
                           {m.email}
                         </div>
                       </div>
-                      <span className={`pill ${rolePill}`} style={{ flexShrink: 0 }}>
-                        {ROLE_LABELS[m.role] || m.role}
-                      </span>
+                      {m.company && (
+                        <span className={`pill ${companyPill}`} style={{ flexShrink: 0 }}>
+                          {m.company}
+                        </span>
+                      )}
                     </div>
 
                     <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
@@ -529,7 +536,7 @@ export default function TeamPage() {
                       {[
                         { k: 'Tapşırıq', v: myTasks.length, ico: 'task' },
                         { k: 'Tamamlandı', v: doneTasks, ico: 'check_circle' },
-                        { k: 'Şöbə', v: m.department || '—', ico: 'apartment' },
+                        { k: 'Personal', v: m.personalCode || '—', ico: 'badge' },
                       ].map(s => (
                         <div key={s.k} style={{
                           padding: '10px 8px',
@@ -571,25 +578,15 @@ export default function TeamPage() {
                       rowGap: 8,
                       columnGap: 16,
                     }}>
-                      <CompactField k="Şöbə" v={m.department || '—'} />
-                      <CompactField k="Status" v={
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 5,
-                          color: (m as any).isActive !== false ? 'var(--success)' : 'var(--muted)',
-                          fontWeight: 700,
-                          fontSize: 11,
-                        }}>
-                          <span className="status-bullet" style={{
-                            background: (m as any).isActive !== false ? 'var(--success)' : 'var(--muted-2)',
-                            boxShadow: 'none',
-                          }} />
-                          {(m as any).isActive !== false ? 'Aktiv' : 'Deaktiv'}
-                        </span>
-                      } />
-                      <CompactField k="Email" v={m.email || '—'} />
-                      <CompactField k="Telefon" v={m.phone || '—'} />
+                      <CompactField k="Vəzifə" v={m.position || m.role || '—'} />
+                      <CompactField k="Şirkət" v={m.company || '—'} />
+                      <CompactField k="Personal kod" v={m.personalCode || '—'} />
+                      <CompactField k="FIN kod" v={m.finCode || '—'} />
+                      <CompactField k="Departament" v={m.department || '—'} />
+                      <CompactField k="Funksional sahə" v={m.division || '—'} />
+                      {m.section && <CompactField k="Bölmə" v={m.section} />}
+                      {m.email && <CompactField k="Email" v={m.email} />}
+                      {m.phone && <CompactField k="Telefon" v={m.phone} />}
                     </div>
 
                     <div style={{ marginTop: 12, display: 'flex', gap: 6 }}>

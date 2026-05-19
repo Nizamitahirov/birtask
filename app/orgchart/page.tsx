@@ -355,18 +355,19 @@ function NodeCard({ member, level, childCount, isCollapsed, isOver, isDragging, 
           </div>
         </div>
 
-        {/* Dept tags */}
-        {(member.department || hasFM) && (
+        {/* Company / func tags */}
+        {(member.company || member.department || hasFM) && (
           <div style={{padding:'0 12px 8px', display:'flex', gap:5, flexWrap:'wrap'}}>
-            {member.department && (
+            {(member.company || member.department) && (
               <span style={{
                 padding:'2px 8px', borderRadius:5,
                 background:'var(--surface-2)', border:'1px solid var(--border)',
                 fontSize:9.5, fontWeight:600, color:'var(--ink-2)',
                 display:'flex', alignItems:'center', gap:4,
+                maxWidth: '100%', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
               }}>
                 <span className="material-symbols-rounded" style={{fontSize:10, color:dc}}>business</span>
-                {member.department}
+                {member.company || member.department}
               </span>
             )}
             {hasFM && (
@@ -453,12 +454,26 @@ function MemberModal({member, members, onClose}:{member:TeamMember;members:TeamM
           }}>{initials(member.name)}</div>
           <div style={{flex:1}}>
             <div style={{fontSize:18, fontWeight:800, color:'var(--ink)', letterSpacing:'-0.02em'}}>{member.name}</div>
-            <div style={{fontSize:13, color:'var(--ink-2)', marginTop:2}}>{member.role||'—'}</div>
-            {member.department&&<span style={{
-              display:'inline-flex', alignItems:'center', gap:4, marginTop:8,
-              padding:'3px 10px', borderRadius:999,
-              background:dc+'18', color:dc, fontSize:11, fontWeight:700,
-            }}><span className="material-symbols-rounded" style={{fontSize:12}}>business</span>{member.department}</span>}
+            <div style={{fontSize:13, color:'var(--ink-2)', marginTop:2}}>{member.position||member.role||'—'}</div>
+            <div style={{display:'flex', gap:6, flexWrap:'wrap', marginTop:6}}>
+              {member.company&&<span style={{
+                display:'inline-flex', alignItems:'center', gap:4,
+                padding:'3px 10px', borderRadius:999,
+                background:dc+'18', color:dc, fontSize:11, fontWeight:700,
+              }}><span className="material-symbols-rounded" style={{fontSize:12}}>business</span>{member.company}</span>}
+              {member.personalCode&&<span style={{
+                display:'inline-flex', alignItems:'center', gap:4,
+                padding:'3px 10px', borderRadius:999,
+                background:'var(--surface-2)', border:'1px solid var(--border)',
+                fontSize:11, fontWeight:700, color:'var(--ink-2)', fontFamily:'monospace',
+              }}># {member.personalCode}</span>}
+              {member.finCode&&<span style={{
+                display:'inline-flex', alignItems:'center', gap:4,
+                padding:'3px 10px', borderRadius:999,
+                background:'var(--surface-2)', border:'1px solid var(--border)',
+                fontSize:11, fontWeight:700, color:'var(--ink-2)', fontFamily:'monospace',
+              }}>FIN: {member.finCode}</span>}
+            </div>
           </div>
           <button onClick={onClose} style={{
             width:32, height:32, borderRadius:9,
@@ -471,8 +486,11 @@ function MemberModal({member, members, onClose}:{member:TeamMember;members:TeamM
           {[
             {icon:'mail',label:'E-poçt',val:member.email,color:'var(--primary)'},
             {icon:'call',label:'Telefon',val:member.phone,color:'#10B981'},
-            {icon:'account_tree',label:'Birbaşa rəhbər',val:mgr?.name,sub:mgr?.role,color:'#4F6AF5'},
-            {icon:'hub',label:'Funksional rəhbər',val:fmgr?.name,sub:fmgr?.role,color:'#8B5CF6',dashed:true},
+            {icon:'apartment',label:'Departament',val:member.department,color:'var(--muted)'},
+            {icon:'hub',label:'Funksional sahə',val:member.division,color:'var(--muted)'},
+            {icon:'category',label:'Bölmə',val:member.section,color:'var(--muted)'},
+            {icon:'account_tree',label:'Birbaşa rəhbər',val:mgr?.name,sub:mgr?.position||mgr?.role,color:'#4F6AF5'},
+            {icon:'hub',label:'Funksional rəhbər',val:fmgr?.name,sub:fmgr?.position||fmgr?.role,color:'#8B5CF6',dashed:true},
           ].filter(r=>r.val).map(r=>(
             <div key={r.label} style={{
               display:'flex', alignItems:'center', gap:12,
@@ -785,8 +803,10 @@ function ListTab({members,onUpdate}:{
   const [search,setSearch]=useState('')
   const filtered=members.filter(m=>
     m.name.toLowerCase().includes(search.toLowerCase())||
-    (m.role||'').toLowerCase().includes(search.toLowerCase())||
-    (m.department||'').toLowerCase().includes(search.toLowerCase())
+    (m.position||m.role||'').toLowerCase().includes(search.toLowerCase())||
+    (m.company||'').toLowerCase().includes(search.toLowerCase())||
+    (m.department||'').toLowerCase().includes(search.toLowerCase())||
+    (m.personalCode||'').toLowerCase().includes(search.toLowerCase())
   )
   return (
     <div style={{display:'flex',flexDirection:'column',gap:14}}>
@@ -839,13 +859,13 @@ function ListTab({members,onUpdate}:{
                   </div>
                   <div style={{fontSize:11,color:'var(--ink-2)',marginTop:1,
                     overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
-                    {m.role||'—'}
+                    {m.position||m.role||'—'}
                   </div>
-                  {m.department&&<span style={{
+                  {m.company&&<span style={{
                     display:'inline-flex',alignItems:'center',gap:3,marginTop:4,
                     padding:'2px 6px',borderRadius:5,
                     background:dc+'15',color:dc,fontSize:9,fontWeight:700,
-                  }}>{m.department}</span>}
+                  }}>{m.company}</span>}
                 </div>
               </div>
               <ManagerSel value={m.managerId??''} members={members} excludeId={m.id}
