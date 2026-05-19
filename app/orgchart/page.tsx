@@ -2,204 +2,460 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
-import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { useTeam } from '@/hooks/useSheets'
 import { db } from '@/lib/db'
 import { TeamMember } from '@/lib/types'
 import toast from 'react-hot-toast'
 
-// ─── Palettes ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const VIBRANT_PALETTES: [string, string][] = [
-  ['#5B5BF5', '#B57BFF'], ['#FF8B7B', '#FFD466'], ['#16C098', '#67E8C5'],
-  ['#4DABF7', '#A78BFA'], ['#E879C8', '#FF8FB1'], ['#F5A524', '#FF8B7B'],
-  ['#7C5BF7', '#E879C8'], ['#16C098', '#5B5BF5'],
+const PALETTES: [string, string][] = [
+  ['#5B5BF5','#B57BFF'],['#FF8B7B','#FFD466'],['#16C098','#67E8C5'],
+  ['#4DABF7','#A78BFA'],['#E879C8','#FF8FB1'],['#F5A524','#FF8B7B'],
+  ['#7C5BF7','#E879C8'],['#16C098','#5B5BF5'],
 ]
-function avatarPaletteFor(seed: string): [string, string] {
-  let h = 0
-  for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) | 0
-  return VIBRANT_PALETTES[Math.abs(h) % 8]
+function pal(seed: string): [string,string] {
+  let h = 0; for (let i = 0; i < seed.length; i++) h = (h*31+seed.charCodeAt(i))|0
+  return PALETTES[Math.abs(h)%8]
 }
 
-const DEPT_HUES = ['#5B5BF5','#EF4444','#10B981','#F59E0B','#8B5CF6',
-                   '#06B6D4','#EC4899','#14B8A6','#F97316','#6366F1']
-function deptColor(s: string) {
-  let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0
-  return DEPT_HUES[Math.abs(h) % DEPT_HUES.length]
+const DEPT_C = ['#4F6AF5','#E85454','#10B981','#F59E0B','#8B5CF6','#06B6D4','#EC4899','#F97316']
+function deptCol(s: string) {
+  let h = 0; for (let i = 0; i < s.length; i++) h = (h*31+s.charCodeAt(i))|0
+  return DEPT_C[Math.abs(h)%DEPT_C.length]
 }
+
+function initials(name: string) { return name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase() }
 
 // ─── Layout ───────────────────────────────────────────────────────────────────
 
-const CW = 196, CH = 118, HG = 40, VG = 80
+const CW = 256, CH = 134, HG = 28, VG = 80   // vertical
+const CWH = 228, CHH = 108, HGH = 56, VGH = 18 // horizontal
 
-interface Pos { x: number; y: number }
+type Dir = 'V'|'H'
+interface Pos { x:number; y:number }
 
-function buildLayout(members: TeamMember[], collapsed: Set<string>) {
-  const ids = new Set(members.map(m => m.id))
-  const childMap = new Map<string, string[]>()
+interface LayoutResult {
+  positions: Map<string,Pos>
+  childMap: Map<string,string[]>
+  roots: string[]
+  levels: Map<string,number>
+  totalW: number; totalH: number
+}
+
+function buildLayout(members: TeamMember[], collapsed: Set<string>, dir: Dir): LayoutResult {
+  const ids = new Set(members.map(m=>m.id))
+  const childMap = new Map<string,string[]>()
   const roots: string[] = []
-
   members.forEach(m => {
-    const valid = m.managerId && ids.has(m.managerId) && m.managerId !== m.id
-    if (valid) {
-      const arr = childMap.get(m.managerId!) ?? []
-      arr.push(m.id); childMap.set(m.managerId!, arr)
-    } else roots.push(m.id)
+    const ok = m.managerId && ids.has(m.managerId) && m.managerId !== m.id
+    if (ok) { const a=childMap.get(m.managerId!)||[]; a.push(m.id); childMap.set(m.managerId!,a) }
+    else roots.push(m.id)
   })
 
-  const widthCache = new Map<string, number>()
-  function subtreeW(id: string, vis = new Set<string>()): number {
-    if (vis.has(id)) return CW
-    if (widthCache.has(id)) return widthCache.get(id)!
-    vis = new Set(vis); vis.add(id)
-    if (collapsed.has(id)) { widthCache.set(id, CW); return CW }
-    const ch = childMap.get(id) ?? []
-    if (!ch.length) { widthCache.set(id, CW); return CW }
-    const w = Math.max(CW, ch.reduce((s, c, i) => s + subtreeW(c, vis) + (i ? HG : 0), 0))
-    widthCache.set(id, w); return w
+  const levels = new Map<string,number>()
+  const calcLevel = (id: string, lv: number, vis=new Set<string>()) => {
+    if (vis.has(id)) return; levels.set(id,lv); vis.add(id)
+    ;(childMap.get(id)||[]).forEach(c=>calcLevel(c,lv+1,new Set(vis)))
+  }
+  roots.forEach(r=>calcLevel(r,1))
+
+  const wCache = new Map<string,number>()
+  const hCache = new Map<string,number>()
+  const positions = new Map<string,Pos>()
+
+  const subW = (id:string, vis=new Set<string>()):number => {
+    if (vis.has(id)||wCache.has(id)) return wCache.get(id)||CW
+    vis=new Set(vis); vis.add(id)
+    if (collapsed.has(id)){wCache.set(id,CW);return CW}
+    const ch=childMap.get(id)||[]
+    if(!ch.length){wCache.set(id,CW);return CW}
+    const w=Math.max(CW,ch.reduce((s,c,i)=>s+subW(c,vis)+(i?HG:0),0))
+    wCache.set(id,w);return w
+  }
+  const place = (id:string,x:number,y:number,vis=new Set<string>()) => {
+    if(vis.has(id))return; vis=new Set(vis); vis.add(id)
+    positions.set(id,{x,y})
+    if(collapsed.has(id))return
+    const ch=childMap.get(id)||[]; if(!ch.length)return
+    const tot=ch.reduce((s,c,i)=>s+subW(c,vis)+(i?HG:0),0)
+    let cx=x+CW/2-tot/2
+    ch.forEach(c=>{const w=subW(c,vis);place(c,cx,y+CH+VG,vis);cx+=w+HG})
   }
 
-  const positions = new Map<string, Pos>()
-  function place(id: string, x: number, y: number, vis = new Set<string>()) {
-    if (vis.has(id)) return
-    vis = new Set(vis); vis.add(id)
-    positions.set(id, { x, y })
-    if (collapsed.has(id)) return
-    const ch = childMap.get(id) ?? []
-    if (!ch.length) return
-    const total = ch.reduce((s, c, i) => s + subtreeW(c, vis) + (i ? HG : 0), 0)
-    let cx = x + CW / 2 - total / 2
-    ch.forEach(c => {
-      const w = subtreeW(c, vis)
-      place(c, cx, y + CH + VG, vis)
-      cx += w + HG
+  const subH = (id:string,vis=new Set<string>()):number => {
+    if(vis.has(id)||hCache.has(id)) return hCache.get(id)||CHH
+    vis=new Set(vis); vis.add(id)
+    if(collapsed.has(id)){hCache.set(id,CHH);return CHH}
+    const ch=childMap.get(id)||[]
+    if(!ch.length){hCache.set(id,CHH);return CHH}
+    const h=Math.max(CHH,ch.reduce((s,c,i)=>s+subH(c,vis)+(i?VGH:0),0))
+    hCache.set(id,h);return h
+  }
+  const placeH = (id:string,x:number,y:number,vis=new Set<string>()) => {
+    if(vis.has(id))return; vis=new Set(vis); vis.add(id)
+    positions.set(id,{x,y})
+    if(collapsed.has(id))return
+    const ch=childMap.get(id)||[]; if(!ch.length)return
+    const tot=ch.reduce((s,c,i)=>s+subH(c,vis)+(i?VGH:0),0)
+    let cy=y+CHH/2-tot/2
+    ch.forEach(c=>{const h=subH(c,vis);placeH(c,x+CWH+HGH,cy,vis);cy+=h+VGH})
+  }
+
+  if (dir === 'V') {
+    let rx=0
+    roots.forEach(r=>{place(r,rx,0);rx+=subW(r)+HG*2})
+    let mxX=0,mxY=0; positions.forEach(({x,y})=>{mxX=Math.max(mxX,x+CW);mxY=Math.max(mxY,y+CH)})
+    return {positions,childMap,roots,levels,totalW:mxX,totalH:mxY}
+  } else {
+    let ry=0
+    roots.forEach(r=>{placeH(r,0,ry);ry+=subH(r)+VGH*3})
+    let mxX=0,mxY=0; positions.forEach(({x,y})=>{mxX=Math.max(mxX,x+CWH);mxY=Math.max(mxY,y+CHH)})
+    return {positions,childMap,roots,levels,totalW:mxX,totalH:mxY}
+  }
+}
+
+// ─── SVG Lines ────────────────────────────────────────────────────────────────
+
+function OrgLines({ positions, childMap, collapsed, members, dir }:{
+  positions:Map<string,Pos>; childMap:Map<string,string[]>
+  collapsed:Set<string>; members:TeamMember[]; dir:Dir
+}) {
+  const cw = dir==='V'?CW:CWH, ch = dir==='V'?CH:CHH
+  const vg = dir==='V'?VG:HGH
+  const paths:{d:string;dashed:boolean}[] = []
+
+  if (dir==='V') {
+    childMap.forEach((children, parentId)=>{
+      if(collapsed.has(parentId)) return
+      const pp = positions.get(parentId); if(!pp) return
+      const pCX = pp.x+cw/2, pBottom = pp.y+ch
+      const midY = pBottom + vg/2
+      const valid = children.map(c=>positions.get(c)).filter(Boolean) as Pos[]
+      if(!valid.length) return
+      const leftCX = Math.min(...children.map(c=>(positions.get(c)?.x||0)+cw/2))
+      const rightCX = Math.max(...children.map(c=>(positions.get(c)?.x||0)+cw/2))
+      // parent down
+      paths.push({d:`M${pCX},${pBottom} L${pCX},${midY}`, dashed:false})
+      // horizontal span
+      if(leftCX!==rightCX) paths.push({d:`M${leftCX},${midY} L${rightCX},${midY}`, dashed:false})
+      // each child up
+      children.forEach(c=>{
+        const cp=positions.get(c); if(!cp) return
+        paths.push({d:`M${cp.x+cw/2},${midY} L${cp.x+cw/2},${cp.y}`, dashed:false})
+      })
+    })
+    // functional manager dashed lines
+    members.forEach(m=>{
+      if(!m.functionalManagerId||m.functionalManagerId===m.id) return
+      const fp=positions.get(m.functionalManagerId), mp=positions.get(m.id)
+      if(!fp||!mp) return
+      const x1=fp.x+cw/2, y1=fp.y+ch, x2=mp.x+cw/2, y2=mp.y
+      const my=(y1+y2)/2
+      paths.push({d:`M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`, dashed:true})
+    })
+
+  } else {
+    // horizontal
+    childMap.forEach((children,parentId)=>{
+      if(collapsed.has(parentId)) return
+      const pp=positions.get(parentId); if(!pp) return
+      const pRight=pp.x+cw, pCY=pp.y+ch/2
+      const midX=pRight+vg/2
+      const valid=children.map(c=>positions.get(c)).filter(Boolean) as Pos[]
+      if(!valid.length) return
+      const topCY=Math.min(...children.map(c=>(positions.get(c)?.y||0)+ch/2))
+      const botCY=Math.max(...children.map(c=>(positions.get(c)?.y||0)+ch/2))
+      paths.push({d:`M${pRight},${pCY} L${midX},${pCY}`, dashed:false})
+      if(topCY!==botCY) paths.push({d:`M${midX},${topCY} L${midX},${botCY}`, dashed:false})
+      children.forEach(c=>{
+        const cp=positions.get(c); if(!cp) return
+        paths.push({d:`M${midX},${cp.y+ch/2} L${cp.x},${cp.y+ch/2}`, dashed:false})
+      })
+    })
+    members.forEach(m=>{
+      if(!m.functionalManagerId||m.functionalManagerId===m.id) return
+      const fp=positions.get(m.functionalManagerId), mp=positions.get(m.id)
+      if(!fp||!mp) return
+      const x1=fp.x+cw, y1=fp.y+ch/2, x2=mp.x, y2=mp.y+ch/2
+      const mx=(x1+x2)/2
+      paths.push({d:`M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`, dashed:true})
     })
   }
 
-  let rx = 0
-  roots.forEach(r => { place(r, rx, 0); rx += subtreeW(r) + HG * 2 })
+  const svgW = Math.max(...Array.from(positions.values()).map(p=>p.x+cw))+200
+  const svgH = Math.max(...Array.from(positions.values()).map(p=>p.y+ch))+200
 
-  let maxX = 0, maxY = 0
-  positions.forEach(({ x, y }) => { maxX = Math.max(maxX, x + CW); maxY = Math.max(maxY, y + CH) })
+  return (
+    <svg style={{position:'absolute',inset:0,pointerEvents:'none',overflow:'visible'}} width={svgW} height={svgH}>
+      <defs>
+        <marker id="arr" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,1 L5,3 L0,5" fill="none" stroke="#94A3B8" strokeWidth="1.2"/>
+        </marker>
+        <marker id="arrF" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto">
+          <path d="M0,1 L5,3 L0,5" fill="none" stroke="#8B5CF6" strokeWidth="1.2"/>
+        </marker>
+      </defs>
+      {paths.map((p,i)=>(
+        <path key={i} d={p.d}
+          stroke={p.dashed?'#8B5CF6':'#94A3B8'}
+          strokeWidth={p.dashed?1.5:1.5}
+          strokeDasharray={p.dashed?'5 3':undefined}
+          fill="none"
+          markerEnd={p.dashed?'url(#arrF)':'url(#arr)'}
+        />
+      ))}
+    </svg>
+  )
+}
 
-  return { positions, childMap, roots, totalW: maxX, totalH: maxY }
+// ─── Card ─────────────────────────────────────────────────────────────────────
+
+function NodeCard({ member, level, childCount, isCollapsed, isOver, isDragging, dir,
+  onDragStart, onDragOver, onDragLeave, onDrop,
+  onToggle, onClick, onScrollToParent, hasParent,
+}:{
+  member:TeamMember; level:number; childCount:number; isCollapsed:boolean
+  isOver:boolean; isDragging:boolean; dir:Dir; hasParent:boolean
+  onDragStart:()=>void; onDragOver:(e:React.DragEvent)=>void
+  onDragLeave:()=>void; onDrop:(e:React.DragEvent)=>void
+  onToggle:()=>void; onClick:()=>void; onScrollToParent:()=>void
+}) {
+  const [c1,c2]=pal(member.id)
+  const dc=deptCol(member.department||'x')
+  const cw=dir==='V'?CW:CWH
+  const hasFM = !!member.functionalManagerId
+
+  return (
+    <div
+      draggable
+      onDragStart={e=>{e.dataTransfer.effectAllowed='move';onDragStart()}}
+      onDragOver={e=>{e.preventDefault();e.stopPropagation();onDragOver(e)}}
+      onDragLeave={onDragLeave}
+      onDrop={e=>{e.preventDefault();e.stopPropagation();onDrop(e)}}
+      onClick={onClick}
+      style={{
+        width:cw, borderRadius:12,
+        background:'var(--surface)',
+        border:`1.5px solid ${isOver?'#4F6AF5':'var(--border)'}`,
+        boxShadow: isOver
+          ? '0 0 0 3px rgba(79,106,245,0.15), 0 4px 20px rgba(0,0,0,0.1)'
+          : '0 2px 12px rgba(0,0,0,0.07)',
+        cursor:'pointer', userSelect:'none',
+        opacity:isDragging?0.35:1,
+        transition:'border-color .15s, box-shadow .15s, opacity .15s',
+        position:'relative', overflow:'visible',
+      }}
+    >
+      <div style={{borderRadius:10, overflow:'hidden'}}>
+        {/* Top section */}
+        <div style={{padding:'12px 12px 8px', display:'flex', gap:10, alignItems:'flex-start'}}>
+          {/* Avatar */}
+          <div style={{position:'relative', flexShrink:0}}>
+            <div style={{
+              width:38, height:38, borderRadius:'50%',
+              background:`linear-gradient(135deg,${c1},${c2})`,
+              display:'flex', alignItems:'center', justifyContent:'center',
+              color:'#fff', fontSize:13, fontWeight:800,
+              boxShadow:`0 3px 8px ${c1}40`,
+            }}>{initials(member.name)}</div>
+            {/* Status dot */}
+            <div style={{
+              position:'absolute', bottom:1, right:1,
+              width:9, height:9, borderRadius:'50%',
+              background:'#10B981', border:'2px solid var(--surface)',
+            }}/>
+          </div>
+
+          {/* Name + role */}
+          <div style={{flex:1, minWidth:0}}>
+            <div style={{fontSize:13, fontWeight:800, color:'var(--ink)', lineHeight:1.25,
+              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+              {member.name}
+            </div>
+            <div style={{fontSize:10.5, color:'var(--ink-2)', marginTop:2,
+              overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+              {member.role||'—'}
+            </div>
+          </div>
+
+          {/* Level + up arrow */}
+          <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0}}>
+            <span style={{
+              padding:'2px 6px', borderRadius:5,
+              background:'rgba(79,106,245,0.1)', color:'#4F6AF5',
+              fontSize:9, fontWeight:800, letterSpacing:'0.04em',
+            }}>L{level}</span>
+            {hasParent && (
+              <button onClick={e=>{e.stopPropagation();onScrollToParent()}}
+                title="Rəhbərə get"
+                style={{
+                  width:18, height:18, borderRadius:5,
+                  border:'1px solid var(--border)', background:'var(--surface-2)',
+                  color:'var(--muted)', cursor:'pointer',
+                  display:'flex', alignItems:'center', justifyContent:'center',
+                }}>
+                <span className="material-symbols-rounded" style={{fontSize:11}}>arrow_upward</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Dept tags */}
+        {(member.department || hasFM) && (
+          <div style={{padding:'0 12px 8px', display:'flex', gap:5, flexWrap:'wrap'}}>
+            {member.department && (
+              <span style={{
+                padding:'2px 8px', borderRadius:5,
+                background:'var(--surface-2)', border:'1px solid var(--border)',
+                fontSize:9.5, fontWeight:600, color:'var(--ink-2)',
+                display:'flex', alignItems:'center', gap:4,
+              }}>
+                <span className="material-symbols-rounded" style={{fontSize:10, color:dc}}>business</span>
+                {member.department}
+              </span>
+            )}
+            {hasFM && (
+              <span style={{
+                padding:'2px 8px', borderRadius:5,
+                background:'rgba(139,92,246,0.08)', border:'1px dashed rgba(139,92,246,0.3)',
+                fontSize:9.5, fontWeight:600, color:'#8B5CF6',
+                display:'flex', alignItems:'center', gap:4,
+              }}>
+                <span className="material-symbols-rounded" style={{fontSize:10}}>hub</span>
+                Funksional
+              </span>
+            )}
+          </div>
+        )}
+
+        {/* Direct reports footer */}
+        {childCount > 0 && (
+          <div style={{
+            padding:'6px 12px',
+            borderTop:'1px solid var(--border)',
+            display:'flex', alignItems:'center',
+            background:'var(--surface-2)',
+          }}>
+            <span style={{fontSize:10.5, color:'var(--muted)', display:'flex', alignItems:'center', gap:5}}>
+              <span className="material-symbols-rounded" style={{fontSize:13}}>groups</span>
+              {childCount} Direct Report{childCount!==1?'s':''}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {/* Collapse button */}
+      {childCount>0 && (
+        <button
+          onClick={e=>{e.stopPropagation();onToggle()}}
+          style={{
+            position:'absolute',
+            ...(dir==='V'
+              ? {bottom:-14, left:'50%', transform:'translateX(-50%)'}
+              : {right:-14, top:'50%', transform:'translateY(-50%)'}),
+            width:26, height:26, borderRadius:'50%',
+            background:isCollapsed?'#10B981':'#EF4444',
+            color:'#fff', border:'3px solid var(--surface)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            cursor:'pointer', zIndex:5, fontSize:14, fontWeight:800,
+            boxShadow:'0 2px 6px rgba(0,0,0,0.15)',
+          }}
+        >
+          {isCollapsed?'+':'−'}
+        </button>
+      )}
+    </div>
+  )
 }
 
 // ─── Member Modal ─────────────────────────────────────────────────────────────
 
-function MemberModal({ member, members, onClose }: {
-  member: TeamMember; members: TeamMember[]; onClose: () => void
-}) {
-  const [c1, c2] = avatarPaletteFor(member.id)
-  const dc = deptColor(member.department || '')
-  const mgr = members.find(m => m.id === member.managerId)
-  const fmgr = members.find(m => m.id === member.functionalManagerId)
-  const reports = members.filter(m => m.managerId === member.id)
-  const initials = member.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()
+function MemberModal({member, members, onClose}:{member:TeamMember;members:TeamMember[];onClose:()=>void}) {
+  const [c1,c2]=pal(member.id)
+  const dc=deptCol(member.department||'x')
+  const mgr=members.find(m=>m.id===member.managerId)
+  const fmgr=members.find(m=>m.id===member.functionalManagerId)
+  const reports=members.filter(m=>m.managerId===member.id)
 
   return createPortal(
-    <div style={{
-      position: 'fixed', inset: 0, zIndex: 9999,
-      background: 'rgba(10,10,30,0.55)', backdropFilter: 'blur(4px)',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-    }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{
-        width: 460, borderRadius: 20,
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        boxShadow: '0 32px 80px rgba(0,0,0,0.22)', overflow: 'hidden',
+    <div style={{position:'fixed',inset:0,zIndex:99999,
+      background:'rgba(10,10,30,0.5)',backdropFilter:'blur(4px)',
+      display:'flex',alignItems:'center',justifyContent:'center'}}
+      onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} style={{
+        width:460, borderRadius:20,
+        background:'var(--surface)', border:'1px solid var(--border)',
+        boxShadow:'0 32px 80px rgba(0,0,0,0.2)', overflow:'hidden',
       }}>
-        {/* colour strip */}
-        <div style={{ height: 6, background: `linear-gradient(90deg,${c1},${c2})` }} />
-
-        {/* Header */}
-        <div style={{ padding: '28px 28px 20px', display: 'flex', gap: 20, alignItems: 'flex-start' }}>
+        <div style={{height:5, background:`linear-gradient(90deg,${c1},${c2})`}}/>
+        <div style={{padding:'24px 24px 0', display:'flex', gap:16, alignItems:'flex-start'}}>
           <div style={{
-            width: 72, height: 72, borderRadius: 18, flexShrink: 0,
-            background: `linear-gradient(135deg,${c1},${c2})`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            color: '#fff', fontSize: 22, fontWeight: 800,
-            boxShadow: `0 8px 24px ${c1}50`,
-          }}>{initials}</div>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-0.03em' }}>
-              {member.name}
-            </div>
-            <div style={{ fontSize: 14, color: 'var(--ink-2)', marginTop: 3 }}>{member.role || '—'}</div>
-            {member.department && (
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: 5, marginTop: 8,
-                padding: '3px 10px', borderRadius: 999,
-                background: dc + '18', color: dc, fontSize: 11, fontWeight: 700,
-              }}>
-                <span className="material-symbols-rounded" style={{ fontSize: 12 }}>business</span>
-                {member.department}
-              </span>
-            )}
+            width:64, height:64, borderRadius:16, flexShrink:0,
+            background:`linear-gradient(135deg,${c1},${c2})`,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            color:'#fff', fontSize:20, fontWeight:800,
+            boxShadow:`0 6px 20px ${c1}50`,
+          }}>{initials(member.name)}</div>
+          <div style={{flex:1}}>
+            <div style={{fontSize:18, fontWeight:800, color:'var(--ink)', letterSpacing:'-0.02em'}}>{member.name}</div>
+            <div style={{fontSize:13, color:'var(--ink-2)', marginTop:2}}>{member.role||'—'}</div>
+            {member.department&&<span style={{
+              display:'inline-flex', alignItems:'center', gap:4, marginTop:8,
+              padding:'3px 10px', borderRadius:999,
+              background:dc+'18', color:dc, fontSize:11, fontWeight:700,
+            }}><span className="material-symbols-rounded" style={{fontSize:12}}>business</span>{member.department}</span>}
           </div>
           <button onClick={onClose} style={{
-            width: 32, height: 32, borderRadius: 10,
-            border: '1px solid var(--border)', background: 'var(--surface-2)',
-            color: 'var(--muted)', cursor: 'pointer',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <span className="material-symbols-rounded" style={{ fontSize: 16 }}>close</span>
-          </button>
+            width:32, height:32, borderRadius:9,
+            border:'1px solid var(--border)', background:'var(--surface-2)',
+            color:'var(--muted)', cursor:'pointer',
+            display:'flex', alignItems:'center', justifyContent:'center',
+          }}><span className="material-symbols-rounded" style={{fontSize:16}}>close</span></button>
         </div>
-
-        {/* Info rows */}
-        <div style={{ padding: '0 28px 24px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+        <div style={{padding:'16px 24px 24px', display:'flex', flexDirection:'column', gap:8}}>
           {[
-            { icon: 'mail', label: 'E-poçt', value: member.email },
-            { icon: 'call', label: 'Telefon', value: member.phone },
-            { icon: 'account_tree', label: 'Birbaşa rəhbər', value: mgr?.name, sub: mgr?.role },
-            { icon: 'hub', label: 'Funksional rəhbər', value: fmgr?.name, sub: fmgr?.role, dashed: true },
-          ].filter(r => r.value).map(r => (
+            {icon:'mail',label:'E-poçt',val:member.email,color:'var(--primary)'},
+            {icon:'call',label:'Telefon',val:member.phone,color:'#10B981'},
+            {icon:'account_tree',label:'Birbaşa rəhbər',val:mgr?.name,sub:mgr?.role,color:'#4F6AF5'},
+            {icon:'hub',label:'Funksional rəhbər',val:fmgr?.name,sub:fmgr?.role,color:'#8B5CF6',dashed:true},
+          ].filter(r=>r.val).map(r=>(
             <div key={r.label} style={{
-              display: 'flex', alignItems: 'center', gap: 12,
-              padding: '10px 14px', borderRadius: 12,
-              background: 'var(--surface-2)', border: '1px solid var(--border)',
+              display:'flex', alignItems:'center', gap:12,
+              padding:'10px 14px', borderRadius:12,
+              background:'var(--surface-2)', border:`1px solid ${r.dashed?'rgba(139,92,246,0.2)':'var(--border)'}`,
             }}>
-              <span className="material-symbols-rounded" style={{
-                fontSize: 16, color: r.dashed ? '#8B5CF6' : 'var(--primary)',
-                flexShrink: 0,
-              }}>{r.icon}</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  {r.label}
-                </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {r.value}
-                  {r.sub && <span style={{ color: 'var(--muted)', fontWeight: 500, marginLeft: 6 }}>· {r.sub}</span>}
+              <span className="material-symbols-rounded" style={{fontSize:16, color:r.color, flexShrink:0}}>{r.icon}</span>
+              <div style={{flex:1, minWidth:0}}>
+                <div style={{fontSize:9.5, color:'var(--muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em'}}>{r.label}</div>
+                <div style={{fontSize:13, fontWeight:700, color:'var(--ink)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                  {r.val}{r.sub&&<span style={{color:'var(--muted)', fontWeight:500}}> · {r.sub}</span>}
                 </div>
               </div>
             </div>
           ))}
-
-          {reports.length > 0 && (
-            <div style={{ marginTop: 4 }}>
-              <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>
+          {reports.length>0&&(
+            <div style={{marginTop:4}}>
+              <div style={{fontSize:10, color:'var(--muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em', marginBottom:8}}>
                 Birbaşa tabelilər ({reports.length})
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {reports.map(r => {
-                  const [rc1, rc2] = avatarPaletteFor(r.id)
-                  return (
-                    <div key={r.id} style={{
-                      display: 'flex', alignItems: 'center', gap: 7,
-                      padding: '5px 10px', borderRadius: 999,
-                      background: 'var(--surface-3)', border: '1px solid var(--border)',
-                      fontSize: 12, fontWeight: 600, color: 'var(--ink)',
-                    }}>
-                      <div style={{
-                        width: 20, height: 20, borderRadius: '50%', flexShrink: 0,
-                        background: `linear-gradient(135deg,${rc1},${rc2})`,
-                        display: 'flex', alignItems: 'center', justifyContent: 'center',
-                        color: '#fff', fontSize: 8, fontWeight: 800,
-                      }}>{r.name.substring(0, 2).toUpperCase()}</div>
-                      {r.name}
+              <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
+                {reports.map(r=>{const[rc1,rc2]=pal(r.id);return(
+                  <div key={r.id} style={{
+                    display:'flex', alignItems:'center', gap:7,
+                    padding:'5px 10px', borderRadius:999,
+                    background:'var(--surface-3)', border:'1px solid var(--border)',
+                    fontSize:11, fontWeight:600, color:'var(--ink)',
+                  }}>
+                    <div style={{width:20, height:20, borderRadius:'50%', flexShrink:0,
+                      background:`linear-gradient(135deg,${rc1},${rc2})`,
+                      display:'flex', alignItems:'center', justifyContent:'center',
+                      color:'#fff', fontSize:8, fontWeight:800}}>
+                      {initials(r.name)}
                     </div>
-                  )
-                })}
+                    {r.name}
+                  </div>
+                )})}
               </div>
             </div>
           )}
@@ -210,332 +466,207 @@ function MemberModal({ member, members, onClose }: {
   )
 }
 
-// ─── Org Node Card ────────────────────────────────────────────────────────────
-
-function OrgNode({ member, members, isOver, isDragging, hasChildren, isCollapsed,
-  onDragStart, onDragOver, onDragLeave, onDrop, onToggleCollapse, onClick,
-}: {
-  member: TeamMember; members: TeamMember[]; isOver: boolean; isDragging: boolean
-  hasChildren: boolean; isCollapsed: boolean
-  onDragStart: () => void; onDragOver: (e: React.DragEvent) => void
-  onDragLeave: () => void; onDrop: (e: React.DragEvent) => void
-  onToggleCollapse: () => void; onClick: () => void
-}) {
-  const [c1, c2] = avatarPaletteFor(member.id)
-  const dc = deptColor(member.department || 'x')
-  const initials = member.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()
-
-  return (
-    <div
-      draggable
-      onDragStart={e => { e.dataTransfer.effectAllowed = 'move'; onDragStart() }}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-      onClick={onClick}
-      style={{
-        width: CW, minHeight: CH,
-        borderRadius: 14,
-        background: isOver ? 'rgba(91,91,245,0.07)' : 'var(--surface)',
-        border: `2px solid ${isOver ? 'var(--primary)' : isDragging ? 'var(--primary)' : 'var(--border)'}`,
-        boxShadow: isOver ? '0 0 0 3px rgba(91,91,245,0.18)' : '0 2px 12px rgba(0,0,0,0.06)',
-        overflow: 'hidden', cursor: 'pointer', userSelect: 'none',
-        opacity: isDragging ? 0.4 : 1,
-        transition: 'border-color .15s, box-shadow .15s, opacity .15s',
-        position: 'relative',
-      }}
-    >
-      {/* Department color bar */}
-      <div style={{ height: 4, background: `linear-gradient(90deg,${c1},${c2})` }} />
-
-      <div style={{ padding: '10px 12px', display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-        {/* Avatar */}
-        <div style={{
-          width: 40, height: 40, borderRadius: 12, flexShrink: 0,
-          background: `linear-gradient(135deg,${c1},${c2})`,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          color: '#fff', fontSize: 14, fontWeight: 800,
-          boxShadow: `0 4px 10px ${c1}40`,
-        }}>{initials}</div>
-
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 12, fontWeight: 800, color: 'var(--ink)', lineHeight: 1.3,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {member.name}
-          </div>
-          <div style={{ fontSize: 10, color: 'var(--ink-2)', marginTop: 2,
-            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {member.role || '—'}
-          </div>
-          {member.department && (
-            <span style={{
-              display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 5,
-              padding: '2px 6px', borderRadius: 6,
-              background: dc + '15', color: dc, fontSize: 9, fontWeight: 700,
-            }}>{member.department}</span>
-          )}
-          {member.email && (
-            <div style={{ fontSize: 9, color: 'var(--muted)', marginTop: 4,
-              overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {member.email}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Collapse toggle */}
-      {hasChildren && (
-        <button onClick={e => { e.stopPropagation(); onToggleCollapse() }} style={{
-          position: 'absolute', bottom: 6, right: 6,
-          width: 20, height: 20, borderRadius: 6,
-          border: '1px solid var(--border)', background: 'var(--surface-2)',
-          color: 'var(--muted)', cursor: 'pointer',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 10, fontWeight: 800,
-        }}>
-          <span className="material-symbols-rounded" style={{ fontSize: 12 }}>
-            {isCollapsed ? 'expand_more' : 'expand_less'}
-          </span>
-        </button>
-      )}
-    </div>
-  )
-}
-
 // ─── Visual Chart ─────────────────────────────────────────────────────────────
 
-function VisualChart({ members, onUpdateManager }: {
-  members: TeamMember[]
-  onUpdateManager: (id: string, field: 'managerId' | 'functionalManagerId', val: string | null) => void
+function VisualChart({ members, onUpdateManager, fullscreen, onToggleFullscreen }:{
+  members:TeamMember[]
+  onUpdateManager:(id:string, field:'managerId'|'functionalManagerId', val:string|null)=>void
+  fullscreen:boolean; onToggleFullscreen:()=>void
 }) {
+  const [dir, setDir] = useState<Dir>('V')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-  const [transform, setTransform] = useState({ x: 60, y: 60, scale: 0.85 })
-  const [draggingId, setDraggingId] = useState<string | null>(null)
-  const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [tf, setTf] = useState({x:80, y:60, scale:0.9})
   const [panning, setPanning] = useState(false)
-  const [panOrigin, setPanOrigin] = useState({ mx: 0, my: 0, tx: 0, ty: 0 })
-  const [selectedMember, setSelectedMember] = useState<TeamMember | null>(null)
+  const [panO, setPanO] = useState({mx:0,my:0,tx:0,ty:0})
+  const [draggingId, setDraggingId] = useState<string|null>(null)
+  const [dragOverId, setDragOverId] = useState<string|null>(null)
+  const [selectedMember, setSelectedMember] = useState<TeamMember|null>(null)
   const containerRef = useRef<HTMLDivElement>(null)
 
-  const { positions, childMap, totalW, totalH } = buildLayout(members, collapsed)
+  const layout = buildLayout(members, collapsed, dir)
+  const { positions, childMap, roots, levels, totalW, totalH } = layout
 
-  // Center the tree
+  const cw = dir==='V'?CW:CWH, ch = dir==='V'?CH:CHH
+
   const centerView = useCallback(() => {
-    const c = containerRef.current
-    if (!c) return
-    const { width, height } = c.getBoundingClientRect()
-    const scale = Math.min(1, Math.min(width / (totalW + 80), height / (totalH + 80)), 0.9)
-    setTransform({ x: (width - totalW * scale) / 2, y: 40, scale })
+    const el = containerRef.current; if(!el) return
+    const {width, height} = el.getBoundingClientRect()
+    const sc = Math.min(0.95, Math.min(width/(totalW+120), height/(totalH+120)))
+    setTf({ x:(width-totalW*sc)/2, y:60, scale:sc })
   }, [totalW, totalH])
 
-  useEffect(() => { centerView() }, [centerView])
+  useEffect(() => { setTimeout(centerView, 50) }, [centerView, dir])
 
-  // Zoom
-  const zoom = (delta: number) =>
-    setTransform(t => ({ ...t, scale: Math.max(0.25, Math.min(2, t.scale + delta)) }))
+  const zoom = (d:number) => setTf(t=>({...t, scale:Math.max(0.2,Math.min(2.5,t.scale+d))}))
 
-  // Wheel zoom
-  const onWheel = (e: React.WheelEvent) => {
+  const scrollToNode = (id:string) => {
+    const pos=positions.get(id); if(!pos||!containerRef.current) return
+    const {width,height}=containerRef.current.getBoundingClientRect()
+    setTf(t=>({...t, x:width/2-(pos.x+cw/2)*t.scale, y:height/2-(pos.y+ch/2)*t.scale}))
+  }
+
+  const onWheel = (e:React.WheelEvent) => { e.preventDefault(); zoom(e.deltaY<0?0.08:-0.08) }
+  const onMD = (e:React.MouseEvent) => {
+    if((e.target as HTMLElement).closest('[data-node]')) return
+    setPanning(true); setPanO({mx:e.clientX,my:e.clientY,tx:tf.x,ty:tf.y})
+  }
+  const onMM = (e:React.MouseEvent) => {
+    if(!panning) return
+    setTf(t=>({...t, x:panO.tx+e.clientX-panO.mx, y:panO.ty+e.clientY-panO.my}))
+  }
+  const onMU = () => setPanning(false)
+
+  const handleDrop = (e:React.DragEvent, targetId:string) => {
     e.preventDefault()
-    zoom(e.deltaY < 0 ? 0.08 : -0.08)
-  }
-
-  // Pan
-  const onMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).closest('[data-node]')) return
-    setPanning(true)
-    setPanOrigin({ mx: e.clientX, my: e.clientY, tx: transform.x, ty: transform.y })
-  }
-  const onMouseMove = (e: React.MouseEvent) => {
-    if (!panning) return
-    setTransform(t => ({ ...t, x: panOrigin.tx + e.clientX - panOrigin.mx, y: panOrigin.ty + e.clientY - panOrigin.my }))
-  }
-  const onMouseUp = () => setPanning(false)
-
-  // Drag-and-drop
-  const handleDrop = (e: React.DragEvent, targetId: string) => {
-    e.preventDefault()
-    if (!draggingId || draggingId === targetId) { setDragOverId(null); return }
-    onUpdateManager(draggingId, 'managerId', targetId)
+    if(!draggingId||draggingId===targetId){setDragOverId(null);return}
+    onUpdateManager(draggingId,'managerId',targetId)
     setDraggingId(null); setDragOverId(null)
   }
 
-  // Expand / Collapse all
-  const collapseAll = () => setCollapsed(new Set(Array.from(childMap.keys())))
-  const expandAll = () => setCollapsed(new Set())
-
-  // Build SVG lines
-  const lines: { x1: number; y1: number; x2: number; y2: number; dashed: boolean }[] = []
-  members.forEach(m => {
-    const mPos = positions.get(m.id)
-    if (!mPos) return
-    // Line manager (solid)
-    if (m.managerId && m.managerId !== m.id) {
-      const pPos = positions.get(m.managerId)
-      if (pPos) lines.push({
-        x1: pPos.x + CW / 2, y1: pPos.y + CH,
-        x2: mPos.x + CW / 2, y2: mPos.y,
-        dashed: false,
-      })
-    }
-    // Functional manager (dashed)
-    if (m.functionalManagerId && m.functionalManagerId !== m.id) {
-      const fPos = positions.get(m.functionalManagerId)
-      if (fPos) lines.push({
-        x1: fPos.x + CW / 2, y1: fPos.y + CH,
-        x2: mPos.x + CW / 2, y2: mPos.y,
-        dashed: true,
-      })
-    }
-  })
-
-  const svgW = Math.max(totalW + 200, 800)
-  const svgH = Math.max(totalH + 200, 600)
+  const svgW = Math.max(totalW+300, 800)
+  const svgH = Math.max(totalH+300, 600)
 
   return (
-    <div style={{ flex: 1, position: 'relative', overflow: 'hidden', background: 'var(--surface-2)' }}>
-      {/* Controls */}
-      <div style={{
-        position: 'absolute', left: 16, top: 16, zIndex: 10,
-        display: 'flex', flexDirection: 'column', gap: 6,
-      }}>
-        {[
-          { icon: 'add', action: () => zoom(0.12), title: 'Böyüt' },
-          { icon: 'remove', action: () => zoom(-0.12), title: 'Kiçilt' },
-          { icon: 'center_focus_strong', action: centerView, title: 'Mərkəzləşdir' },
-          { icon: 'unfold_less', action: collapseAll, title: 'Hamısını qat' },
-          { icon: 'unfold_more', action: expandAll, title: 'Hamısını aç' },
-        ].map(btn => (
-          <button key={btn.icon} onClick={btn.action} title={btn.title} style={{
-            width: 36, height: 36, borderRadius: 10,
-            border: '1px solid var(--border)',
-            background: 'var(--surface)',
-            color: 'var(--ink-2)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-          }}>
-            <span className="material-symbols-rounded" style={{ fontSize: 18 }}>{btn.icon}</span>
-          </button>
+    <div style={{flex:1, position:'relative', overflow:'hidden',
+      background:'var(--surface-2)',
+      backgroundImage:'radial-gradient(circle, var(--border) 1px, transparent 1px)',
+      backgroundSize:'22px 22px',
+    }}>
+      {/* Top-right controls */}
+      <div style={{position:'absolute', top:16, right:16, zIndex:10, display:'flex', gap:6}}>
+        {([['V','Şaquli'],['H','Üfüqi']] as [Dir,string][]).map(([d,label])=>(
+          <button key={d} onClick={()=>setDir(d)} style={{
+            padding:'7px 16px', borderRadius:8,
+            background: dir===d?'var(--primary)':'var(--surface)',
+            color: dir===d?'#fff':'var(--ink)',
+            border:`1px solid ${dir===d?'var(--primary)':'var(--border)'}`,
+            fontSize:12, fontWeight:700, cursor:'pointer',
+            boxShadow:'0 1px 4px rgba(0,0,0,0.07)',
+          }}>{label}</button>
         ))}
-
-        {/* Scale indicator */}
-        <div style={{
-          marginTop: 4, padding: '4px 8px', borderRadius: 8,
-          background: 'var(--surface)', border: '1px solid var(--border)',
-          fontSize: 10, fontWeight: 700, color: 'var(--muted)', textAlign: 'center',
+        <div style={{width:1, background:'var(--border)', margin:'0 2px'}}/>
+        <button onClick={()=>setCollapsed(new Set(Array.from(childMap.keys())))} style={{
+          padding:'7px 14px', borderRadius:8,
+          background:'var(--surface)', color:'var(--ink)',
+          border:'1px solid var(--border)', fontSize:12, fontWeight:700, cursor:'pointer',
+        }}>Hamısını Qat</button>
+        <button onClick={()=>setCollapsed(new Set())} style={{
+          padding:'7px 14px', borderRadius:8,
+          background:'var(--surface)', color:'var(--ink)',
+          border:'1px solid var(--border)', fontSize:12, fontWeight:700, cursor:'pointer',
+        }}>Hamısını Aç</button>
+        <button onClick={onToggleFullscreen} title={fullscreen?'Tam ekrandan çıx':'Tam ekran'} style={{
+          width:34, height:34, borderRadius:8,
+          background:'var(--surface)', color:'var(--ink)',
+          border:'1px solid var(--border)', cursor:'pointer',
+          display:'flex', alignItems:'center', justifyContent:'center',
         }}>
-          {Math.round(transform.scale * 100)}%
-        </div>
+          <span className="material-symbols-rounded" style={{fontSize:16}}>
+            {fullscreen?'fullscreen_exit':'fullscreen'}
+          </span>
+        </button>
       </div>
 
-      {/* Legend */}
-      <div style={{
-        position: 'absolute', right: 16, bottom: 16, zIndex: 10,
-        background: 'var(--surface)', border: '1px solid var(--border)',
-        borderRadius: 12, padding: '10px 14px',
-        display: 'flex', flexDirection: 'column', gap: 6, fontSize: 11,
+      {/* Left control panel */}
+      <div style={{position:'absolute', left:12, top:'50%', transform:'translateY(-50%)', zIndex:10,
+        display:'flex', flexDirection:'column', alignItems:'center', gap:4,
+        background:'var(--surface)', border:'1px solid var(--border)',
+        borderRadius:12, padding:'8px 6px',
+        boxShadow:'0 2px 12px rgba(0,0,0,0.08)',
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 24, height: 2, background: 'var(--primary)' }} />
-          <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Birbaşa rəhbər</span>
+        <div style={{fontSize:11, fontWeight:800, color:'var(--primary)', marginBottom:4}}>
+          {Math.round(tf.scale*100)}%
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 24, height: 0, borderTop: '2px dashed #8B5CF6' }} />
-          <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Funksional rəhbər</span>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 24, height: 2, background: 'var(--border)', opacity: 0.5 }} />
-          <span style={{ color: 'var(--muted)', fontWeight: 600 }}>Sürüklə → manager təyin et</span>
-        </div>
+        {[
+          {icon:'add',action:()=>zoom(0.1),title:'Böyüt'},
+          {icon:'remove',action:()=>zoom(-0.1),title:'Kiçilt'},
+          {icon:'center_focus_strong',action:centerView,title:'Mərkəzləşdir'},
+          {icon:'fit_screen',action:()=>{const sc=Math.min(0.95,Math.min((containerRef.current?.clientWidth||800)/(totalW+120),(containerRef.current?.clientHeight||600)/(totalH+120)));setTf(t=>({...t,scale:sc,x:((containerRef.current?.clientWidth||800)-totalW*sc)/2,y:60}))},title:'Ekrana sığdır'},
+        ].map(b=>(
+          <button key={b.icon} onClick={b.action} title={b.title} style={{
+            width:32, height:32, borderRadius:8, border:'none',
+            background:'transparent', color:'var(--ink-2)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            cursor:'pointer',
+          }}
+            onMouseEnter={e=>e.currentTarget.style.background='var(--surface-2)'}
+            onMouseLeave={e=>e.currentTarget.style.background='transparent'}
+          >
+            <span className="material-symbols-rounded" style={{fontSize:18}}>{b.icon}</span>
+          </button>
+        ))}
       </div>
 
       {/* Root drop zone */}
       <div
-        onDragOver={e => { e.preventDefault(); setDragOverId('__root__') }}
-        onDragLeave={() => setDragOverId(null)}
-        onDrop={e => { e.preventDefault(); if (draggingId) { onUpdateManager(draggingId, 'managerId', null); setDraggingId(null); setDragOverId(null) } }}
+        onDragOver={e=>{e.preventDefault();setDragOverId('__root__')}}
+        onDragLeave={()=>setDragOverId(null)}
+        onDrop={e=>{e.preventDefault();if(draggingId){onUpdateManager(draggingId,'managerId',null);setDraggingId(null);setDragOverId(null)}}}
         style={{
-          position: 'absolute', top: 16, right: 16, zIndex: 10,
-          padding: '7px 14px', borderRadius: 10,
-          border: `2px dashed ${dragOverId === '__root__' ? 'var(--primary)' : 'var(--border)'}`,
-          background: dragOverId === '__root__' ? 'var(--primary-soft)' : 'var(--surface)',
-          color: dragOverId === '__root__' ? 'var(--primary)' : 'var(--muted)',
-          fontSize: 11, fontWeight: 700, cursor: 'default',
-          transition: 'all .15s',
+          position:'absolute', bottom:16, right:16, zIndex:10,
+          padding:'7px 14px', borderRadius:9,
+          border:`2px dashed ${dragOverId==='__root__'?'var(--primary)':'var(--border)'}`,
+          background:dragOverId==='__root__'?'var(--primary-soft)':'var(--surface)',
+          color:dragOverId==='__root__'?'var(--primary)':'var(--muted)',
+          fontSize:11, fontWeight:700, transition:'all .15s',
         }}
       >
-        Rəhbərsiz et (kök)
+        <span className="material-symbols-rounded" style={{fontSize:12, marginRight:4}}>upload</span>
+        Rəhbərsiz et
+      </div>
+
+      {/* Legend */}
+      <div style={{
+        position:'absolute', bottom:16, left:60, zIndex:10,
+        background:'var(--surface)', border:'1px solid var(--border)',
+        borderRadius:10, padding:'8px 12px',
+        display:'flex', gap:12, fontSize:10, boxShadow:'0 1px 6px rgba(0,0,0,0.06)',
+      }}>
+        <div style={{display:'flex', alignItems:'center', gap:6}}>
+          <svg width="24" height="4"><line x1="0" y1="2" x2="24" y2="2" stroke="#94A3B8" strokeWidth="1.5" markerEnd="url(#arr)"/></svg>
+          <span style={{color:'var(--muted)', fontWeight:600}}>Birbaşa rəhbər</span>
+        </div>
+        <div style={{display:'flex', alignItems:'center', gap:6}}>
+          <svg width="24" height="4"><line x1="0" y1="2" x2="24" y2="2" stroke="#8B5CF6" strokeWidth="1.5" strokeDasharray="4 2"/></svg>
+          <span style={{color:'var(--muted)', fontWeight:600}}>Funksional rəhbər</span>
+        </div>
       </div>
 
       {/* Canvas */}
-      <div
-        ref={containerRef}
-        onWheel={onWheel}
-        onMouseDown={onMouseDown}
-        onMouseMove={onMouseMove}
-        onMouseUp={onMouseUp}
-        onMouseLeave={onMouseUp}
-        style={{ width: '100%', height: '100%', cursor: panning ? 'grabbing' : 'grab', overflow: 'hidden' }}
+      <div ref={containerRef} style={{width:'100%', height:'100%',
+        cursor:panning?'grabbing':'grab', overflow:'hidden'}}
+        onWheel={onWheel} onMouseDown={onMD} onMouseMove={onMM}
+        onMouseUp={onMU} onMouseLeave={onMU}
       >
         <div style={{
-          transform: `translate(${transform.x}px,${transform.y}px) scale(${transform.scale})`,
-          transformOrigin: '0 0',
-          position: 'relative',
-          width: svgW,
-          height: svgH,
+          transform:`translate(${tf.x}px,${tf.y}px) scale(${tf.scale})`,
+          transformOrigin:'0 0', position:'relative',
+          width:svgW, height:svgH,
         }}>
-          {/* SVG lines */}
-          <svg style={{ position: 'absolute', inset: 0, pointerEvents: 'none', overflow: 'visible' }}
-            width={svgW} height={svgH}>
-            <defs>
-              <marker id="arrowSolid" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-                <path d="M0,0 L6,3 L0,6 Z" fill="var(--primary)" opacity="0.6" />
-              </marker>
-              <marker id="arrowDash" markerWidth="6" markerHeight="6" refX="3" refY="3" orient="auto">
-                <path d="M0,0 L6,3 L0,6 Z" fill="#8B5CF6" opacity="0.6" />
-              </marker>
-            </defs>
-            {lines.map((l, i) => {
-              const mx = (l.x1 + l.x2) / 2
-              const my1 = l.y1 + VG * 0.45
-              const my2 = l.y2 - VG * 0.45
-              const d = `M${l.x1},${l.y1} C${l.x1},${my1} ${l.x2},${my2} ${l.x2},${l.y2}`
-              return (
-                <path key={i} d={d}
-                  stroke={l.dashed ? '#8B5CF6' : 'var(--primary)'}
-                  strokeWidth={l.dashed ? 1.5 : 2}
-                  strokeDasharray={l.dashed ? '6 4' : undefined}
-                  fill="none" opacity={0.55}
-                  markerEnd={l.dashed ? 'url(#arrowDash)' : 'url(#arrowSolid)'}
-                />
-              )
-            })}
-          </svg>
+          <OrgLines positions={positions} childMap={childMap}
+            collapsed={collapsed} members={members} dir={dir}/>
 
-          {/* Nodes */}
-          {members.map(m => {
-            const pos = positions.get(m.id)
-            if (!pos) return null
-            const children = childMap.get(m.id) ?? []
+          {members.map(m=>{
+            const pos=positions.get(m.id); if(!pos) return null
+            const children=childMap.get(m.id)||[]
+            const mgr=members.find(x=>x.id===m.managerId)
             return (
-              <div key={m.id} data-node="1" style={{ position: 'absolute', left: pos.x, top: pos.y }}>
-                <OrgNode
-                  member={m} members={members}
-                  isOver={dragOverId === m.id && draggingId !== m.id}
-                  isDragging={draggingId === m.id}
-                  hasChildren={children.length > 0}
+              <div key={m.id} data-node="1"
+                style={{position:'absolute', left:pos.x, top:pos.y}}>
+                <NodeCard
+                  member={m} level={levels.get(m.id)||1}
+                  childCount={children.length}
                   isCollapsed={collapsed.has(m.id)}
-                  onDragStart={() => setDraggingId(m.id)}
-                  onDragOver={e => { e.preventDefault(); e.stopPropagation(); setDragOverId(m.id) }}
-                  onDragLeave={() => setDragOverId(null)}
-                  onDrop={e => { e.stopPropagation(); handleDrop(e, m.id) }}
-                  onToggleCollapse={() => setCollapsed(prev => {
-                    const n = new Set(prev)
-                    n.has(m.id) ? n.delete(m.id) : n.add(m.id)
-                    return n
-                  })}
-                  onClick={() => setSelectedMember(m)}
+                  isOver={dragOverId===m.id&&draggingId!==m.id}
+                  isDragging={draggingId===m.id} dir={dir}
+                  hasParent={!!mgr}
+                  onDragStart={()=>setDraggingId(m.id)}
+                  onDragOver={e=>{e.preventDefault();setDragOverId(m.id)}}
+                  onDragLeave={()=>setDragOverId(null)}
+                  onDrop={e=>handleDrop(e,m.id)}
+                  onToggle={()=>setCollapsed(prev=>{const n=new Set(prev);n.has(m.id)?n.delete(m.id):n.add(m.id);return n})}
+                  onClick={()=>setSelectedMember(m)}
+                  onScrollToParent={()=>mgr&&scrollToNode(mgr.id)}
                 />
               </div>
             )
@@ -543,166 +674,126 @@ function VisualChart({ members, onUpdateManager }: {
         </div>
       </div>
 
-      {selectedMember && (
-        <MemberModal member={selectedMember} members={members} onClose={() => setSelectedMember(null)} />
-      )}
-    </div>
-  )
-}
-
-// ─── Manager Select ───────────────────────────────────────────────────────────
-
-function ManagerSelect({ value, members, excludeId, placeholder, onChange, color }: {
-  value: string; members: TeamMember[]; excludeId: string
-  placeholder: string; onChange: (v: string) => void; color?: string
-}) {
-  return (
-    <div style={{ position: 'relative', flex: 1, minWidth: 160 }}>
-      <span className="material-symbols-rounded" style={{
-        position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)',
-        fontSize: 14, color: color ?? 'var(--primary)', pointerEvents: 'none', zIndex: 1,
-      }}>account_tree</span>
-      <select
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        style={{
-          width: '100%', padding: '8px 10px 8px 30px',
-          border: '1.5px solid var(--border)', borderRadius: 10,
-          background: 'var(--surface)', color: 'var(--ink)',
-          fontSize: 12, fontWeight: 600, outline: 'none', cursor: 'pointer',
-          appearance: 'none', WebkitAppearance: 'none',
-        }}
-      >
-        <option value="">— {placeholder} —</option>
-        {members.filter(m => m.id !== excludeId).map(m => (
-          <option key={m.id} value={m.id}>{m.name} ({m.role || m.department || '—'})</option>
-        ))}
-      </select>
-      <span className="material-symbols-rounded" style={{
-        position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)',
-        fontSize: 14, color: 'var(--muted)', pointerEvents: 'none',
-      }}>unfold_more</span>
+      {selectedMember&&<MemberModal member={selectedMember} members={members} onClose={()=>setSelectedMember(null)}/>}
     </div>
   )
 }
 
 // ─── List Tab ─────────────────────────────────────────────────────────────────
 
-function ListTab({ members, onUpdate }: {
-  members: TeamMember[]
-  onUpdate: (id: string, field: 'managerId' | 'functionalManagerId', val: string | null) => void
+function ManagerSel({value,members,excludeId,placeholder,onChange,accent}:{
+  value:string;members:TeamMember[];excludeId:string
+  placeholder:string;onChange:(v:string)=>void;accent?:string
 }) {
-  const [search, setSearch] = useState('')
-  const filtered = members.filter(m =>
-    m.name.toLowerCase().includes(search.toLowerCase()) ||
-    (m.role || '').toLowerCase().includes(search.toLowerCase()) ||
-    (m.department || '').toLowerCase().includes(search.toLowerCase())
-  )
-
+  const ac=accent||'var(--primary)'
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      {/* Search */}
-      <div style={{ position: 'relative' }}>
-        <span className="material-symbols-rounded" style={{
-          position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-          fontSize: 16, color: 'var(--muted)', pointerEvents: 'none',
-        }}>search</span>
-        <input
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          placeholder="İşçi axtar..."
-          style={{
-            width: '100%', padding: '10px 14px 10px 38px',
-            border: '1.5px solid var(--border)', borderRadius: 12,
-            background: 'var(--surface)', color: 'var(--ink)',
-            fontSize: 13, outline: 'none', boxSizing: 'border-box',
-          }}
-        />
-      </div>
-
-      {/* Column headers */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: '1fr 1fr 1fr',
-        gap: 12, padding: '0 16px',
-        fontSize: 10, fontWeight: 800, color: 'var(--muted)',
-        textTransform: 'uppercase', letterSpacing: '0.08em',
+    <div style={{position:'relative',flex:1,minWidth:160}}>
+      <span className="material-symbols-rounded" style={{
+        position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',
+        fontSize:13,color:ac,pointerEvents:'none',zIndex:1,
+      }}>account_tree</span>
+      <select value={value} onChange={e=>onChange(e.target.value)} style={{
+        width:'100%',padding:'8px 28px 8px 28px',
+        border:`1.5px solid var(--border)`,borderRadius:10,
+        background:'var(--surface)',color:'var(--ink)',
+        fontSize:12,fontWeight:600,outline:'none',cursor:'pointer',
+        appearance:'none',WebkitAppearance:'none',
       }}>
-        <span>İşçi</span>
-        <span>Birbaşa rəhbər</span>
-        <span>Funksional rəhbər</span>
+        <option value="">— {placeholder} —</option>
+        {members.filter(m=>m.id!==excludeId).map(m=>(
+          <option key={m.id} value={m.id}>{m.name}{m.role?` (${m.role})`:''}</option>
+        ))}
+      </select>
+      <span className="material-symbols-rounded" style={{
+        position:'absolute',right:8,top:'50%',transform:'translateY(-50%)',
+        fontSize:13,color:'var(--muted)',pointerEvents:'none',
+      }}>expand_more</span>
+    </div>
+  )
+}
+
+function ListTab({members,onUpdate}:{
+  members:TeamMember[]
+  onUpdate:(id:string,field:'managerId'|'functionalManagerId',val:string|null)=>void
+}) {
+  const [search,setSearch]=useState('')
+  const filtered=members.filter(m=>
+    m.name.toLowerCase().includes(search.toLowerCase())||
+    (m.role||'').toLowerCase().includes(search.toLowerCase())||
+    (m.department||'').toLowerCase().includes(search.toLowerCase())
+  )
+  return (
+    <div style={{display:'flex',flexDirection:'column',gap:14}}>
+      <div style={{position:'relative'}}>
+        <span className="material-symbols-rounded" style={{
+          position:'absolute',left:12,top:'50%',transform:'translateY(-50%)',
+          fontSize:16,color:'var(--muted)',pointerEvents:'none',
+        }}>search</span>
+        <input value={search} onChange={e=>setSearch(e.target.value)}
+          placeholder="İşçi axtar..."
+          style={{width:'100%',padding:'10px 14px 10px 38px',
+            border:'1.5px solid var(--border)',borderRadius:12,
+            background:'var(--surface)',color:'var(--ink)',
+            fontSize:13,outline:'none',boxSizing:'border-box'}}/>
       </div>
 
-      {/* Rows */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        {filtered.map((m, i) => {
-          const [c1, c2] = avatarPaletteFor(m.id)
-          const dc = deptColor(m.department || 'x')
-          const initials = m.name.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase()
+      <div style={{display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
+        gap:12,padding:'4px 16px',
+        fontSize:10,fontWeight:800,color:'var(--muted)',
+        textTransform:'uppercase',letterSpacing:'0.08em'}}>
+        <span>İşçi</span><span>Birbaşa rəhbər</span><span>Funksional rəhbər</span>
+      </div>
+
+      <div style={{display:'flex',flexDirection:'column',gap:6}}>
+        {filtered.map(m=>{
+          const[c1,c2]=pal(m.id); const dc=deptCol(m.department||'x')
           return (
             <div key={m.id} style={{
-              display: 'grid', gridTemplateColumns: '1fr 1fr 1fr',
-              gap: 12, alignItems: 'center',
-              padding: '12px 16px', borderRadius: 14,
-              background: 'var(--surface)',
-              border: '1px solid var(--border)',
-              transition: 'box-shadow .15s',
+              display:'grid',gridTemplateColumns:'minmax(0,1fr) minmax(0,1fr) minmax(0,1fr)',
+              gap:12,alignItems:'center',
+              padding:'12px 16px',borderRadius:14,
+              background:'var(--surface)',border:'1px solid var(--border)',
+              transition:'box-shadow .15s',
             }}
-              onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.07)')}
-              onMouseLeave={e => (e.currentTarget.style.boxShadow = '')}
+              onMouseEnter={e=>e.currentTarget.style.boxShadow='0 4px 16px rgba(0,0,0,0.08)'}
+              onMouseLeave={e=>e.currentTarget.style.boxShadow=''}
             >
-              {/* Member info */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{display:'flex',alignItems:'center',gap:12}}>
                 <div style={{
-                  width: 42, height: 42, borderRadius: 12, flexShrink: 0,
-                  background: `linear-gradient(135deg,${c1},${c2})`,
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: '#fff', fontSize: 14, fontWeight: 800,
-                  boxShadow: `0 4px 12px ${c1}40`,
-                }}>{initials}</div>
-                <div style={{ minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--ink)',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  width:42,height:42,borderRadius:12,flexShrink:0,
+                  background:`linear-gradient(135deg,${c1},${c2})`,
+                  display:'flex',alignItems:'center',justifyContent:'center',
+                  color:'#fff',fontSize:14,fontWeight:800,
+                  boxShadow:`0 4px 10px ${c1}40`,
+                }}>{initials(m.name)}</div>
+                <div style={{minWidth:0}}>
+                  <div style={{fontSize:13,fontWeight:800,color:'var(--ink)',
+                    overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                     {m.name}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 1,
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                    {m.role || '—'}
+                  <div style={{fontSize:11,color:'var(--ink-2)',marginTop:1,
+                    overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                    {m.role||'—'}
                   </div>
-                  {m.department && (
-                    <span style={{
-                      display: 'inline-flex', alignItems: 'center', gap: 3, marginTop: 4,
-                      padding: '2px 6px', borderRadius: 6,
-                      background: dc + '15', color: dc, fontSize: 9, fontWeight: 700,
-                    }}>{m.department}</span>
-                  )}
+                  {m.department&&<span style={{
+                    display:'inline-flex',alignItems:'center',gap:3,marginTop:4,
+                    padding:'2px 6px',borderRadius:5,
+                    background:dc+'15',color:dc,fontSize:9,fontWeight:700,
+                  }}>{m.department}</span>}
                 </div>
               </div>
-
-              {/* Line Manager */}
-              <ManagerSelect
-                value={m.managerId ?? ''}
-                members={members}
-                excludeId={m.id}
+              <ManagerSel value={m.managerId??''} members={members} excludeId={m.id}
                 placeholder="Birbaşa rəhbər yoxdur"
-                onChange={v => onUpdate(m.id, 'managerId', v || null)}
-              />
-
-              {/* Functional Manager */}
-              <ManagerSelect
-                value={m.functionalManagerId ?? ''}
-                members={members}
-                excludeId={m.id}
+                onChange={v=>onUpdate(m.id,'managerId',v||null)}/>
+              <ManagerSel value={m.functionalManagerId??''} members={members} excludeId={m.id}
                 placeholder="Funksional rəhbər yoxdur"
-                onChange={v => onUpdate(m.id, 'functionalManagerId', v || null)}
-                color="#8B5CF6"
-              />
+                onChange={v=>onUpdate(m.id,'functionalManagerId',v||null)}
+                accent="#8B5CF6"/>
             </div>
           )
         })}
-
-        {filtered.length === 0 && (
-          <div style={{ padding: '48px 20px', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>
+        {!filtered.length&&(
+          <div style={{padding:'48px 20px',textAlign:'center',color:'var(--muted)',fontSize:13}}>
             İşçi tapılmadı
           </div>
         )}
@@ -714,89 +805,72 @@ function ListTab({ members, onUpdate }: {
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function OrgChartPage() {
-  const { currentWorkspaceId } = useWorkspace()
   const { members, loading } = useTeam()
-  const [localMembers, setLocalMembers] = useState<TeamMember[]>([])
-  const [tab, setTab] = useState<'list' | 'chart'>('list')
+  const [local, setLocal] = useState<TeamMember[]>([])
+  const [tab, setTab] = useState<'list'|'chart'>('chart')
+  const [fullscreen, setFullscreen] = useState(false)
 
-  useEffect(() => { setLocalMembers(members) }, [members])
+  useEffect(()=>{ setLocal(members) },[members])
 
-  const updateManager = useCallback(async (
-    id: string, field: 'managerId' | 'functionalManagerId', val: string | null
-  ) => {
-    setLocalMembers(prev => prev.map(m => m.id === id ? { ...m, [field]: val ?? undefined } : m))
-    const res = await db.team.update(id, { [field]: val ?? null })
-    if (!res.success) {
-      toast.error('Saxlanmadı')
-      setLocalMembers(members)
-    } else {
-      toast.success(field === 'managerId' ? 'Birbaşa rəhbər yeniləndi' : 'Funksional rəhbər yeniləndi')
-    }
-  }, [members])
+  const updateManager = useCallback(async(
+    id:string, field:'managerId'|'functionalManagerId', val:string|null
+  )=>{
+    setLocal(prev=>prev.map(m=>m.id===id?{...m,[field]:val??undefined}:m))
+    const res = await db.team.update(id,{[field]:val??null})
+    if(!res.success){toast.error('Saxlanmadı');setLocal(members)}
+    else toast.success(field==='managerId'?'Birbaşa rəhbər yeniləndi':'Funksional rəhbər yeniləndi')
+  },[members])
 
-  const placed = localMembers.filter(m => m.managerId && localMembers.some(x => x.id === m.managerId)).length
+  const placed=local.filter(m=>m.managerId&&local.some(x=>x.id===m.managerId)).length
+  const depts=new Set(local.map(m=>m.department).filter(Boolean)).size
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+  const chartContent = (
+    <div style={{display:'flex',flexDirection:'column',flex:1,minHeight:0,overflow:'hidden',
+      ...(fullscreen?{position:'fixed',inset:0,zIndex:9990,background:'var(--surface-2)'}:{}),
+    }}>
       {/* Header */}
-      <div style={{
-        padding: '20px 24px 16px',
-        borderBottom: '1px solid var(--border)',
-        background: 'var(--surface)',
-        flexShrink: 0,
-      }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{
-              width: 38, height: 38, borderRadius: 11,
-              background: 'var(--primary-soft)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <span className="material-symbols-rounded" style={{ fontSize: 20, color: 'var(--primary)' }}>account_tree</span>
+      <div style={{padding:'14px 20px 12px',borderBottom:'1px solid var(--border)',
+        background:'var(--surface)',flexShrink:0}}>
+        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:16,flexWrap:'wrap'}}>
+          <div style={{display:'flex',alignItems:'center',gap:12}}>
+            <div style={{width:36,height:36,borderRadius:10,background:'var(--primary-soft)',
+              display:'flex',alignItems:'center',justifyContent:'center'}}>
+              <span className="material-symbols-rounded" style={{fontSize:19,color:'var(--primary)'}}>account_tree</span>
             </div>
             <div>
-              <h1 style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', letterSpacing: '-0.03em', margin: 0 }}>
-                Org Chart
-              </h1>
-              <p style={{ color: 'var(--muted)', fontSize: 12, margin: 0 }}>Komanda iyerarxiyasını idarə edin</p>
+              <h1 style={{fontSize:18,fontWeight:800,color:'var(--ink)',letterSpacing:'-0.03em',margin:0}}>Org Chart</h1>
+              <p style={{color:'var(--muted)',fontSize:11,margin:0}}>Komanda iyerarxiyasını idarə edin</p>
             </div>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{display:'flex',alignItems:'center',gap:8,flexWrap:'wrap'}}>
             {[
-              { icon: 'groups', label: `${localMembers.length} üzv`, color: 'var(--primary)', bg: 'var(--primary-soft)' },
-              { icon: 'account_tree', label: `${placed} yerləşdirilmiş`, color: '#10B981', bg: 'rgba(16,185,129,0.1)' },
-              { icon: 'person_off', label: `${localMembers.length - placed} rəhbərsiz`, color: '#F59E0B', bg: 'rgba(245,158,11,0.1)' },
-            ].map(s => (
-              <div key={s.label} style={{
-                display: 'flex', alignItems: 'center', gap: 6,
-                padding: '6px 12px', borderRadius: 10,
-                background: s.bg, color: s.color,
-                fontSize: 12, fontWeight: 700,
-              }}>
-                <span className="material-symbols-rounded" style={{ fontSize: 14 }}>{s.icon}</span>
+              {icon:'groups',label:`${local.length} İşçi`,c:'var(--primary)',bg:'var(--primary-soft)'},
+              {icon:'manage_accounts',label:`${placed} Manager`,c:'#10B981',bg:'rgba(16,185,129,0.1)'},
+              {icon:'business',label:`${depts} Şöbə`,c:'#F59E0B',bg:'rgba(245,158,11,0.1)'},
+            ].map(s=>(
+              <div key={s.label} style={{display:'flex',alignItems:'center',gap:5,
+                padding:'5px 11px',borderRadius:8,background:s.bg,color:s.c,
+                fontSize:11,fontWeight:700}}>
+                <span className="material-symbols-rounded" style={{fontSize:13}}>{s.icon}</span>
                 {s.label}
               </div>
             ))}
-
-            {/* Tab switcher */}
-            <div style={{
-              display: 'flex', background: 'var(--surface-2)',
-              borderRadius: 10, padding: 3, gap: 2, marginLeft: 8,
-            }}>
-              {(['list', 'chart'] as const).map(t => (
-                <button key={t} onClick={() => setTab(t)} style={{
-                  padding: '6px 14px', borderRadius: 8,
-                  fontSize: 12, fontWeight: 700,
-                  color: tab === t ? 'var(--ink)' : 'var(--muted)',
-                  background: tab === t ? 'var(--surface)' : 'transparent',
-                  boxShadow: tab === t ? 'var(--shadow-sm)' : 'none',
-                  display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+            <div style={{display:'flex',background:'var(--surface-2)',
+              borderRadius:9,padding:3,gap:2,marginLeft:4}}>
+              {(['chart','list'] as const).map(t=>(
+                <button key={t} onClick={()=>setTab(t)} style={{
+                  padding:'5px 12px',borderRadius:7,
+                  fontSize:11,fontWeight:700,cursor:'pointer',
+                  color:tab===t?'var(--ink)':'var(--muted)',
+                  background:tab===t?'var(--surface)':'transparent',
+                  boxShadow:tab===t?'var(--shadow-sm)':'none',
+                  display:'flex',alignItems:'center',gap:5,
                 }}>
-                  <span className="material-symbols-rounded" style={{ fontSize: 14 }}>
-                    {t === 'list' ? 'view_list' : 'account_tree'}
+                  <span className="material-symbols-rounded" style={{fontSize:13}}>
+                    {t==='chart'?'account_tree':'view_list'}
                   </span>
-                  {t === 'list' ? 'Siyahı' : 'Vizual'}
+                  {t==='chart'?'Vizual':'Siyahı'}
                 </button>
               ))}
             </div>
@@ -805,21 +879,24 @@ export default function OrgChartPage() {
       </div>
 
       {/* Content */}
-      {tab === 'chart' ? (
-        <VisualChart members={localMembers} onUpdateManager={updateManager} />
-      ) : (
-        <div style={{ flex: 1, overflowY: 'auto', padding: 24 }}>
-          {loading ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {[...Array(5)].map((_, i) => (
-                <div key={i} className="skeleton" style={{ height: 68, borderRadius: 14 }} />
+      {tab==='chart'?(
+        <VisualChart members={local} onUpdateManager={updateManager}
+          fullscreen={fullscreen} onToggleFullscreen={()=>setFullscreen(f=>!f)}/>
+      ):(
+        <div style={{flex:1,overflowY:'auto',padding:20}}>
+          {loading?(
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              {[...Array(5)].map((_,i)=>(
+                <div key={i} className="skeleton" style={{height:68,borderRadius:14}}/>
               ))}
             </div>
-          ) : (
-            <ListTab members={localMembers} onUpdate={updateManager} />
+          ):(
+            <ListTab members={local} onUpdate={updateManager}/>
           )}
         </div>
       )}
     </div>
   )
+
+  return chartContent
 }
