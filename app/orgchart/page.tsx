@@ -97,9 +97,15 @@ function buildLayout(members: TeamMember[], collapsed: Set<string>, dir: Dir): L
     })
     treeHCache.set(id,h);return h
   }
-  const place = (id:string,x:number,y:number,vis=new Set<string>()) => {
+  // Pre-compute all widths & heights so place() can read from cache safely
+  roots.forEach(r=>{ subW(r); subTreeH(r) })
+  // place() uses leftEdge (left boundary of the full subtree span).
+  // Node box is centered within that span → no child can overflow left or overlap siblings.
+  const place = (id:string,leftEdge:number,y:number,vis=new Set<string>()) => {
     if(vis.has(id))return; vis=new Set(vis); vis.add(id)
-    positions.set(id,{x,y})
+    const span=wCache.get(id)??CW
+    const centerX=leftEdge+span/2
+    positions.set(id,{x:centerX-CW/2,y})
     if(collapsed.has(id))return
     const ch=childMap.get(id)||[]; if(!ch.length)return
     const rows:string[][]=[]
@@ -107,10 +113,10 @@ function buildLayout(members: TeamMember[], collapsed: Set<string>, dir: Dir): L
     rowGroupsMap.set(id,rows)
     let rowY=y+CH+VG
     rows.forEach(row=>{
-      const rowW=row.reduce((s,c,i)=>s+subW(c,vis)+(i?HG:0),0)
-      let cx=x+CW/2-rowW/2
-      row.forEach(c=>{const w=subW(c,vis);place(c,cx,rowY,vis);cx+=w+HG})
-      rowY+=Math.max(...row.map(c=>subTreeH(c,vis)))+VG
+      const rowW=row.reduce((s,c,i)=>s+(wCache.get(c)??CW)+(i?HG:0),0)
+      let cx=centerX-rowW/2
+      row.forEach(c=>{const w=wCache.get(c)??CW;place(c,cx,rowY,vis);cx+=w+HG})
+      rowY+=Math.max(...row.map(c=>treeHCache.get(c)??CH))+VG
     })
   }
 
@@ -136,7 +142,7 @@ function buildLayout(members: TeamMember[], collapsed: Set<string>, dir: Dir): L
 
   if (dir === 'V') {
     let rx=0
-    roots.forEach(r=>{place(r,rx,0);rx+=subW(r)+HG*2})
+    roots.forEach(r=>{place(r,rx,0);rx+=(wCache.get(r)??CW)+HG*2})
     let mxX=0,mxY=0; positions.forEach(({x,y})=>{mxX=Math.max(mxX,x+CW);mxY=Math.max(mxY,y+CH)})
     return {positions,childMap,roots,levels,totalW:mxX,totalH:mxY,rowGroupsMap}
   } else {
