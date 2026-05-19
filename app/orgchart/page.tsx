@@ -31,6 +31,7 @@ function initials(name: string) { return name.split(' ').map(w=>w[0]).join('').s
 
 const CW = 256, CH = 134, HG = 28, VG = 80   // vertical
 const CWH = 228, CHH = 108, HGH = 56, VGH = 18 // horizontal
+const MAX_COLS = 4
 
 type Dir = 'V'|'H'
 interface Pos { x:number; y:number }
@@ -41,6 +42,7 @@ interface LayoutResult {
   roots: string[]
   levels: Map<string,number>
   totalW: number; totalH: number
+  rowGroupsMap: Map<string, string[][]>
 }
 
 function buildLayout(members: TeamMember[], collapsed: Set<string>, dir: Dir): LayoutResult {
@@ -62,27 +64,57 @@ function buildLayout(members: TeamMember[], collapsed: Set<string>, dir: Dir): L
 
   const wCache = new Map<string,number>()
   const hCache = new Map<string,number>()
+  const treeHCache = new Map<string,number>()
   const positions = new Map<string,Pos>()
+  const rowGroupsMap = new Map<string,string[][]>()
 
+  // ── Vertical layout ──────────────────────────────────────────────────────────
   const subW = (id:string, vis=new Set<string>()):number => {
     if (vis.has(id)||wCache.has(id)) return wCache.get(id)||CW
     vis=new Set(vis); vis.add(id)
     if (collapsed.has(id)){wCache.set(id,CW);return CW}
     const ch=childMap.get(id)||[]
     if(!ch.length){wCache.set(id,CW);return CW}
-    const w=Math.max(CW,ch.reduce((s,c,i)=>s+subW(c,vis)+(i?HG:0),0))
+    const rows:string[][]=[]
+    for(let i=0;i<ch.length;i+=MAX_COLS) rows.push(ch.slice(i,i+MAX_COLS))
+    const rowWidths=rows.map(row=>row.reduce((s,c,i)=>s+subW(c,vis)+(i?HG:0),0))
+    const w=Math.max(CW,...rowWidths)
     wCache.set(id,w);return w
+  }
+  const subTreeH = (id:string, vis=new Set<string>()):number => {
+    if(vis.has(id)) return CH
+    if(treeHCache.has(id)) return treeHCache.get(id)!
+    vis=new Set(vis); vis.add(id)
+    if(collapsed.has(id)){treeHCache.set(id,CH);return CH}
+    const ch=childMap.get(id)||[]
+    if(!ch.length){treeHCache.set(id,CH);return CH}
+    const rows:string[][]=[]
+    for(let i=0;i<ch.length;i+=MAX_COLS) rows.push(ch.slice(i,i+MAX_COLS))
+    let h=CH+VG
+    rows.forEach((row,ri)=>{
+      h+=Math.max(...row.map(c=>subTreeH(c,vis)))
+      if(ri<rows.length-1) h+=VG
+    })
+    treeHCache.set(id,h);return h
   }
   const place = (id:string,x:number,y:number,vis=new Set<string>()) => {
     if(vis.has(id))return; vis=new Set(vis); vis.add(id)
     positions.set(id,{x,y})
     if(collapsed.has(id))return
     const ch=childMap.get(id)||[]; if(!ch.length)return
-    const tot=ch.reduce((s,c,i)=>s+subW(c,vis)+(i?HG:0),0)
-    let cx=x+CW/2-tot/2
-    ch.forEach(c=>{const w=subW(c,vis);place(c,cx,y+CH+VG,vis);cx+=w+HG})
+    const rows:string[][]=[]
+    for(let i=0;i<ch.length;i+=MAX_COLS) rows.push(ch.slice(i,i+MAX_COLS))
+    rowGroupsMap.set(id,rows)
+    let rowY=y+CH+VG
+    rows.forEach(row=>{
+      const rowW=row.reduce((s,c,i)=>s+subW(c,vis)+(i?HG:0),0)
+      let cx=x+CW/2-rowW/2
+      row.forEach(c=>{const w=subW(c,vis);place(c,cx,rowY,vis);cx+=w+HG})
+      rowY+=Math.max(...row.map(c=>subTreeH(c,vis)))+VG
+    })
   }
 
+  // ── Horizontal layout ────────────────────────────────────────────────────────
   const subH = (id:string,vis=new Set<string>()):number => {
     if(vis.has(id)||hCache.has(id)) return hCache.get(id)||CHH
     vis=new Set(vis); vis.add(id)
@@ -106,20 +138,21 @@ function buildLayout(members: TeamMember[], collapsed: Set<string>, dir: Dir): L
     let rx=0
     roots.forEach(r=>{place(r,rx,0);rx+=subW(r)+HG*2})
     let mxX=0,mxY=0; positions.forEach(({x,y})=>{mxX=Math.max(mxX,x+CW);mxY=Math.max(mxY,y+CH)})
-    return {positions,childMap,roots,levels,totalW:mxX,totalH:mxY}
+    return {positions,childMap,roots,levels,totalW:mxX,totalH:mxY,rowGroupsMap}
   } else {
     let ry=0
     roots.forEach(r=>{placeH(r,0,ry);ry+=subH(r)+VGH*3})
     let mxX=0,mxY=0; positions.forEach(({x,y})=>{mxX=Math.max(mxX,x+CWH);mxY=Math.max(mxY,y+CHH)})
-    return {positions,childMap,roots,levels,totalW:mxX,totalH:mxY}
+    return {positions,childMap,roots,levels,totalW:mxX,totalH:mxY,rowGroupsMap:new Map()}
   }
 }
 
 // ─── SVG Lines ────────────────────────────────────────────────────────────────
 
-function OrgLines({ positions, childMap, collapsed, members, dir }:{
+function OrgLines({ positions, childMap, collapsed, members, dir, rowGroupsMap }:{
   positions:Map<string,Pos>; childMap:Map<string,string[]>
   collapsed:Set<string>; members:TeamMember[]; dir:Dir
+  rowGroupsMap: Map<string,string[][]>
 }) {
   const cw = dir==='V'?CW:CWH, ch = dir==='V'?CH:CHH
   const vg = dir==='V'?VG:HGH
@@ -130,19 +163,34 @@ function OrgLines({ positions, childMap, collapsed, members, dir }:{
       if(collapsed.has(parentId)) return
       const pp = positions.get(parentId); if(!pp) return
       const pCX = pp.x+cw/2, pBottom = pp.y+ch
-      const midY = pBottom + vg/2
-      const valid = children.map(c=>positions.get(c)).filter(Boolean) as Pos[]
-      if(!valid.length) return
-      const leftCX = Math.min(...children.map(c=>(positions.get(c)?.x||0)+cw/2))
-      const rightCX = Math.max(...children.map(c=>(positions.get(c)?.x||0)+cw/2))
-      // parent down
-      paths.push({d:`M${pCX},${pBottom} L${pCX},${midY}`, dashed:false})
-      // horizontal span
-      if(leftCX!==rightCX) paths.push({d:`M${leftCX},${midY} L${rightCX},${midY}`, dashed:false})
-      // each child up
-      children.forEach(c=>{
-        const cp=positions.get(c); if(!cp) return
-        paths.push({d:`M${cp.x+cw/2},${midY} L${cp.x+cw/2},${cp.y}`, dashed:false})
+
+      // Use row groups if available, otherwise treat all children as one row
+      const rows = rowGroupsMap.get(parentId) || [children]
+
+      // Compute midY for each row (halfway between this row's children top and the gap above)
+      const rowMidYs: number[] = rows.map(row => {
+        const firstPos = positions.get(row[0])
+        if (!firstPos) return pBottom + vg/2
+        return firstPos.y - vg/2
+      })
+
+      const lastMidY = rowMidYs[rowMidYs.length - 1]
+
+      // Vertical trunk from parent bottom down to last row's midY
+      paths.push({d:`M${pCX},${pBottom} L${pCX},${lastMidY}`, dashed:false})
+
+      // For each row: horizontal span + drops
+      rows.forEach((row, ri) => {
+        const midY = rowMidYs[ri]
+        const valid = row.filter(c => positions.has(c))
+        if (!valid.length) return
+        const leftCX = Math.min(...valid.map(c=>(positions.get(c)?.x||0)+cw/2))
+        const rightCX = Math.max(...valid.map(c=>(positions.get(c)?.x||0)+cw/2))
+        if (leftCX !== rightCX) paths.push({d:`M${leftCX},${midY} L${rightCX},${midY}`, dashed:false})
+        valid.forEach(c=>{
+          const cp=positions.get(c)!
+          paths.push({d:`M${cp.x+cw/2},${midY} L${cp.x+cw/2},${cp.y}`, dashed:false})
+        })
       })
     })
     // functional manager dashed lines
@@ -468,10 +516,9 @@ function MemberModal({member, members, onClose}:{member:TeamMember;members:TeamM
 
 // ─── Visual Chart ─────────────────────────────────────────────────────────────
 
-function VisualChart({ members, onUpdateManager, fullscreen, onToggleFullscreen }:{
+function VisualChart({ members, onUpdateManager }:{
   members:TeamMember[]
   onUpdateManager:(id:string, field:'managerId'|'functionalManagerId', val:string|null)=>void
-  fullscreen:boolean; onToggleFullscreen:()=>void
 }) {
   const [dir, setDir] = useState<Dir>('V')
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -481,28 +528,41 @@ function VisualChart({ members, onUpdateManager, fullscreen, onToggleFullscreen 
   const [draggingId, setDraggingId] = useState<string|null>(null)
   const [dragOverId, setDragOverId] = useState<string|null>(null)
   const [selectedMember, setSelectedMember] = useState<TeamMember|null>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const outerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const handler = () => setIsFullscreen(!!document.fullscreenElement)
+    document.addEventListener('fullscreenchange', handler)
+    return () => document.removeEventListener('fullscreenchange', handler)
+  }, [])
+
+  const toggleFullscreen = async () => {
+    if (document.fullscreenElement) await document.exitFullscreen()
+    else await outerRef.current?.requestFullscreen()
+  }
 
   const layout = buildLayout(members, collapsed, dir)
-  const { positions, childMap, roots, levels, totalW, totalH } = layout
+  const { positions, childMap, roots, levels, totalW, totalH, rowGroupsMap } = layout
 
   const cw = dir==='V'?CW:CWH, ch = dir==='V'?CH:CHH
 
   const centerView = useCallback(() => {
-    const el = containerRef.current; if(!el) return
-    const {width, height} = el.getBoundingClientRect()
-    const sc = Math.min(0.95, Math.min(width/(totalW+120), height/(totalH+120)))
-    setTf({ x:(width-totalW*sc)/2, y:60, scale:sc })
+    const el = containerRef.current; if(!el || !totalW || !totalH) return
+    const w = el.offsetWidth, h = el.offsetHeight
+    const sc = Math.max(0.1, Math.min(0.9, (w-80)/totalW, (h-80)/totalH))
+    setTf({ x: Math.max(20, (w - totalW*sc)/2), y: Math.max(20, (h - totalH*sc)/2), scale: sc })
   }, [totalW, totalH])
 
-  useEffect(() => { setTimeout(centerView, 50) }, [centerView, dir])
+  useEffect(() => { const t = setTimeout(centerView, 60); return () => clearTimeout(t) }, [centerView, dir])
 
   const zoom = (d:number) => setTf(t=>({...t, scale:Math.max(0.2,Math.min(2.5,t.scale+d))}))
 
   const scrollToNode = (id:string) => {
     const pos=positions.get(id); if(!pos||!containerRef.current) return
-    const {width,height}=containerRef.current.getBoundingClientRect()
-    setTf(t=>({...t, x:width/2-(pos.x+cw/2)*t.scale, y:height/2-(pos.y+ch/2)*t.scale}))
+    const w=containerRef.current.offsetWidth, h=containerRef.current.offsetHeight
+    setTf(t=>({...t, x:w/2-(pos.x+cw/2)*t.scale, y:h/2-(pos.y+ch/2)*t.scale}))
   }
 
   const onWheel = (e:React.WheelEvent) => { e.preventDefault(); zoom(e.deltaY<0?0.08:-0.08) }
@@ -527,7 +587,7 @@ function VisualChart({ members, onUpdateManager, fullscreen, onToggleFullscreen 
   const svgH = Math.max(totalH+300, 600)
 
   return (
-    <div style={{flex:1, position:'relative', overflow:'hidden',
+    <div ref={outerRef} style={{flex:1, position:'relative', overflow:'hidden',
       background:'var(--surface-2)',
       backgroundImage:'radial-gradient(circle, var(--border) 1px, transparent 1px)',
       backgroundSize:'22px 22px',
@@ -555,14 +615,14 @@ function VisualChart({ members, onUpdateManager, fullscreen, onToggleFullscreen 
           background:'var(--surface)', color:'var(--ink)',
           border:'1px solid var(--border)', fontSize:12, fontWeight:700, cursor:'pointer',
         }}>Hamısını Aç</button>
-        <button onClick={onToggleFullscreen} title={fullscreen?'Tam ekrandan çıx':'Tam ekran'} style={{
+        <button onClick={toggleFullscreen} title={isFullscreen?'Tam ekrandan çıx':'Tam ekran'} style={{
           width:34, height:34, borderRadius:8,
           background:'var(--surface)', color:'var(--ink)',
           border:'1px solid var(--border)', cursor:'pointer',
           display:'flex', alignItems:'center', justifyContent:'center',
         }}>
           <span className="material-symbols-rounded" style={{fontSize:16}}>
-            {fullscreen?'fullscreen_exit':'fullscreen'}
+            {isFullscreen?'fullscreen_exit':'fullscreen'}
           </span>
         </button>
       </div>
@@ -581,7 +641,7 @@ function VisualChart({ members, onUpdateManager, fullscreen, onToggleFullscreen 
           {icon:'add',action:()=>zoom(0.1),title:'Böyüt'},
           {icon:'remove',action:()=>zoom(-0.1),title:'Kiçilt'},
           {icon:'center_focus_strong',action:centerView,title:'Mərkəzləşdir'},
-          {icon:'fit_screen',action:()=>{const sc=Math.min(0.95,Math.min((containerRef.current?.clientWidth||800)/(totalW+120),(containerRef.current?.clientHeight||600)/(totalH+120)));setTf(t=>({...t,scale:sc,x:((containerRef.current?.clientWidth||800)-totalW*sc)/2,y:60}))},title:'Ekrana sığdır'},
+          {icon:'fit_screen',action:centerView,title:'Ekrana sığdır'},
         ].map(b=>(
           <button key={b.icon} onClick={b.action} title={b.title} style={{
             width:32, height:32, borderRadius:8, border:'none',
@@ -644,7 +704,7 @@ function VisualChart({ members, onUpdateManager, fullscreen, onToggleFullscreen 
           width:svgW, height:svgH,
         }}>
           <OrgLines positions={positions} childMap={childMap}
-            collapsed={collapsed} members={members} dir={dir}/>
+            collapsed={collapsed} members={members} dir={dir} rowGroupsMap={rowGroupsMap}/>
 
           {members.map(m=>{
             const pos=positions.get(m.id); if(!pos) return null
@@ -808,7 +868,6 @@ export default function OrgChartPage() {
   const { members, loading } = useTeam()
   const [local, setLocal] = useState<TeamMember[]>([])
   const [tab, setTab] = useState<'list'|'chart'>('chart')
-  const [fullscreen, setFullscreen] = useState(false)
 
   useEffect(()=>{ setLocal(members) },[members])
 
@@ -825,9 +884,7 @@ export default function OrgChartPage() {
   const depts=new Set(local.map(m=>m.department).filter(Boolean)).size
 
   const chartContent = (
-    <div style={{display:'flex',flexDirection:'column',flex:1,minHeight:0,overflow:'hidden',
-      ...(fullscreen?{position:'fixed',inset:0,zIndex:9990,background:'var(--surface-2)'}:{}),
-    }}>
+    <div style={{display:'flex',flexDirection:'column',flex:1,minHeight:0,overflow:'hidden'}}>
       {/* Header */}
       <div style={{padding:'14px 20px 12px',borderBottom:'1px solid var(--border)',
         background:'var(--surface)',flexShrink:0}}>
@@ -880,8 +937,7 @@ export default function OrgChartPage() {
 
       {/* Content */}
       {tab==='chart'?(
-        <VisualChart members={local} onUpdateManager={updateManager}
-          fullscreen={fullscreen} onToggleFullscreen={()=>setFullscreen(f=>!f)}/>
+        <VisualChart members={local} onUpdateManager={updateManager}/>
       ):(
         <div style={{flex:1,overflowY:'auto',padding:20}}>
           {loading?(
