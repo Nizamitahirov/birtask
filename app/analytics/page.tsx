@@ -115,7 +115,7 @@ function AnStat({ color, icon, label, value, total, trend, change, positive, neg
     <div className={`statM color-${color}`}>
       <div className="statM-head">
         <div className="ico"><Icon name={icon} size={16} /></div>
-        <span className={`delta ${deltaClass}`}>{deltaSign}{delta}%</span>
+        <span className={`delta ${deltaClass}`}>{delta}%</span>
       </div>
       <div className="v">{value}</div>
       <div className="l">{label} <span style={{ color: 'var(--muted-2)' }}>· {total}</span></div>
@@ -636,40 +636,40 @@ export default function AnalyticsPage() {
 
       {/* 4 KPI stat cards */}
       <div className="statsM">
-        {/* Projects: total count, delta = new projects this period vs previous */}
+        {/* Projects: total, delta = % of projects completed */}
         <AnStat
           color="indigo" icon="folder"
           label="Layihə" value={projects.length}
           total={`${projects.filter(p => p.status === 'Davam edir').length} aktiv · ${projects.filter(p => p.status === 'Tamamlandı').length} tamamlandı`}
           trend={stats.projTrend.length ? stats.projTrend : [0, projects.length]}
-          change={stats.projChange}
+          change={pct(projects.filter(p => p.status === 'Tamamlandı').length, projects.length)}
           positive
         />
-        {/* Completed tasks: in current range, delta = vs previous same period */}
+        {/* Completed tasks: delta = completion rate (completed / all tasks) */}
         <AnStat
           color="info" icon="check_circle"
           label="Tamamlanan tapşırıq" value={stats.completed}
-          total={`${stats.total} tapşırıq · ${stats.completionRate}% nisbət`}
+          total={`${tasks.length} tapşırıqdan · tamamlanma nisbəti`}
           trend={stats.completedTrend.length ? stats.completedTrend : [0, stats.completed]}
-          change={stats.completedChange}
+          change={pct(stats.completed, tasks.length)}
           positive
         />
-        {/* Overdue tasks: snapshot of tasks past due date, delta = vs previous period's new overdue */}
+        {/* Overdue: delta = % of active tasks that are overdue */}
         <AnStat
           color="warn" icon="warning"
           label="Gecikmiş tapşırıq" value={stats.overdueNow}
           total={`${tasks.filter(t => t.status !== 'Tamamlandı').length} aktiv tapşırıq`}
           trend={stats.overdueTrend.length ? stats.overdueTrend : [0, stats.overdueNow]}
-          change={stats.overdueChange}
+          change={pct(stats.overdueNow, tasks.filter(t => t.status !== 'Tamamlandı').length)}
           negative
         />
-        {/* Time entries: hours logged in current range, delta = vs previous period */}
+        {/* Time entries: delta = on-time completion rate */}
         <AnStat
           color="pink" icon="schedule"
           label="Vaxt qeydləri" value={fmtH(stats.teMinNow)}
-          total={`${timeEntries.length} qeyd · əvvəlki: ${fmtH(stats.teMinPrev)}`}
+          total={`${timeEntries.length} qeyd · ${members.length} üzv`}
           trend={stats.timeTrend.length ? stats.timeTrend : [0, Math.round(stats.teMinNow / 60)]}
-          change={stats.teChange}
+          change={stats.onTimeRate}
           positive
         />
       </div>
