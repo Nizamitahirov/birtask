@@ -20,6 +20,7 @@ interface AnStatProps {
   value: string | number
   total: string
   trend: number[]
+  change?: number   // explicit % change vs previous period (overrides trend-based delta)
   positive?: boolean
   negative?: boolean
 }
@@ -88,7 +89,7 @@ function fmtH(min: number): string {
 
 // ── AnStat — KPI card with sparkline ─────────────────────────────────────────
 
-function AnStat({ color, icon, label, value, total, trend, positive, negative }: AnStatProps) {
+function AnStat({ color, icon, label, value, total, trend, change, positive, negative }: AnStatProps) {
   const max = Math.max(...trend, 1)
   const path = trend
     .map((p, i) => `${i === 0 ? 'M' : 'L'} ${(i / (trend.length - 1)) * 100},${30 - (p / max) * 24}`)
@@ -104,7 +105,8 @@ function AnStat({ color, icon, label, value, total, trend, positive, negative }:
 
   const last = trend[trend.length - 1]
   const prev = trend[trend.length - 2] ?? last
-  const delta = prev ? Math.round(((last - prev) / Math.max(prev, 1)) * 100) : 0
+  const trendDelta = prev ? Math.round(((last - prev) / Math.max(prev, 1)) * 100) : 0
+  const delta = change !== undefined ? change : trendDelta
   const isGood = (positive && delta >= 0) || (negative && delta <= 0) || (!positive && !negative && delta >= 0)
   const deltaClass = isGood ? 'up' : 'down'
   const deltaSign = delta >= 0 ? '+' : ''
@@ -347,32 +349,107 @@ export default function AnalyticsPage() {
   // ── Computed stats ───────────────────────────────────────────────────────────
 
   const stats = useMemo(() => {
-    const rangeStart = range === 'all'
-      ? new Date(0)
-      : new Date(today.getTime() - parseInt(range) * 86400000)
+    const days = range === 'all' ? null : parseInt(range)
+    const rangeStart = days ? new Date(today.getTime() - days * 86400000) : new Date(0)
+    const prevStart  = days ? new Date(today.getTime() - days * 2 * 86400000) : new Date(0)
 
+    // Current period: tasks updated within range
     const tasksInRange = tasks.filter(t => new Date(t.updatedAt) >= rangeStart)
+    // Previous period: same length, before current range
+    const prevTasks    = tasks.filter(t => {
+      const d = new Date(t.updatedAt)
+      return d >= prevStart && d < rangeStart
+    })
+
     const total      = tasksInRange.length
     const completed  = tasksInRange.filter(t => t.status === 'Tamamlandı').length
     const inProgress = tasksInRange.filter(t => t.status === 'Davam edir').length
     const inReview   = tasksInRange.filter(t => t.status === 'Yoxlanılır').length
     const pending    = tasksInRange.filter(t => t.status === 'Gözləyir').length
-    const overdue    = tasksInRange.filter(t =>
-      t.status !== 'Tamamlandı' && t.dueDate && new Date(t.dueDate) < today
+
+    const prevCompleted = prevTasks.filter(t => t.status === 'Tamamlandı').length
+
+    // Overdue = tasks not done and past due date RIGHT NOW (snapshot)
+    const allOverdue  = tasks.filter(t => t.status !== 'Tamamlandı' && t.dueDate && new Date(t.dueDate) < today)
+    const overdueNow  = allOverdue.length
+    // Previous period overdue proxy: tasks with dueDate falling in the previous window and still not done
+    const prevOverdue = tasks.filter(t =>
+      t.status !== 'Tamamlandı' && t.dueDate &&
+      new Date(t.dueDate) >= prevStart && new Date(t.dueDate) < rangeStart
     ).length
+
+    // On-time completion: completed within range AND finished before/on dueDate
     const onTimeDone = tasksInRange.filter(t =>
       t.status === 'Tamamlandı' && (!t.dueDate || new Date(t.updatedAt) <= new Date(t.dueDate))
     ).length
 
+    // Projects: new projects created in current vs previous period
+    const projNow  = projects.filter(p => new Date(p.createdAt) >= rangeStart).length
+    const projPrev = projects.filter(p => {
+      const d = new Date(p.createdAt)
+      return d >= prevStart && d < rangeStart
+    }).length
+
+    // Time entries: current vs previous period
+    const teNow  = timeEntries.filter(e => !e.createdAt || new Date(e.createdAt) >= rangeStart)
+    const tePrev = timeEntries.filter(e => {
+      if (!e.createdAt) return false
+      const d = new Date(e.createdAt)
+      return d >= prevStart && d < rangeStart
+    })
+    const teMinNow  = teNow.reduce((a, e) => a + (e.durationMinutes ?? 0), 0)
+    const teMinPrev = tePrev.reduce((a, e) => a + (e.durationMinutes ?? 0), 0)
+
+    // % change helpers — null if no previous data
+    const changePct = (cur: number, prev: number) =>
+      prev > 0 ? Math.round(((cur - prev) / prev) * 100) : (cur > 0 ? 100 : 0)
+
+    // Sparkline trends: weekly points for the range
+    const numWeeks = days ? Math.min(Math.ceil(days / 7), 8) : 8
+    const completedTrend: number[] = []
+    const overdueTrend:   number[] = []
+    const projTrend:      number[] = []
+    const timeTrend:      number[] = []
+
+    for (let i = numWeeks - 1; i >= 0; i--) {
+      const wEnd   = new Date(today.getTime() - i * 7 * 86400000)
+      const wStart = new Date(today.getTime() - (i + 1) * 7 * 86400000)
+
+      completedTrend.push(tasks.filter(t => {
+        if (t.status !== 'Tamamlandı') return false
+        const d = new Date(t.updatedAt)
+        return d >= wStart && d <= wEnd
+      }).length)
+
+      overdueTrend.push(tasks.filter(t =>
+        t.status !== 'Tamamlandı' && t.dueDate &&
+        new Date(t.dueDate) >= wStart && new Date(t.dueDate) <= wEnd
+      ).length)
+
+      projTrend.push(projects.filter(p => new Date(p.createdAt) <= wEnd).length)
+
+      timeTrend.push(Math.round(
+        timeEntries
+          .filter(e => e.createdAt && new Date(e.createdAt) >= wStart && new Date(e.createdAt) <= wEnd)
+          .reduce((a, e) => a + (e.durationMinutes ?? 0), 0) / 60
+      ))
+    }
+
     return {
       tasks: tasksInRange,
-      total, completed, inProgress, inReview, pending, overdue,
+      total, completed, inProgress, inReview, pending,
+      overdueNow, prevOverdue,
       completionRate: pct(completed, total),
       onTimeRate: pct(onTimeDone, completed),
+      completedChange: changePct(completed, prevCompleted),
+      overdueChange:   changePct(overdueNow, prevOverdue),
+      projNow, projChange: changePct(projNow, projPrev),
+      teMinNow, teMinPrev, teChange: changePct(teMinNow, teMinPrev),
+      completedTrend, overdueTrend, projTrend, timeTrend,
     }
-  }, [tasks, range, today])
+  }, [tasks, projects, timeEntries, range, today])
 
-  // ── Trend points (14-day) ────────────────────────────────────────────────────
+  // ── Trend points (14-day daily, for line chart) ──────────────────────────────
 
   const trendPoints = useMemo<TrendPoint[]>(() => {
     const out: TrendPoint[] = []
@@ -494,16 +571,7 @@ export default function AnalyticsPage() {
       .sort((a, b) => b.rate - a.rate || b.done - a.done)
   }, [members, stats.tasks, timeEntries])
 
-  // ── Time entry totals ────────────────────────────────────────────────────────
-
-  const totalLoggedMin = useMemo(() => {
-    const rangeStart = range === 'all'
-      ? new Date(0)
-      : new Date(today.getTime() - parseInt(range) * 86400000)
-    return timeEntries
-      .filter(e => !e.createdAt || new Date(e.createdAt) >= rangeStart)
-      .reduce((a, e) => a + (e.durationMinutes ?? 0), 0)
-  }, [timeEntries, range, today])
+  // totalLoggedMin is now computed inside stats as stats.teMinNow
 
   const rangeLabel = AN_RANGES.find(r => r.v === range)!.l
 
@@ -528,8 +596,9 @@ export default function AnalyticsPage() {
             tapşırıq tamamlandı.
           </h1>
           <p>
-            {projects.length} layihə · {stats.total} tapşırıq izlənilir.
+            {projects.length} layihə · {tasks.length} tapşırıq izlənilir.
             Vaxtında çatdırılma nisbəti <b>{stats.onTimeRate}%</b>.
+            {stats.overdueNow > 0 && <> · <span style={{ color: '#FFD466', fontWeight: 700 }}>{stats.overdueNow} gecikmiş</span></>}
           </p>
           <div className="cta-row" style={{ flexWrap: 'wrap', gap: 6 }}>
             {AN_RANGES.map(r => (
@@ -567,31 +636,41 @@ export default function AnalyticsPage() {
 
       {/* 4 KPI stat cards */}
       <div className="statsM">
+        {/* Projects: total count, delta = new projects this period vs previous */}
         <AnStat
           color="indigo" icon="folder"
           label="Layihə" value={projects.length}
-          total={projects.filter(p => p.status === 'Tamamlandı').length + ' tamamlandı'}
-          trend={[2,3,4,5,6,7,8,8,9, Math.max(projects.length, 1)]}
-        />
-        <AnStat
-          color="info" icon="check_circle"
-          label="Tamamlanan" value={stats.completed}
-          total={stats.total + ' tapşırıq'}
-          trend={[1,2,2,3,4,5,5,6,7, Math.max(stats.completed, 1)]}
+          total={`${projects.filter(p => p.status === 'Davam edir').length} aktiv · ${projects.filter(p => p.status === 'Tamamlandı').length} tamamlandı`}
+          trend={stats.projTrend.length ? stats.projTrend : [0, projects.length]}
+          change={stats.projChange}
           positive
         />
+        {/* Completed tasks: in current range, delta = vs previous same period */}
+        <AnStat
+          color="info" icon="check_circle"
+          label="Tamamlanan tapşırıq" value={stats.completed}
+          total={`${stats.total} tapşırıq · ${stats.completionRate}% nisbət`}
+          trend={stats.completedTrend.length ? stats.completedTrend : [0, stats.completed]}
+          change={stats.completedChange}
+          positive
+        />
+        {/* Overdue tasks: snapshot of tasks past due date, delta = vs previous period's new overdue */}
         <AnStat
           color="warn" icon="warning"
-          label="Gecikmiş" value={stats.overdue}
-          total={stats.tasks.length + ' tapşırıq'}
-          trend={[3,4,4,5,4,4,3,3,2, Math.max(stats.overdue, 1)]}
+          label="Gecikmiş tapşırıq" value={stats.overdueNow}
+          total={`${tasks.filter(t => t.status !== 'Tamamlandı').length} aktiv tapşırıq`}
+          trend={stats.overdueTrend.length ? stats.overdueTrend : [0, stats.overdueNow]}
+          change={stats.overdueChange}
           negative
         />
+        {/* Time entries: hours logged in current range, delta = vs previous period */}
         <AnStat
           color="pink" icon="schedule"
-          label="Vaxt qeydləri" value={fmtH(totalLoggedMin)}
-          total={timeEntries.length + ' qeyd'}
-          trend={[40,55,68,90,110,130,150,180,210, Math.max(totalLoggedMin / 60, 1)]}
+          label="Vaxt qeydləri" value={fmtH(stats.teMinNow)}
+          total={`${timeEntries.length} qeyd · əvvəlki: ${fmtH(stats.teMinPrev)}`}
+          trend={stats.timeTrend.length ? stats.timeTrend : [0, Math.round(stats.teMinNow / 60)]}
+          change={stats.teChange}
+          positive
         />
       </div>
 
