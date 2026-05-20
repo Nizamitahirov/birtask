@@ -1,148 +1,200 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { useTasks, useProjects, useTeamNames } from '@/hooks/useSheets'
-import { Task, TaskStatus } from '@/lib/types'
+import ReactDOM from 'react-dom'
+import { useTasks, useProjects, useTeam } from '@/hooks/useSheets'
+import { Task } from '@/lib/types'
 import { TaskForm } from '@/components/tasks/TaskForm'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
-import { StatusBadge, PriorityBadge } from '@/components/ui/Badge'
-import { CardSkeleton } from '@/components/ui/Skeleton'
+import { Icon } from '@/components/ui/Icon'
 import {
-  ChevronLeft, ChevronRight, Plus, RefreshCw,
-  CalendarDays, Calendar, LayoutGrid, X,
-  Edit2, Trash2, Tag, User, Clock, AlertCircle
-} from 'lucide-react'
-import { cn, getDaysLeft, formatDate } from '@/lib/utils'
+  avatarPaletteFor,
+  paletteFor,
+  initialsM,
+  fmtDateM,
+  daysFromNow,
+} from '@/lib/design-utils'
 
-const MONTH_NAMES = ['Yanvar','Fevral','Mart','Aprel','May','İyun','İyul','Avqust','Sentyabr','Oktyabr','Noyabr','Dekabr']
-const DAY_NAMES_SHORT = ['B.e', 'Ç.a', 'Ç', 'C.a', 'C', 'Ş', 'B']
-const DAY_NAMES_FULL = ['Bazar ertəsi', 'Çərşənbə axşamı', 'Çərşənbə', 'Cümə axşamı', 'Cümə', 'Şənbə', 'Bazar']
+/* ─── Constants ─────────────────────────────────────────────── */
 
-const STATUS_COLORS: Record<TaskStatus, { bg: string; text: string; border: string }> = {
-  'Gözləyir':   { bg: '#94A3B822', text: '#94A3B8', border: '#94A3B844' },
-  'Davam edir': { bg: '#3B82F622', text: '#3B82F6', border: '#3B82F644' },
-  'Yoxlanılır': { bg: '#F59E0B22', text: '#F59E0B', border: '#F59E0B44' },
-  'Tamamlandı': { bg: '#10B98122', text: '#10B981', border: '#10B98144' },
+const CAL_MONTHS_AZ = ['Yanvar','Fevral','Mart','Aprel','May','İyun','İyul','Avqust','Sentyabr','Oktyabr','Noyabr','Dekabr']
+const CAL_DAY_AZ_SHORT = ['B.e','Ç.a','Ç','C.a','C','Ş','B']
+const CAL_DAY_AZ_FULL  = ['Bazar ertəsi','Çərşənbə axşamı','Çərşənbə','Cümə axşamı','Cümə','Şənbə','Bazar']
+
+const CAL_STATUS: Record<string, { fg: string; bg: string; ring: string }> = {
+  'Gözləyir':   { fg: 'var(--muted)',   bg: 'var(--surface-2)',    ring: '#CFD1DD' },
+  'Davam edir': { fg: 'var(--primary)', bg: 'var(--primary-soft)', ring: '#C5C5FA' },
+  'Yoxlanılır': { fg: 'var(--warn)',    bg: 'var(--warn-soft)',    ring: '#F8D69C' },
+  'Tamamlandı': { fg: 'var(--success)', bg: 'var(--success-soft)', ring: '#B6E8D6' },
 }
 
-const PRIORITY_DOT: Record<string, string> = {
-  'Kritik': '#EF4444',
-  'Yüksək': '#F97316',
-  'Orta':   '#F59E0B',
-  'Aşağı':  '#94A3B8',
+const CAL_PRIORITY_DOT: Record<string, string> = {
+  'Kritik': 'var(--accent)',
+  'Yüksək': 'var(--warn)',
+  'Orta':   'var(--info)',
+  'Aşağı':  'var(--muted-2)',
 }
 
-function toLocalDateStr(date: Date): string {
-  const y = date.getFullYear()
-  const m = String(date.getMonth() + 1).padStart(2, '0')
-  const d = String(date.getDate()).padStart(2, '0')
-  return `${y}-${m}-${d}`
+/* ─── Helpers ───────────────────────────────────────────────── */
+
+function localKey(d: Date): string {
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0')
 }
 
-function parseDateStr(s: string): Date | null {
-  if (!s) return null
-  const d = new Date(s)
-  return isNaN(d.getTime()) ? null : d
-}
-
-function isSameDay(a: Date, b: Date) {
+function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() &&
     a.getMonth() === b.getMonth() &&
     a.getDate() === b.getDate()
 }
 
-type CalendarView = 'month' | 'week' | 'agenda'
+function getWeekStart(d: Date): Date {
+  const x = new Date(d)
+  const offset = (x.getDay() + 6) % 7
+  x.setDate(x.getDate() - offset)
+  x.setHours(0, 0, 0, 0)
+  return x
+}
+
+function statusPillClass(status: string): string {
+  if (status === 'Davam edir') return 'indigo'
+  if (status === 'Yoxlanılır') return 'warn'
+  if (status === 'Tamamlandı') return 'green'
+  return 'muted'
+}
+
+function priorityPillClass(priority: string): string {
+  if (priority === 'Kritik') return 'accent'
+  if (priority === 'Yüksək') return 'warn'
+  if (priority === 'Orta') return 'info'
+  return 'muted'
+}
+
+type CalView = 'month' | 'week' | 'agenda'
+
+/* ─── Main Page ─────────────────────────────────────────────── */
 
 export default function CalendarPage() {
-  const { tasks, loading, refresh, create, update, remove } = useTasks()
+  const { tasks, loading, create, update, remove } = useTasks()
   const { projects } = useProjects()
-  const teamNames = useTeamNames()
+  const { members } = useTeam()
 
-  const today = new Date()
-  const [currentDate, setCurrentDate] = useState(new Date(today.getFullYear(), today.getMonth(), 1))
-  const [view, setView] = useState<CalendarView>('month')
-  const [selectedDay, setSelectedDay] = useState<Date | null>(today)
+  const today = useMemo(() => new Date(), [])
+
+  const [view, setView] = useState<CalView>('month')
+  const [cursor, setCursor] = useState(() => new Date(today.getFullYear(), today.getMonth(), 1))
+  const [selectedDay, setSelectedDay] = useState<Date>(today)
   const [projectFilter, setProjectFilter] = useState('all')
-  const [modal, setModal] = useState<'create' | 'edit' | null>(null)
-  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
-  const [confirmDelete, setConfirmDelete] = useState<Task | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [deleting, setDeleting] = useState(false)
-  const [newTaskDate, setNewTaskDate] = useState<string>('')
+  const [taskDrawer, setTaskDrawer] = useState<string | null>(null)
 
-  const filteredTasks = useMemo(() =>
-    tasks.filter(t => projectFilter === 'all' || t.projectId === projectFilter),
+  // TaskForm modal state
+  const [modal, setModal] = useState<'create' | 'edit' | null>(null)
+  const [editTask, setEditTask] = useState<Task | null>(null)
+  const [newTaskDate, setNewTaskDate] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  // ConfirmDialog state
+  const [confirmDelete, setConfirmDelete] = useState<Task | null>(null)
+  const [deleting, setDeleting] = useState(false)
+
+  /* Derived */
+  const filtered = useMemo(
+    () => tasks.filter(t => projectFilter === 'all' || t.projectId === projectFilter),
     [tasks, projectFilter]
   )
 
-  // Group tasks by date string
-  const tasksByDate = useMemo(() => {
-    const map: Record<string, Task[]> = {}
-    filteredTasks.forEach(t => {
+  const tasksByDay = useMemo(() => {
+    const m: Record<string, Task[]> = {}
+    filtered.forEach(t => {
       if (!t.dueDate) return
-      const d = parseDateStr(t.dueDate)
-      if (!d) return
-      const key = toLocalDateStr(d)
-      if (!map[key]) map[key] = []
-      map[key].push(t)
+      const k = localKey(new Date(t.dueDate))
+      ;(m[k] = m[k] || []).push(t)
     })
-    return map
-  }, [filteredTasks])
+    return m
+  }, [filtered])
 
-  const selectedDayStr = selectedDay ? toLocalDateStr(selectedDay) : ''
-  const selectedDayTasks = selectedDay ? (tasksByDate[selectedDayStr] || []) : []
+  const y = cursor.getFullYear()
+  const mo = cursor.getMonth()
+
+  const monthStats = useMemo(() => {
+    const inMonth = filtered.filter(t => {
+      if (!t.dueDate) return false
+      const d = new Date(t.dueDate)
+      return d.getFullYear() === y && d.getMonth() === mo
+    })
+    const byStatus: Record<string, number> = { 'Gözləyir': 0, 'Davam edir': 0, 'Yoxlanılır': 0, 'Tamamlandı': 0 }
+    let overdue = 0
+    inMonth.forEach(t => {
+      if (byStatus[t.status] !== undefined) byStatus[t.status]++
+      if (t.status !== 'Tamamlandı' && new Date(t.dueDate) < today) overdue++
+    })
+    return { total: inMonth.length, byStatus, overdue }
+  }, [cursor, filtered, y, mo, today])
 
   // Month grid
-  const year = currentDate.getFullYear()
-  const monthIdx = currentDate.getMonth()
-  const firstDayOfMonth = new Date(year, monthIdx, 1)
-  const daysInMonth = new Date(year, monthIdx + 1, 0).getDate()
-  const startOffset = (firstDayOfMonth.getDay() + 6) % 7  // Monday first
+  const startOffset = (new Date(y, mo, 1).getDay() + 6) % 7
+  const daysInMonth = new Date(y, mo + 1, 0).getDate()
   const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7
 
-  // Week grid (for week view)
-  const getWeekStart = (date: Date) => {
-    const d = new Date(date)
-    const day = (d.getDay() + 6) % 7  // Monday = 0
-    d.setDate(d.getDate() - day)
-    d.setHours(0, 0, 0, 0)
-    return d
-  }
-  const weekStart = getWeekStart(selectedDay || today)
-  const weekDays = Array.from({ length: 7 }, (_, i) => {
+  // Week
+  const weekStart = useMemo(() => getWeekStart(selectedDay), [selectedDay])
+  const weekDays = useMemo(() => Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart)
     d.setDate(d.getDate() + i)
     return d
-  })
+  }), [weekStart])
 
+  // Agenda
+  const agendaGroups = useMemo(() => {
+    const start = new Date(y, mo, 1)
+    const end = new Date(y, mo + 1, 0)
+    const items = filtered
+      .filter(t => {
+        if (!t.dueDate) return false
+        const d = new Date(t.dueDate)
+        return d >= start && d <= end
+      })
+      .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+    const groups: { key: string; date: Date; tasks: Task[] }[] = []
+    const seen: Record<string, { key: string; date: Date; tasks: Task[] }> = {}
+    items.forEach(t => {
+      const k = localKey(new Date(t.dueDate))
+      if (!seen[k]) {
+        seen[k] = { key: k, date: new Date(t.dueDate), tasks: [] }
+        groups.push(seen[k])
+      }
+      seen[k].tasks.push(t)
+    })
+    return groups
+  }, [filtered, y, mo])
+
+  /* Navigation */
   const navigate = (dir: -1 | 1) => {
-    if (view === 'month') {
-      setCurrentDate(new Date(year, monthIdx + dir, 1))
-    } else if (view === 'week') {
+    if (view === 'week') {
       const d = new Date(weekStart)
       d.setDate(d.getDate() + dir * 7)
       setSelectedDay(d)
+      setCursor(new Date(d.getFullYear(), d.getMonth(), 1))
     } else {
-      // agenda: month navigation
-      setCurrentDate(new Date(year, monthIdx + dir, 1))
+      setCursor(new Date(y, mo + dir, 1))
     }
   }
 
-  const jumpToToday = () => {
-    setCurrentDate(new Date(today.getFullYear(), today.getMonth(), 1))
+  const jumpToday = () => {
+    setCursor(new Date(today.getFullYear(), today.getMonth(), 1))
     setSelectedDay(today)
   }
 
-  const handleDayClick = (date: Date) => {
-    setSelectedDay(date)
-    if (view === 'month' && date.getMonth() !== monthIdx) {
-      setCurrentDate(new Date(date.getFullYear(), date.getMonth(), 1))
-    }
-  }
+  const headerLabel = view === 'week'
+    ? `${weekDays[0].getDate()} ${CAL_MONTHS_AZ[weekDays[0].getMonth()]} – ${weekDays[6].getDate()} ${CAL_MONTHS_AZ[weekDays[6].getMonth()]}`
+    : `${CAL_MONTHS_AZ[mo]} ${y}`
 
+  /* Handlers */
   const openCreateForDay = (date: Date) => {
-    setNewTaskDate(toLocalDateStr(date))
+    setNewTaskDate(localKey(date))
+    setEditTask(null)
     setModal('create')
   }
 
@@ -155,12 +207,12 @@ export default function CalendarPage() {
   }
 
   const handleEdit = async (data: Omit<Task, 'id' | 'createdAt' | 'updatedAt'>) => {
-    if (!selectedTask) return
+    if (!editTask) return
     setSaving(true)
-    await update(selectedTask.id, data)
+    await update(editTask.id, data)
     setSaving(false)
     setModal(null)
-    setSelectedTask(null)
+    setEditTask(null)
   }
 
   const handleDelete = async () => {
@@ -171,194 +223,169 @@ export default function CalendarPage() {
     setConfirmDelete(null)
   }
 
-  const openEdit = (task: Task) => {
-    setSelectedTask(task)
+  const openEditTask = (task: Task) => {
+    setEditTask(task)
     setModal('edit')
+    setTaskDrawer(null)
   }
 
-  const headerTitle = view === 'month'
-    ? `${MONTH_NAMES[monthIdx]} ${year}`
-    : view === 'week'
-      ? `${weekDays[0].getDate()} ${MONTH_NAMES[weekDays[0].getMonth()]} – ${weekDays[6].getDate()} ${MONTH_NAMES[weekDays[6].getMonth()]} ${weekDays[6].getFullYear()}`
-      : `${MONTH_NAMES[monthIdx]} ${year}`
+  const teamNames = useMemo(() => members.map(m => m.name), [members])
 
-  // Agenda: flat sorted list of tasks with dates
-  const agendaTasks = useMemo(() => {
-    const start = new Date(year, monthIdx, 1)
-    const end = new Date(year, monthIdx + 1, 0)
-    return filteredTasks
-      .filter(t => {
-        if (!t.dueDate) return false
-        const d = parseDateStr(t.dueDate)
-        if (!d) return false
-        return d >= start && d <= end
-      })
-      .sort((a, b) => {
-        const da = parseDateStr(a.dueDate)
-        const db = parseDateStr(b.dueDate)
-        if (!da || !db) return 0
-        return da.getTime() - db.getTime()
-      })
-  }, [filteredTasks, year, monthIdx])
-
-  const groupedAgenda = useMemo(() => {
-    const groups: { dateStr: string; date: Date; dayTasks: Task[] }[] = []
-    const seen = new Set<string>()
-    agendaTasks.forEach(t => {
-      const d = parseDateStr(t.dueDate)
-      if (!d) return
-      const key = toLocalDateStr(d)
-      if (!seen.has(key)) {
-        seen.add(key)
-        groups.push({ dateStr: key, date: d, dayTasks: [] })
-      }
-      groups.find(g => g.dateStr === key)!.dayTasks.push(t)
-    })
-    return groups
-  }, [agendaTasks])
-
+  /* ─── Render ────────────────────────────────────────────────── */
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Main Calendar */}
-      <div className="pageM fade-in" style={{ flex: 1, minWidth: 0 }}>
-        {/* Header */}
-        <div className="page-headerM">
-          <div>
-            <h1>Təqvim</h1>
-            <p className="sub">Tapşırıqları tarixə görə izləyin</p>
-          </div>
-          <div className="flex items-center gap-2" style={{ flexShrink: 0 }}>
-            <select
-              value={projectFilter}
-              onChange={e => setProjectFilter(e.target.value)}
-              className="inputM"
-              style={{ maxWidth: 160, padding: '6px 10px', fontSize: 12 }}
-            >
-              <option value="all">Bütün layihələr</option>
-              {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-            </select>
-            <button onClick={refresh} className="btn-ghostM" style={{ width: 36, height: 36, padding: 0, justifyContent: 'center' }} title="Yenilə">
-              <RefreshCw size={15} />
-            </button>
-            <button onClick={() => { setNewTaskDate(selectedDay ? toLocalDateStr(selectedDay) : ''); setModal('create') }} className="btn-primaryM">
-              <Plus size={15} /> Tapşırıq
-            </button>
+    <div className="pageM fade-in">
+      {/* Header */}
+      <div className="team-headM">
+        <div>
+          <h1>Təqvim <span className="cnt">{monthStats.total}</span></h1>
+          <div className="sub">
+            {CAL_MONTHS_AZ[mo]} {y} üçün {monthStats.total} tapşırıq
+            {monthStats.overdue > 0 && (
+              <> · <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{monthStats.overdue} gecikmiş</span></>
+            )}
           </div>
         </div>
-
-        {/* View toggle + navigation */}
-        <div className="flex items-center justify-between flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <button onClick={() => navigate(-1)} className="btn-ghostM" style={{ width: 32, height: 32, padding: 0, justifyContent: 'center' }}>
-              <ChevronLeft size={15} />
-            </button>
-            <button onClick={jumpToToday} className="btn-ghostM" style={{ padding: '4px 10px', fontSize: 12 }}>Bugün</button>
-            <span style={{ color: 'var(--ink)', fontWeight: 600, fontSize: 14, minWidth: 200, textAlign: 'center' }}>{headerTitle}</span>
-            <button onClick={() => navigate(1)} className="btn-ghostM" style={{ width: 32, height: 32, padding: 0, justifyContent: 'center' }}>
-              <ChevronRight size={15} />
-            </button>
-          </div>
-          <div className="flex gap-1">
-            {([['month', Calendar], ['week', LayoutGrid], ['agenda', CalendarDays]] as const).map(([v, Icon]) => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                title={v === 'month' ? 'Ay' : v === 'week' ? 'Həftə' : 'Gündəlik'}
-                className="btn-ghostM"
-                style={{
-                  width: 32, height: 32, padding: 0, justifyContent: 'center',
-                  background: view === v ? 'var(--surface-2)' : 'transparent',
-                  color: view === v ? 'var(--ink)' : 'var(--muted)',
-                }}
-              >
-                <Icon size={15} />
-              </button>
-            ))}
-          </div>
+        <div className="actions">
+          <select
+            className="task-select"
+            value={projectFilter}
+            onChange={e => setProjectFilter(e.target.value)}
+            style={{ minWidth: 200 }}
+          >
+            <option value="all">Bütün layihələr</option>
+            {projects.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+          </select>
+          <button
+            className="btn-primaryM"
+            onClick={() => { setNewTaskDate(localKey(selectedDay)); setEditTask(null); setModal('create') }}
+          >
+            <Icon name="add_task" size={14} /> Yeni Tapşırıq
+          </button>
         </div>
+      </div>
 
-        {/* Calendar body */}
-        <div className="flex-1 overflow-auto">
-          {loading ? (
-            <div className="grid grid-cols-7 gap-2">
-              {[...Array(35)].map((_, i) => <CardSkeleton key={i} />)}
+      {/* Stat row */}
+      <div className="cal-stat-row">
+        {(['Gözləyir', 'Davam edir', 'Yoxlanılır', 'Tamamlandı'] as const).map(s => {
+          const c = CAL_STATUS[s]
+          return (
+            <div key={s} className="cal-stat" style={{ borderColor: c.ring }}>
+              <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.fg, flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, fontSize: 12, color: 'var(--ink-2)' }}>{s}</span>
+              <span style={{ marginLeft: 'auto', fontSize: 14, fontWeight: 800, color: c.fg, letterSpacing: '-0.02em' }}>
+                {monthStats.byStatus[s] ?? 0}
+              </span>
             </div>
-          ) : view === 'month' ? (
-            <div className="cardM" style={{ padding: 0, overflow: 'hidden', height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {/* Day names header */}
-              <div className="grid grid-cols-7 border-b flex-shrink-0" style={{ borderColor: 'var(--border)' }}>
-                {DAY_NAMES_SHORT.map(d => (
-                  <div key={d} className="py-2 text-center text-[11px] font-medium text-text-muted">{d}</div>
-                ))}
+          )
+        })}
+      </div>
+
+      {/* Toolbar */}
+      <div className="cal-toolbar">
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button className="icon-btn" onClick={() => navigate(-1)}>
+            <Icon name="arrow_forward" size={14} />
+          </button>
+          <button className="btn-ghostM" onClick={jumpToday} style={{ padding: '8px 14px', fontSize: 12 }}>
+            <Icon name="calendar_today" size={13} /> Bu gün
+          </button>
+          <button className="icon-btn" onClick={() => navigate(1)} style={{ transform: 'scaleX(-1)' }}>
+            <Icon name="arrow_forward" size={14} />
+          </button>
+          <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-0.025em', marginLeft: 12 }}>
+            {headerLabel}
+          </div>
+        </div>
+
+        <div style={{
+          display: 'flex', background: 'var(--surface)',
+          border: '1px solid var(--border)', borderRadius: 10, padding: 3, gap: 2,
+        }}>
+          {([
+            { v: 'month',  label: 'Ay',       ico: 'calendar_month' },
+            { v: 'week',   label: 'Həftə',    ico: 'space_dashboard' },
+            { v: 'agenda', label: 'Gündəlik', ico: 'sort' },
+          ] as { v: CalView; label: string; ico: string }[]).map(b => (
+            <button
+              key={b.v}
+              onClick={() => setView(b.v)}
+              style={{
+                padding: '7px 14px', border: 0, borderRadius: 8,
+                background: view === b.v ? 'var(--primary)' : 'transparent',
+                color: view === b.v ? 'white' : 'var(--muted)',
+                fontSize: 12, fontWeight: 700,
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                cursor: 'pointer',
+              }}
+            >
+              <Icon name={b.ico} size={13} />
+              {b.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Body */}
+      <div className="cal-body">
+        <div className="cal-main">
+
+          {/* ── Month view ── */}
+          {view === 'month' && (
+            <div className="cal-card">
+              <div className="cal-month-head">
+                {CAL_DAY_AZ_SHORT.map(d => <div key={d}>{d}</div>)}
               </div>
-              {/* Day cells */}
-              <div className="grid grid-cols-7 flex-1" style={{ gridTemplateRows: `repeat(${totalCells / 7}, 1fr)` }}>
+              <div
+                className="cal-month-grid"
+                style={{ gridTemplateRows: `repeat(${totalCells / 7}, minmax(96px, 1fr))` }}
+              >
                 {Array.from({ length: totalCells }).map((_, i) => {
                   const dayNum = i - startOffset + 1
-                  const isCurrentMonth = dayNum >= 1 && dayNum <= daysInMonth
-                  const cellDate = new Date(year, monthIdx, dayNum)
-                  const isToday = isSameDay(cellDate, today)
-                  const isSelected = selectedDay ? isSameDay(cellDate, selectedDay) : false
-                  const dateKey = toLocalDateStr(cellDate)
-                  const dayTasks = isCurrentMonth ? (tasksByDate[dateKey] || []) : []
-                  const overflow = Math.max(0, dayTasks.length - 3)
-
+                  const inMonth = dayNum >= 1 && dayNum <= daysInMonth
+                  const cellDate = new Date(y, mo, dayNum)
+                  const isToday = inMonth && sameDay(cellDate, today)
+                  const isSelected = inMonth && sameDay(cellDate, selectedDay)
+                  const isWeekend = i % 7 >= 5
+                  const items = inMonth ? (tasksByDay[localKey(cellDate)] || []) : []
+                  const overflow = Math.max(0, items.length - 3)
                   return (
                     <div
                       key={i}
-                      onClick={() => isCurrentMonth && handleDayClick(cellDate)}
-                      className={cn(
-                        'border-r border-b p-1.5 cursor-pointer transition-colors',
-                        isCurrentMonth ? '' : 'opacity-25 pointer-events-none',
-                      )}
-                      style={{
-                        borderColor: 'var(--border)',
-                        background: isSelected && isCurrentMonth ? 'var(--primary-soft)' : isToday ? 'var(--surface-2)' : 'transparent',
-                      }}
+                      className={
+                        'cal-cell' +
+                        (inMonth ? '' : ' outside') +
+                        (isSelected ? ' selected' : '') +
+                        (isToday ? ' today' : '') +
+                        (isWeekend ? ' weekend' : '')
+                      }
+                      onClick={() => inMonth && setSelectedDay(cellDate)}
                     >
-                      <div className="flex items-center justify-between mb-1">
-                        <div className={cn(
-                          'w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors',
-                        )}
-                          style={{
-                            background: isToday ? 'var(--primary)' : 'transparent',
-                            color: isToday ? '#fff' : isSelected ? 'var(--primary)' : 'var(--muted)',
-                            fontWeight: isSelected ? 700 : 500,
-                          }}
-                        >
-                          {isCurrentMonth ? dayNum : ''}
-                        </div>
-                        {isCurrentMonth && (
-                          <button
-                            onClick={e => { e.stopPropagation(); openCreateForDay(cellDate) }}
-                            className="w-5 h-5 rounded flex items-center justify-center text-text-muted hover:text-accent-blue opacity-0 hover:opacity-100 group-hover:opacity-100 transition-all"
-                          >
-                            <Plus size={11} />
-                          </button>
+                      <div className="cal-cell-head">
+                        <span className={'cal-cell-num' + (isToday ? ' today' : '') + (isSelected && !isToday ? ' selected' : '')}>
+                          {inMonth ? dayNum : ''}
+                        </span>
+                        {inMonth && items.length > 0 && (
+                          <span className="cal-cell-count">{items.length}</span>
                         )}
                       </div>
-                      <div className="space-y-0.5">
-                        {dayTasks.slice(0, 3).map(t => {
-                          const sc = STATUS_COLORS[t.status] || STATUS_COLORS['Gözləyir']
-                          return (
-                            <div
-                              key={t.id}
-                              onClick={e => { e.stopPropagation(); openEdit(t) }}
-                              className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] leading-tight cursor-pointer hover:opacity-80 transition-opacity truncate"
-                              style={{ background: sc.bg, color: sc.text, borderLeft: `2px solid ${sc.text}` }}
-                            >
-                              <div
-                                className="w-1.5 h-1.5 rounded-full flex-shrink-0"
-                                style={{ background: PRIORITY_DOT[t.priority] || '#94A3B8' }}
-                              />
-                              <span className="truncate">{t.title}</span>
-                            </div>
-                          )
-                        })}
+                      <div className="cal-cell-items">
+                        {items.slice(0, 3).map(t => (
+                          <button
+                            key={t.id}
+                            className="cal-pill"
+                            onClick={e => { e.stopPropagation(); setTaskDrawer(t.id) }}
+                            style={{
+                              background: CAL_STATUS[t.status]?.bg,
+                              color: CAL_STATUS[t.status]?.fg,
+                              borderLeft: '3px solid ' + CAL_STATUS[t.status]?.fg,
+                            }}
+                          >
+                            <span className="cal-pill-dot" style={{ background: CAL_PRIORITY_DOT[t.priority] }} />
+                            <span className="cal-pill-text">{t.title}</span>
+                          </button>
+                        ))}
                         {overflow > 0 && (
-                          <div className="text-[10px] text-text-muted pl-1 hover:text-text-secondary cursor-pointer" onClick={e => { e.stopPropagation(); handleDayClick(cellDate) }}>
-                            +{overflow} daha
-                          </div>
+                          <div className="cal-overflow">+{overflow} daha</div>
                         )}
                       </div>
                     </div>
@@ -366,97 +393,80 @@ export default function CalendarPage() {
                 })}
               </div>
             </div>
-          ) : view === 'week' ? (
-            <div className="cardM" style={{ padding: 0, overflow: 'hidden' }}>
-              <div className="grid grid-cols-7 border-b" style={{ borderColor: 'var(--border)' }}>
+          )}
+
+          {/* ── Week view ── */}
+          {view === 'week' && (
+            <div className="cal-card">
+              <div className="cal-week-head">
                 {weekDays.map((d, i) => {
-                  const isToday = isSameDay(d, today)
-                  const isSelected = selectedDay ? isSameDay(d, selectedDay) : false
+                  const isToday = sameDay(d, today)
+                  const isSelected = sameDay(d, selectedDay)
+                  const count = (tasksByDay[localKey(d)] || []).length
                   return (
                     <div
                       key={i}
-                      onClick={() => handleDayClick(d)}
-                      className="py-3 px-2 text-center cursor-pointer transition-colors border-r"
-                      style={{
-                        borderColor: 'var(--border)',
-                        background: isSelected ? 'var(--primary-soft)' : 'transparent',
-                      }}
+                      className={'cal-week-dayhead' + (isSelected ? ' selected' : '')}
+                      onClick={() => setSelectedDay(d)}
                     >
-                      <div className="text-[11px] text-text-muted mb-1">{DAY_NAMES_SHORT[i]}</div>
-                      <div className="w-7 h-7 rounded-full flex items-center justify-center text-sm font-semibold mx-auto"
-                        style={{
-                          background: isToday ? 'var(--primary)' : 'transparent',
-                          color: isToday ? '#fff' : isSelected ? 'var(--primary)' : 'var(--muted)',
-                        }}
-                      >
+                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                        {CAL_DAY_AZ_SHORT[i]}
+                      </div>
+                      <div className={'cal-cell-num large' + (isToday ? ' today' : '') + (isSelected && !isToday ? ' selected' : '')}>
                         {d.getDate()}
                       </div>
-                      {/* Task count dot */}
-                      {(() => {
-                        const count = (tasksByDate[toLocalDateStr(d)] || []).length
-                        return count > 0 ? (
-                          <div className="mt-1 flex justify-center">
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent-blue/10 text-accent-blue">{count}</span>
-                          </div>
-                        ) : null
-                      })()}
+                      {count > 0 && <span className="cal-week-pip">{count}</span>}
                     </div>
                   )
                 })}
               </div>
-              {/* Week task columns */}
-              <div className="grid grid-cols-7 min-h-[400px]">
+              <div className="cal-week-grid">
                 {weekDays.map((d, i) => {
-                  const dateKey = toLocalDateStr(d)
-                  const dayTasks = tasksByDate[dateKey] || []
-                  const isToday = isSameDay(d, today)
-                  const isSelected = selectedDay ? isSameDay(d, selectedDay) : false
+                  const items = tasksByDay[localKey(d)] || []
+                  const isToday = sameDay(d, today)
                   return (
                     <div
                       key={i}
-                      className="border-r p-2 space-y-1.5 cursor-pointer transition-colors"
-                      style={{
-                        borderColor: 'var(--border)',
-                        background: (isToday || isSelected) ? 'var(--surface-2)' : 'transparent',
-                      }}
-                      onClick={() => handleDayClick(d)}
+                      className={'cal-week-col' + (isToday ? ' today' : '')}
+                      onClick={() => setSelectedDay(d)}
                     >
-                      {dayTasks.length === 0 && (
-                        <button
+                      {items.length === 0 && (
+                        <div
+                          className="cal-week-empty"
                           onClick={e => { e.stopPropagation(); openCreateForDay(d) }}
-                          className="w-full py-3 rounded-lg text-xs flex items-center justify-center gap-1 transition-all"
-                          style={{ border: '1px dashed var(--border)', color: 'var(--muted)' }}
                         >
-                          <Plus size={11} />
-                        </button>
+                          <Icon name="add" size={13} />
+                        </div>
                       )}
-                      {dayTasks.map(t => {
-                        const sc = STATUS_COLORS[t.status] || STATUS_COLORS['Gözləyir']
-                        const overdue = t.dueDate && getDaysLeft(t.dueDate) < 0 && t.status !== 'Tamamlandı'
+                      {items.map(t => {
+                        const c = CAL_STATUS[t.status] || CAL_STATUS['Gözləyir']
+                        const overdue = new Date(t.dueDate) < today && t.status !== 'Tamamlandı'
+                        const member = members.find(m => m.name === t.assignee)
+                        const [a1, a2] = avatarPaletteFor(t.assignee || '')
                         return (
                           <div
                             key={t.id}
-                            onClick={e => { e.stopPropagation(); openEdit(t) }}
-                            className="rounded-lg p-2 cursor-pointer hover:opacity-80 transition-opacity"
-                            style={{ background: sc.bg, border: `1px solid ${sc.border}` }}
+                            className="cal-week-task"
+                            onClick={e => { e.stopPropagation(); setTaskDrawer(t.id) }}
+                            style={{ background: c.bg, borderColor: c.ring }}
                           >
-                            <div className="flex items-start gap-1.5 mb-1">
-                              <div
-                                className="w-1.5 h-1.5 rounded-full flex-shrink-0 mt-1"
-                                style={{ background: PRIORITY_DOT[t.priority] || '#94A3B8' }}
-                              />
-                              <span className="text-[11px] font-medium leading-tight" style={{ color: sc.text }}>{t.title}</span>
+                            <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                              <span style={{ width: 6, height: 6, borderRadius: '50%', background: CAL_PRIORITY_DOT[t.priority], marginTop: 5, flexShrink: 0 }} />
+                              <span style={{ fontSize: 11, fontWeight: 700, lineHeight: 1.3, color: c.fg }}>{t.title}</span>
                             </div>
-                            {t.assignee && (
-                              <div className="flex items-center gap-1 text-[10px] text-text-muted">
-                                <User size={9} /> {t.assignee}
-                              </div>
-                            )}
-                            {overdue && (
-                              <div className="flex items-center gap-1 text-[10px] text-accent-red mt-0.5">
-                                <AlertCircle size={9} /> Gecikmiş
-                              </div>
-                            )}
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+                              {member && (
+                                <div style={{
+                                  width: 18, height: 18, borderRadius: '50%',
+                                  background: `linear-gradient(135deg, ${a1}, ${a2})`,
+                                  color: 'white', fontSize: 8, fontWeight: 700,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}>
+                                  {initialsM(member.name)}
+                                </div>
+                              )}
+                              {overdue && <Icon name="warning" size={11} />}
+                            </div>
                           </div>
                         )
                       })}
@@ -465,80 +475,92 @@ export default function CalendarPage() {
                 })}
               </div>
             </div>
-          ) : (
-            /* Agenda view */
-            <div className="space-y-4">
-              {groupedAgenda.length === 0 ? (
-                <div className="cardM" style={{ padding: 48, textAlign: 'center' }}>
-                  <CalendarDays size={40} className="text-text-muted mx-auto mb-3 opacity-40" />
-                  <p className="text-text-secondary text-sm">Bu ay üçün tapşırıq yoxdur</p>
+          )}
+
+          {/* ── Agenda view ── */}
+          {view === 'agenda' && (
+            <div className="cal-agenda">
+              {agendaGroups.length === 0 ? (
+                <div style={{
+                  padding: 60, textAlign: 'center',
+                  color: 'var(--muted)',
+                  background: 'var(--surface)',
+                  borderRadius: 16,
+                  border: '1px dashed var(--border)',
+                }}>
+                  <Icon name="calendar_month" size={36} />
+                  <div style={{ marginTop: 12, fontWeight: 700 }}>Bu ay üçün tapşırıq yoxdur</div>
                 </div>
-              ) : groupedAgenda.map(({ date, dateStr, dayTasks }) => {
-                const isToday = isSameDay(date, today)
-                const dayOfWeek = (date.getDay() + 6) % 7
+              ) : agendaGroups.map(({ key, date, tasks: dayTasks }) => {
+                const isToday = sameDay(date, today)
+                const dow = (date.getDay() + 6) % 7
                 return (
-                  <div key={dateStr} className="flex gap-4">
-                    <div
-                      className={cn(
-                        'flex-shrink-0 w-16 text-center pt-1',
-                        isToday && 'text-accent-blue'
-                      )}
-                    >
-                      <div className="text-xs text-text-muted">{DAY_NAMES_SHORT[dayOfWeek]}</div>
-                      <div className={cn(
-                        'text-2xl font-bold mt-0.5',
-                        isToday ? 'text-accent-blue' : 'text-text-primary'
-                      )}>
-                        {date.getDate()}
+                  <div key={key} className="cal-agenda-group">
+                    <div className="cal-agenda-date">
+                      <div style={{ fontSize: 10, color: 'var(--muted)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+                        {CAL_DAY_AZ_SHORT[dow]}
+                      </div>
+                      <div className={'cal-agenda-num' + (isToday ? ' today' : '')}>{date.getDate()}</div>
+                      <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 600 }}>
+                        {CAL_MONTHS_AZ[date.getMonth()].slice(0, 3)}
                       </div>
                     </div>
-                    <div className="flex-1 space-y-2">
+                    <div className="cal-agenda-list">
                       {dayTasks.map(t => {
-                        const sc = STATUS_COLORS[t.status] || STATUS_COLORS['Gözləyir']
-                        const overdue = t.dueDate && getDaysLeft(t.dueDate) < 0 && t.status !== 'Tamamlandı'
+                        const c = CAL_STATUS[t.status] || CAL_STATUS['Gözləyir']
+                        const overdue = new Date(t.dueDate) < today && t.status !== 'Tamamlandı'
+                        const done = t.status === 'Tamamlandı'
+                        const proj = projects.find(p => p.id === t.projectId)
+                        const member = members.find(m => m.name === t.assignee)
+                        const [a1, a2] = avatarPaletteFor(t.assignee || '')
                         return (
-                          <div
-                            key={t.id}
-                            className="cardM flex items-center gap-3 cursor-pointer transition-all group"
-                          style={{ padding: 12 }}
-                            onClick={() => openEdit(t)}
-                          >
-                            <div className="w-1 self-stretch rounded-full flex-shrink-0" style={{ background: sc.text }} />
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-start justify-between gap-2">
-                                <span className={cn('text-text-primary text-sm font-medium', t.status === 'Tamamlandı' && 'line-through text-text-muted')}>
+                          <div key={t.id} className="cal-agenda-row" onClick={() => setTaskDrawer(t.id)}>
+                            <div style={{ width: 4, alignSelf: 'stretch', borderRadius: 999, background: c.fg }} />
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: CAL_PRIORITY_DOT[t.priority], flexShrink: 0 }} />
+                                <span style={{
+                                  fontSize: 13, fontWeight: 700,
+                                  textDecoration: done ? 'line-through' : 'none',
+                                  color: done ? 'var(--muted)' : 'var(--ink)',
+                                }}>
                                   {t.title}
                                 </span>
-                                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                                  <button onClick={e => { e.stopPropagation(); openEdit(t) }}
-                                    className="w-6 h-6 rounded flex items-center justify-center text-text-secondary hover:text-text-primary transition-all"
-                                    style={{ background: 'transparent' }}>
-                                    <Edit2 size={11} />
-                                  </button>
-                                  <button onClick={e => { e.stopPropagation(); setConfirmDelete(t) }}
-                                    className="w-6 h-6 rounded flex items-center justify-center text-text-secondary hover:text-accent-red hover:bg-accent-red/10 transition-all">
-                                    <Trash2 size={11} />
-                                  </button>
-                                </div>
                               </div>
-                              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
-                                <StatusBadge status={t.status} />
-                                <PriorityBadge priority={t.priority} />
-                                {t.assignee && (
-                                  <span className="flex items-center gap-1 text-[10px] text-text-muted">
-                                    <User size={9} /> {t.assignee}
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
+                                <span className={'pill ' + statusPillClass(t.status)} style={{ fontSize: 10 }}>
+                                  <span className="dot" />{t.status}
+                                </span>
+                                <span className={'pill ' + priorityPillClass(t.priority)} style={{ fontSize: 10 }}>
+                                  {t.priority}
+                                </span>
+                                {proj && (
+                                  <span style={{ fontSize: 11, color: 'var(--primary)', fontWeight: 700, display: 'inline-flex', gap: 4, alignItems: 'center' }}>
+                                    <Icon name="folder" size={11} />{proj.name}
                                   </span>
                                 )}
-                                {t.projectName && (
-                                  <span className="text-[10px] text-text-muted truncate max-w-[120px]">{t.projectName}</span>
-                                )}
                                 {overdue && (
-                                  <span className="flex items-center gap-1 text-[10px] text-accent-red">
-                                    <AlertCircle size={9} /> Gecikmiş
+                                  <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, display: 'inline-flex', gap: 3, alignItems: 'center' }}>
+                                    <Icon name="warning" size={11} />Gecikmiş
                                   </span>
                                 )}
                               </div>
                             </div>
+                            {member && (
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                                <div style={{
+                                  width: 28, height: 28, borderRadius: '50%',
+                                  background: `linear-gradient(135deg, ${a1}, ${a2})`,
+                                  color: 'white', fontSize: 10, fontWeight: 700,
+                                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                }}>
+                                  {initialsM(member.name)}
+                                </div>
+                                <span style={{ fontSize: 11, color: 'var(--ink-2)', fontWeight: 600 }}>
+                                  {member.name.split(' ')[0]}
+                                </span>
+                              </div>
+                            )}
                           </div>
                         )
                       })}
@@ -549,111 +571,45 @@ export default function CalendarPage() {
             </div>
           )}
         </div>
+
+        {/* ── Right sidebar — day detail ── */}
+        {view !== 'agenda' && (
+          <CalDayPanel
+            date={selectedDay}
+            tasks={tasksByDay[localKey(selectedDay)] || []}
+            projects={projects}
+            members={members}
+            today={today}
+            onOpenTask={setTaskDrawer}
+            onAddTask={openCreateForDay}
+          />
+        )}
       </div>
 
-      {/* Day Detail Panel */}
-      {selectedDay && view !== 'agenda' && (
-        <div className="w-72 flex-shrink-0 border-l overflow-y-auto" style={{ borderColor: 'var(--border)', background: 'var(--surface)' }}>
-          <div className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <div className="text-text-muted text-xs">{DAY_NAMES_FULL[(selectedDay.getDay() + 6) % 7]}</div>
-                <div className={cn(
-                  'text-2xl font-bold mt-0.5',
-                  isSameDay(selectedDay, today) ? 'text-accent-blue' : 'text-text-primary'
-                )}>
-                  {selectedDay.getDate()} {MONTH_NAMES[selectedDay.getMonth()]}
-                </div>
-              </div>
-              <button
-                onClick={() => openCreateForDay(selectedDay)}
-                className="w-8 h-8 rounded-lg flex items-center justify-center text-text-secondary hover:text-accent-blue hover:bg-accent-blue/10 transition-all"
-                style={{ border: '1px solid var(--border)' }}
-                title="Bu günə tapşırıq əlavə et"
-              >
-                <Plus size={14} />
-              </button>
-            </div>
-
-            {selectedDayTasks.length === 0 ? (
-              <div className="text-center py-8">
-                <Calendar size={28} className="text-text-muted mx-auto mb-2 opacity-40" />
-                <p className="text-text-muted text-xs">Bu gün üçün tapşırıq yoxdur</p>
-                <button
-                  onClick={() => openCreateForDay(selectedDay)}
-                  className="mt-3 text-xs text-accent-blue hover:underline"
-                >
-                  Əlavə et
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <div className="text-text-muted text-xs mb-2">{selectedDayTasks.length} tapşırıq</div>
-                {selectedDayTasks.map(t => {
-                  const sc = STATUS_COLORS[t.status] || STATUS_COLORS['Gözləyir']
-                  const overdue = t.dueDate && getDaysLeft(t.dueDate) < 0 && t.status !== 'Tamamlandı'
-                  return (
-                    <div
-                      key={t.id}
-                      className="rounded-xl p-3 cursor-pointer hover:opacity-80 transition-opacity group"
-                      style={{ background: sc.bg, border: `1px solid ${sc.border}` }}
-                      onClick={() => openEdit(t)}
-                    >
-                      <div className="flex items-start justify-between gap-2 mb-2">
-                        <span className={cn('text-text-primary text-xs font-medium leading-snug flex-1', t.status === 'Tamamlandı' && 'line-through text-text-muted')}>
-                          {t.title}
-                        </span>
-                        <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                          <button onClick={e => { e.stopPropagation(); openEdit(t) }}
-                            className="w-5 h-5 rounded flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors">
-                            <Edit2 size={10} />
-                          </button>
-                          <button onClick={e => { e.stopPropagation(); setConfirmDelete(t) }}
-                            className="w-5 h-5 rounded flex items-center justify-center text-text-secondary hover:text-accent-red transition-colors">
-                            <Trash2 size={10} />
-                          </button>
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <StatusBadge status={t.status} />
-                          <PriorityBadge priority={t.priority} />
-                        </div>
-                        {t.assignee && (
-                          <div className="flex items-center gap-1 text-[10px] text-text-muted">
-                            <User size={9} /> {t.assignee}
-                          </div>
-                        )}
-                        {t.projectName && (
-                          <div className="flex items-center gap-1 text-[10px] text-text-muted truncate">
-                            <Clock size={9} /> {t.projectName}
-                          </div>
-                        )}
-                        {t.tags && (
-                          <div className="flex items-center gap-1 flex-wrap">
-                            <Tag size={9} className="text-text-muted" />
-                            {t.tags.split(',').map(tg => tg.trim()).filter(Boolean).map(tag => (
-                              <span key={tag} className="text-[9px] px-1 py-0.5 rounded text-text-muted" style={{ background: 'var(--surface-2)' }}>{tag}</span>
-                            ))}
-                          </div>
-                        )}
-                        {overdue && (
-                          <div className="flex items-center gap-1 text-[10px] text-accent-red">
-                            <AlertCircle size={9} /> Gecikmiş
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+      {/* Task drawer portal */}
+      {taskDrawer && (
+        <TaskDrawerPortal
+          taskId={taskDrawer}
+          tasks={tasks}
+          projects={projects}
+          members={members}
+          today={today}
+          onClose={() => setTaskDrawer(null)}
+          onEdit={task => openEditTask(task)}
+          onComplete={async (task) => {
+            await update(task.id, { status: 'Tamamlandı' })
+            setTaskDrawer(null)
+          }}
+          onDelete={task => { setConfirmDelete(task); setTaskDrawer(null) }}
+        />
       )}
 
-      {/* Modals */}
-      <Modal open={modal === 'create'} onClose={() => { setModal(null); setNewTaskDate('') }} title="Yeni Tapşırıq">
+      {/* Create modal */}
+      <Modal
+        open={modal === 'create'}
+        onClose={() => { setModal(null); setNewTaskDate('') }}
+        title="Yeni Tapşırıq"
+      >
         <TaskForm
           initial={newTaskDate ? { dueDate: newTaskDate } : undefined}
           projects={projects}
@@ -664,19 +620,25 @@ export default function CalendarPage() {
         />
       </Modal>
 
-      <Modal open={modal === 'edit'} onClose={() => { setModal(null); setSelectedTask(null) }} title="Tapşırığı Düzəlt">
-        {selectedTask && (
+      {/* Edit modal */}
+      <Modal
+        open={modal === 'edit'}
+        onClose={() => { setModal(null); setEditTask(null) }}
+        title="Tapşırığı Düzəlt"
+      >
+        {editTask && (
           <TaskForm
-            initial={selectedTask}
+            initial={editTask}
             projects={projects}
             teamNames={teamNames}
             onSubmit={handleEdit}
-            onCancel={() => { setModal(null); setSelectedTask(null) }}
+            onCancel={() => { setModal(null); setEditTask(null) }}
             loading={saving}
           />
         )}
       </Modal>
 
+      {/* Delete confirm */}
       <ConfirmDialog
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
@@ -686,5 +648,262 @@ export default function CalendarPage() {
         loading={deleting}
       />
     </div>
+  )
+}
+
+/* ─── Day detail sidebar ─────────────────────────────────────── */
+
+interface CalDayPanelProps {
+  date: Date
+  tasks: Task[]
+  projects: { id: string; name: string }[]
+  members: { id: string; name: string }[]
+  today: Date
+  onOpenTask: (id: string) => void
+  onAddTask: (date: Date) => void
+}
+
+function CalDayPanel({ date, tasks, projects, members, today, onOpenTask, onAddTask }: CalDayPanelProps) {
+  const isToday = sameDay(date, today)
+  const dow = (date.getDay() + 6) % 7
+
+  return (
+    <div className="cal-side cardM">
+      <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          {CAL_DAY_AZ_FULL[dow]}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
+          <div style={{ fontSize: 36, fontWeight: 800, letterSpacing: '-0.04em', lineHeight: 1, color: isToday ? 'var(--primary)' : 'var(--ink)' }}>
+            {date.getDate()}
+          </div>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-2)' }}>
+            {CAL_MONTHS_AZ[date.getMonth()]} {date.getFullYear()}
+          </div>
+        </div>
+        {isToday && (
+          <span className="pill indigo" style={{ marginTop: 8, display: 'inline-flex' }}>
+            <span className="dot" />Bu gün
+          </span>
+        )}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
+          <span style={{ fontSize: 12, color: 'var(--muted)', fontWeight: 600 }}>{tasks.length} tapşırıq</span>
+          <button className="btn-ghostM" style={{ padding: '5px 10px', fontSize: 11 }} onClick={() => onAddTask(date)}>
+            <Icon name="add" size={12} /> Əlavə et
+          </button>
+        </div>
+      </div>
+
+      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8, overflowY: 'auto', flex: 1 }}>
+        {tasks.length === 0 ? (
+          <div style={{ padding: 30, textAlign: 'center', color: 'var(--muted)' }}>
+            <Icon name="calendar_today" size={28} />
+            <div style={{ marginTop: 10, fontWeight: 600, fontSize: 12 }}>Bu gün üçün tapşırıq yoxdur</div>
+          </div>
+        ) : tasks.map(t => {
+          const c = CAL_STATUS[t.status] || CAL_STATUS['Gözləyir']
+          const overdue = new Date(t.dueDate) < today && t.status !== 'Tamamlandı'
+          const done = t.status === 'Tamamlandı'
+          const proj = projects.find(p => p.id === t.projectId)
+          const member = members.find(m => m.name === t.assignee)
+          const [a1, a2] = avatarPaletteFor(t.assignee || '')
+          const tags = (t.tags || '').split(',').map(s => s.trim()).filter(Boolean)
+          return (
+            <div
+              key={t.id}
+              className="cal-side-task"
+              onClick={() => onOpenTask(t.id)}
+              style={{ background: c.bg, borderColor: c.ring }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 6 }}>
+                <span style={{ width: 8, height: 8, borderRadius: '50%', background: CAL_PRIORITY_DOT[t.priority], marginTop: 5, flexShrink: 0 }} />
+                <span style={{ fontSize: 12, fontWeight: 700, lineHeight: 1.3, color: done ? 'var(--muted)' : c.fg, textDecoration: done ? 'line-through' : 'none' }}>
+                  {t.title}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 8 }}>
+                <span className={'pill ' + statusPillClass(t.status)} style={{ fontSize: 9 }}>
+                  <span className="dot" />{t.status}
+                </span>
+                {proj && <span style={{ fontSize: 10, color: 'var(--primary)', fontWeight: 700 }}>{proj.name}</span>}
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
+                {member ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <div style={{
+                      width: 20, height: 20, borderRadius: '50%',
+                      background: `linear-gradient(135deg, ${a1}, ${a2})`,
+                      color: 'white', fontSize: 9, fontWeight: 700,
+                      display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    }}>
+                      {initialsM(member.name)}
+                    </div>
+                    <span style={{ fontSize: 10, color: 'var(--ink-2)', fontWeight: 600 }}>
+                      {member.name.split(' ')[0]}
+                    </span>
+                  </div>
+                ) : <div />}
+                {overdue && (
+                  <span style={{ fontSize: 10, color: 'var(--accent)', fontWeight: 700, display: 'inline-flex', gap: 3, alignItems: 'center' }}>
+                    <Icon name="warning" size={11} />Gecikmiş
+                  </span>
+                )}
+              </div>
+              {tags.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3, marginTop: 8 }}>
+                  {tags.slice(0, 3).map(tag => (
+                    <span key={tag} style={{ fontSize: 9, padding: '1px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.65)', color: 'var(--muted)', fontWeight: 600 }}>
+                      #{tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+/* ─── Task drawer portal ─────────────────────────────────────── */
+
+interface TaskDrawerPortalProps {
+  taskId: string
+  tasks: Task[]
+  projects: { id: string; name: string }[]
+  members: { id: string; name: string }[]
+  today: Date
+  onClose: () => void
+  onEdit: (task: Task) => void
+  onComplete: (task: Task) => Promise<void>
+  onDelete: (task: Task) => void
+}
+
+function TaskDrawerPortal({
+  taskId, tasks, projects, members, today,
+  onClose, onEdit, onComplete, onDelete,
+}: TaskDrawerPortalProps) {
+  const task = tasks.find(t => t.id === taskId)
+  if (!task) return null
+
+  const proj = projects.find(p => p.id === task.projectId)
+  const member = members.find(m => m.name === task.assignee)
+  const [ac1, ac2] = avatarPaletteFor(task.assignee || '')
+  const [pc1, pc2] = proj ? paletteFor(proj.id) : ['#FFF', '#EEE']
+
+  const dl = daysFromNow(task.dueDate)
+  const late = dl < 0 && task.status !== 'Tamamlandı'
+  const done = task.status === 'Tamamlandı'
+  const tags = (task.tags || '').split(',').map(s => s.trim()).filter(Boolean)
+
+  const spClass = statusPillClass(task.status)
+  const ppClass = priorityPillClass(task.priority)
+
+  return ReactDOM.createPortal(
+    <div onClick={onClose} className="task-drawer-bg">
+      <div onClick={e => e.stopPropagation()} className="task-drawer fade-in">
+        <div className="task-drawer-cover" style={{ background: `linear-gradient(135deg, ${pc1}, ${pc2})` }}>
+          <button onClick={onClose} className="task-drawer-close">
+            <Icon name="close" size={14} />
+          </button>
+          {proj && (
+            <div className="task-drawer-projtag">
+              <Icon name="folder" size={12} />
+              {proj.name}
+            </div>
+          )}
+        </div>
+
+        <div className="task-drawer-body">
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
+            <span className={'pill ' + spClass}><span className="dot" />{task.status}</span>
+            <span className={'pill ' + ppClass}><Icon name="bolt" size={11} />{task.priority}</span>
+            {late && (
+              <span className="pill accent">
+                <Icon name="warning" size={11} />{Math.abs(dl)} gün gecikdi
+              </span>
+            )}
+          </div>
+
+          <h2 style={{ margin: 0, fontSize: 22, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.2, textDecoration: done ? 'line-through' : 'none' }}>
+            {task.title}
+          </h2>
+          {task.description && (
+            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.5, marginTop: 8, marginBottom: 0 }}>
+              {task.description}
+            </p>
+          )}
+
+          {tags.length > 0 && (
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 14 }}>
+              {tags.map(tag => (
+                <span key={tag} style={{ fontSize: 11, padding: '3px 10px', borderRadius: 6, background: 'var(--surface-2)', color: 'var(--ink-2)', fontWeight: 600 }}>
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="task-drawer-fields">
+            <div className="task-field">
+              <span className="k"><Icon name="person" size={11} />İcraçı</span>
+              {member ? (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <div style={{
+                    width: 24, height: 24, borderRadius: '50%',
+                    background: `linear-gradient(135deg, ${ac1}, ${ac2})`,
+                    color: 'white', fontSize: 9, fontWeight: 700,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  }}>
+                    {initialsM(member.name)}
+                  </div>
+                  <span style={{ fontWeight: 700 }}>{member.name}</span>
+                </span>
+              ) : <span>—</span>}
+            </div>
+            <div className="task-field">
+              <span className="k"><Icon name="schedule" size={11} />Son tarix</span>
+              <span style={{ fontWeight: 700, color: late ? 'var(--accent)' : 'var(--ink)' }}>
+                {fmtDateM(task.dueDate)} · {late ? Math.abs(dl) + 'g gecikdi' : (dl + 'g qaldı')}
+              </span>
+            </div>
+            <div className="task-field">
+              <span className="k"><Icon name="sync" size={11} />Yenilənmə</span>
+              <span style={{ fontWeight: 600, color: 'var(--ink-2)' }}>{fmtDateM(task.updatedAt)}</span>
+            </div>
+            <div className="task-field">
+              <span className="k"><Icon name="task" size={11} />ID</span>
+              <span style={{ fontWeight: 600, color: 'var(--muted)' }}>{task.id.toUpperCase()}</span>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
+            <button
+              className="btn-ghostM"
+              style={{ flex: 1, justifyContent: 'center', padding: '8px', fontSize: 12 }}
+              onClick={() => onEdit(task)}
+            >
+              <Icon name="edit" size={13} /> Düzəlt
+            </button>
+            <button
+              className="btn-ghostM"
+              style={{ flex: 1, justifyContent: 'center', padding: '8px', fontSize: 12 }}
+              onClick={() => onDelete(task)}
+            >
+              <Icon name="delete" size={13} /> Sil
+            </button>
+            <button
+              className={done ? 'btn-ghostM' : 'btn-primaryM'}
+              style={{ flex: 1, justifyContent: 'center', padding: '8px', fontSize: 12 }}
+              onClick={() => onComplete(task)}
+            >
+              <Icon name={done ? 'autorenew' : 'check_circle'} size={13} /> {done ? 'Geri al' : 'Tamamla'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
   )
 }
