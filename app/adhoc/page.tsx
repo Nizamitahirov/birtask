@@ -38,7 +38,7 @@ const SECTIONS: Section[] = [
       { icon: 'handshake',       text: 'Recruitment və HR Operations komandaları prosesi sıx əməkdaşlıq əsasında operativ şəkildə icra etmişdir' },
       { icon: 'lock_person',     text: 'Açıq məsələ: keçidi hələ tamamlanmamış əməkdaşlar üçün sistem girişlərinin verilməsi' },
     ],
-    note: 'Bu qədər böyük həcmli bir prosesi bu sürətlə tamamlamaq Orxan Cavadlı, Nərgiz Əzimova və HR Operations komandasının səmimi əməkdaşlığı olmadan mümkün olmazdı. Hər birinizə ürəkdən təşəkkür edirəm.',
+    note: 'Layihədəki yüksək əməkdaşlığa görə Orxan Cavadlı, Nərgiz Əzimova və bütün HR Operations komandasına təşəkkür edirəm.',
   },
   {
     id: 'muqavile',
@@ -155,7 +155,7 @@ function SectionCard({ s }: { s: Section }) {
   const pct        = totalCount ? Math.round((doneCount / totalCount) * 100) : 0
 
   return (
-    <div className="cardM" style={{ display: 'flex', flexDirection: 'column', gap: 14, height: '100%', boxSizing: 'border-box', overflow: 'hidden' }}>
+    <div className="cardM" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
         <span style={{
@@ -323,18 +323,13 @@ export default function AdhocPage() {
         </button>
       </div>
 
-      {/* Grid: 2 equal columns, equal-height rows */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gridAutoRows: '1fr',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))',
         gap: 14,
+        alignItems: 'start',
       }}>
-        {SECTIONS.map(s => (
-          <div key={s.id} style={{ display: 'grid' }}>
-            <SectionCard s={s} />
-          </div>
-        ))}
+        {SECTIONS.map(s => <SectionCard key={s.id} s={s} />)}
       </div>
     </div>
   )
