@@ -27,16 +27,16 @@ const SECTIONS: Section[] = [
   {
     id: 'struktur',
     tag: '01',
-    title: 'Ekosistem Struktur Dəyişiklikləri',
+    title: 'Ekosistem Struktur Keçidləri',
     color: 'indigo',
     stats: [
-      { value: '~1 880', label: 'əməkdaş üçün struktur dəyişikliyi göndərildi' },
-      { value: '158',    label: 'əməkdaş digər vertikallardan Recruitment ilə keçirildi' },
+      { value: '~1 880', label: 'əməkdaş üçün Ekosistem strukturuna keçid rəsmiləşdirildi' },
+      { value: '158',    label: 'əməkdaş digər vertikallardan müsabiqə prosesi ilə qəbul edildi' },
     ],
     bullets: [
-      { icon: 'send',       text: 'Məlumatlar Orxan Cavadlı tərəfindən göndərilmişdir' },
-      { icon: 'handshake',  text: 'Recruitment (xüsusən Nərgiz Əzimova) və HR Operations — yüksək koordinasiya ilə sürətli icra' },
-      { icon: 'lock_person', text: 'Çətinlik: keçidləri reallaşmayan əməkdaşlar üzrə access verilə bilmir' },
+      { icon: 'manage_accounts', text: 'Struktur keçid məlumatları müvafiq rəhbərlik tərəfindən təqdim edilmişdir' },
+      { icon: 'handshake',       text: 'Recruitment və HR Operations komandaları prosesi sıx əməkdaşlıq əsasında operativ şəkildə icra etmişdir' },
+      { icon: 'lock_person',     text: 'Açıq məsələ: keçidi hələ tamamlanmamış əməkdaşlar üçün sistem girişlərinin verilməsi' },
     ],
   },
   {
@@ -45,46 +45,46 @@ const SECTIONS: Section[] = [
     title: 'Vahid Ekosistem Əmək Müqaviləsi',
     color: 'pink',
     items: [
-      { done: true,  text: '5 günlük və 6 günlük əmək müqavilələri hazırlandı' },
-      { done: true,  text: 'Birmarket növbəli çalışanlar üçün xüsusi şərtlər saxlanıldı' },
-      { done: false, text: 'Növbəti aydan müqavilə dəyişikliyi mərhələli başlayır' },
-      { done: false, text: 'Birmarket/Pashapay üçün 8-17, 10-19 və distant iş rejimi maddələri əlavə ediləcək' },
+      { done: true,  text: 'Həftə içi 5 günlük və 6 günlük iş rejimi üzrə müqavilə formaları tamamlandı' },
+      { done: true,  text: 'Birmarket-in növbə sistemi ilə işləyən heyəti üçün sahəyə məxsus şərtlər qorunub saxlanıldı' },
+      { done: false, text: 'Müqavilələrin dəyişdirilməsi prosesi növbəti aydan mərhələli olaraq başlayacaq' },
+      { done: false, text: 'Birmarket və Pashapay üçün çevik iş rejimləri (8-17, 10-19, distant) müqavilə mətnlərinə daxil ediləcək' },
     ],
-    note: 'Birmarket və Pashapay üzrə vahid əməkdaş təcrübəsinin əldə edilməsi hədəflənir',
+    note: 'Hədəf: 3 vertikal üzrə vahid əməkdaş təcrübəsinin formalaşdırılması',
   },
   {
     id: 'sop',
     tag: '03',
-    title: 'Vahid SOP və Prosedurlar',
+    title: 'Ekosistem üzrə Vahid SOP-lar',
     color: 'info',
     items: [
-      { done: true,  text: 'Məzuniyyət — razılaşdırıldı, SOP hazırlandı' },
-      { done: true,  text: 'Ezamiyyət — razılaşdırıldı, SOP hazırlandı' },
-      { done: true,  text: 'Xitam — razılaşdırıldı, SOP hazırlandı' },
-      { done: true,  text: 'Miqrasiya — razılaşdırıldı, SOP hazırlandı' },
-      { done: true,  text: 'Davamiyyət — razılaşdırıldı, SOP hazırlandı' },
-      { done: false, text: 'Hüquqi və uyğunluq yoxlamalarından sonra tətbiq ediləcək' },
+      { done: true,  text: 'Məzuniyyət idarəetməsi — tərəflərlə razılaşdırıldı, SOP sənədləşdirildi' },
+      { done: true,  text: 'Ezamiyyət prosesi — tərəflərlə razılaşdırıldı, SOP sənədləşdirildi' },
+      { done: true,  text: 'İş müqaviləsinin xitamı — tərəflərlə razılaşdırıldı, SOP sənədləşdirildi' },
+      { done: true,  text: 'Miqrasiya əməliyyatları — tərəflərlə razılaşdırıldı, SOP sənədləşdirildi' },
+      { done: true,  text: 'Davamiyyət uçotu — tərəflərlə razılaşdırıldı, SOP sənədləşdirildi' },
+      { done: false, text: 'Hüquqi ekspertiza və uyğunluq yoxlamasının ardınca rəsmi tətbiqə başlanacaq' },
     ],
-    note: '3 vertikal üzrə eyni qaydada standart proseslərin aparılmasını təmin edəcək',
+    note: 'Vahid standartlar 3 vertikal üzrə HR proseslərinin eyni keyfiyyətdə icrası üçün zəmin yaradır',
   },
   {
     id: 'expat',
     tag: '04',
-    title: 'Expat Miqrasiya Prosesləri',
+    title: 'Xarici Əməkdaşlar üzrə Miqrasiya',
     color: 'success',
     saving: {
       value: '~21 000 AZN / il',
-      note: 'Pasha Travel ilə müqaviləyə xitam verildi — iki şirkət üzrə illik cost saving',
+      note: 'Pasha Travel ilə xidmət müqaviləsinə xitam verildi — iki şirkət üzrə birləşdirilmiş illik qənaət',
     },
     bullets: [
-      { icon: 'swap_horiz',  text: 'Əvvəllər Pashapay/Birmarket bu proseslər üçün Pasha Travel-dən istifadə edirdi' },
-      { icon: 'home_work',   text: 'Proses daxili icra edilə bildiyi üçün xarici şirkətə ehtiyac aradan qalxdı' },
+      { icon: 'swap_horiz', text: 'Pashapay və Birmarket miqrasiya proseslərini əvvəllər xarici xidmət provayderindən alırdı' },
+      { icon: 'home_work',  text: 'Prosesin daxili resurslarla idarə edilə biləcəyi müəyyənləşdirildi, xidmət müqaviləsinə xitam verildi' },
     ],
   },
   {
     id: 'digital',
     tag: '05',
-    title: 'Birmarket HR Dijitallaşdırma',
+    title: 'Birmarket HR Proseslərinin Rəqəmsallaşdırılması',
     color: 'warn',
     phases: [
       { label: 'Məzuniyyət',  month: 'İyun əvvəli',  icon: 'beach_access',   color: 'var(--primary)' },
@@ -92,8 +92,8 @@ const SECTIONS: Section[] = [
       { label: 'Ezamiyyət',   month: 'İyun sonu',    icon: 'flight_takeoff', color: 'var(--success)' },
     ],
     bullets: [
-      { icon: 'flash_on', text: 'Microsoft Power Apps & Power Automate ilə elektron request formaları' },
-      { icon: 'description', text: 'Fiziki kağız dövriyyəsinin azaldılması məqsədi' },
+      { icon: 'flash_on',    text: 'Microsoft Power Apps və Power Automate platformaları əsasında elektron müraciət formaları tətbiq edilir' },
+      { icon: 'description', text: 'Kağız əsaslı sənəd dövriyyəsinin minimuma endirilməsi məqsədlənir' },
     ],
   },
   {
@@ -102,22 +102,22 @@ const SECTIONS: Section[] = [
     title: 'Məzuniyyət Planlaması',
     color: 'accent',
     items: [
-      { done: true,  text: '3 vertikal üzrə eyni yanaşma ilə paralel başladıldı' },
-      { done: true,  text: 'Effektiv planlama üçün live datalar mövcuddur' },
-      { done: false, text: 'Çətinlik: əməkdaşların Ekosistem keçidi zamanı yerlərini dəyişməsi' },
+      { done: true,  text: 'Bütün 3 vertikal üzrə vahid metodologiya ilə eyni vaxtda başladıldı' },
+      { done: true,  text: 'Planlamanın keyfiyyətini artırmaq üçün canlı məlumat axınından istifadə edilir' },
+      { done: false, text: 'Açıq məsələ: Ekosistem keçidi ilə əlaqədar əməkdaş yerdəyişmələrinin idarə edilməsi' },
     ],
   },
   {
     id: 'hik',
     tag: '07',
-    title: 'Pashapay Həmkarlar İttifaqı (HİK)',
+    title: 'Pashapay Müstəqil Həmkarlar İttifaqı',
     color: 'primary',
     items: [
-      { done: true,  text: 'Hüquq departamenti ilə koordinasiyalı iş aparılır' },
-      { done: true,  text: 'HİK-in təsis edilməsi üçün bütün hüquqi müraciətlər edilib' },
-      { done: true,  text: 'Pashapay əməkdaşlarına kommunikasiyalar həyata keçirilib' },
-      { done: false, text: 'HİK təsis edildikdən sonra Birbank kimi HİK benefitlərindən yararlanılacaq' },
-      { done: false, text: 'Növbəti mərhələ: Birmarket əməkdaşlarının müstəqil HİK-ə qoşulması' },
+      { done: true,  text: 'Layihə hüquq departamenti ilə birgə koordinasiyada həyata keçirilir' },
+      { done: true,  text: 'İttifaqın rəsmi qeydiyyatı üçün tələb olunan bütün hüquqi prosedurlar tamamlandı' },
+      { done: true,  text: 'Pashapay əməkdaşları müvafiq kommunikasiyalarla məlumatlandırıldı' },
+      { done: false, text: 'Qeydiyyatın ardınca əməkdaşlar Birbank-dakı kimi HİK üzvlüyü benefitlərindən yararlanacaq' },
+      { done: false, text: 'Növbəti mərhələ: Birmarket heyətinin bu müstəqil ittifaqa inteqrasiyası' },
     ],
   },
 ]
@@ -313,8 +313,8 @@ export default function AdhocPage() {
       {/* Header */}
       <div className="team-headM" style={{ marginBottom: 16 }}>
         <div>
-          <h1>Ad hoc — Townhall Təqdimatı</h1>
-          <div className="sub">İnsan Resursları üzrə Ekosistem layihələri · {SECTIONS.length} layihə</div>
+          <h1>Townhall Təqdimatı <span style={{ color: 'var(--muted)', fontWeight: 500 }}>|</span> HR Operations and Service Delivery</h1>
+          <div className="sub">Ekosistem HR layihələri üzrə icmal · {SECTIONS.length} istiqamət</div>
         </div>
         <button className="btn-ghostM" onClick={toggleFullscreen}>
           <Icon name={isFullscreen ? 'fullscreen_exit' : 'fullscreen'} size={15} />
