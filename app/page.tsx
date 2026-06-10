@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useDashboard, useProjects, useTasks } from '@/hooks/useSheets'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { db } from '@/lib/db'
+import { Task, Project } from '@/lib/types'
 import Link from 'next/link'
 
 const VIBRANT_PALETTES = [
@@ -74,18 +75,98 @@ export default function DashboardPage() {
     })
   }, [currentWorkspaceId])
 
-  const completionRate = stats && stats.totalTasks > 0
-    ? Math.round((stats.completedTasks / stats.totalTasks) * 100)
+  const completionRate = tasks.length > 0
+    ? Math.round((tasks.filter((t: Task) => t.status === 'Tamamlandı').length / tasks.length) * 100)
     : 0
 
   const hour = new Date().getHours()
   const greeting = hour < 5 ? 'Gecə xeyir' : hour < 12 ? 'Sabahın xeyir' : hour < 18 ? 'Salam' : 'Axşamın xeyir'
 
+  // ── Real computed stats from tasks ──────────────────────────────
+  const now = new Date()
+  const todayStart = new Date(now); todayStart.setHours(0, 0, 0, 0)
+  const yesterdayStart = new Date(todayStart); yesterdayStart.setDate(yesterdayStart.getDate() - 1)
+  const weekStart = new Date(todayStart); weekStart.setDate(weekStart.getDate() - 7)
+
+  const todayCompleted = tasks.filter((t: Task) =>
+    t.status === 'Tamamlandı' && new Date(t.updatedAt) >= todayStart
+  ).length
+
+  const yesterdayCompleted = tasks.filter((t: Task) =>
+    t.status === 'Tamamlandı' &&
+    new Date(t.updatedAt) >= yesterdayStart &&
+    new Date(t.updatedAt) < todayStart
+  ).length
+
+  const weekCompleted = tasks.filter((t: Task) =>
+    t.status === 'Tamamlandı' && new Date(t.updatedAt) >= weekStart
+  ).length
+
+  const inReviewCount  = tasks.filter((t: Task) => t.status === 'Yoxlanılır').length
+  const inProgressCount = tasks.filter((t: Task) => t.status === 'Davam edir').length
+  const overdueCount   = tasks.filter((t: Task) =>
+    t.status !== 'Tamamlandı' && t.dueDate && new Date(t.dueDate) < now
+  ).length
+  const activeProjectsCount = projects.filter((p: Project) => p.status === 'Davam edir').length
+
+  // Yesterday overdue proxy
+  const prevOverdueCount = tasks.filter((t: Task) =>
+    t.status !== 'Tamamlandı' && t.dueDate &&
+    new Date(t.dueDate) >= yesterdayStart && new Date(t.dueDate) < todayStart
+  ).length
+
+  // Sparklines: last 7 days of completed per day
+  const completedSpark = Array.from({ length: 7 }, (_, i) => {
+    const ds = new Date(todayStart); ds.setDate(ds.getDate() - (6 - i))
+    const de = new Date(ds);         de.setDate(de.getDate() + 1)
+    return tasks.filter((t: Task) =>
+      t.status === 'Tamamlandı' &&
+      new Date(t.updatedAt) >= ds && new Date(t.updatedAt) < de
+    ).length
+  })
+
+  const reviewSpark = Array.from({ length: 7 }, (_, i) => {
+    const ds = new Date(todayStart); ds.setDate(ds.getDate() - (6 - i))
+    const de = new Date(ds);         de.setDate(de.getDate() + 1)
+    return tasks.filter((t: Task) =>
+      t.status === 'Yoxlanılır' &&
+      new Date(t.updatedAt) >= ds && new Date(t.updatedAt) < de
+    ).length
+  })
+
+  const overdueSpark = Array.from({ length: 7 }, (_, i) => {
+    const ds = new Date(todayStart); ds.setDate(ds.getDate() - (6 - i))
+    const de = new Date(ds);         de.setDate(de.getDate() + 1)
+    return tasks.filter((t: Task) =>
+      t.status !== 'Tamamlandı' && t.dueDate &&
+      new Date(t.dueDate) >= ds && new Date(t.dueDate) < de
+    ).length
+  })
+
+  const projectSpark = Array.from({ length: 7 }, (_, i) => {
+    const ds = new Date(todayStart); ds.setDate(ds.getDate() - (6 - i))
+    return projects.filter((p: Project) =>
+      p.status === 'Davam edir' && new Date(p.createdAt) <= ds
+    ).length
+  })
+
+  // Delta helpers
+  const pctDelta = (cur: number, prev: number) =>
+    prev > 0
+      ? (cur >= prev ? '+' : '') + Math.round(((cur - prev) / prev) * 100) + '%'
+      : cur > 0 ? '+100%' : '0%'
+  const numDelta = (cur: number, prev: number) =>
+    cur > prev ? '+' + (cur - prev) : cur < prev ? String(cur - prev) : '±0'
+
+  const completedDelta = pctDelta(todayCompleted, yesterdayCompleted)
+  const reviewDelta    = numDelta(inReviewCount, inProgressCount > 0 ? Math.round(inProgressCount * 0.3) : 0)
+  const overdueDelta   = numDelta(overdueCount, prevOverdueCount)
+
   const PAGE_SIZE = 5
   const filteredProjects = tab === 'active'
-    ? projects.filter(p => (p.status as string) === 'Davam edir')
+    ? projects.filter((p: Project) => (p.status as string) === 'Davam edir')
     : tab === 'review'
-      ? projects.filter(p => (p.status as string) === 'Yoxlanılır' || (p.status as string) === 'Tamamlandı')
+      ? projects.filter((p: Project) => (p.status as string) === 'Yoxlanılır' || (p.status as string) === 'Tamamlandı')
       : projects
   const totalPages = Math.ceil(filteredProjects.length / PAGE_SIZE)
   const pagedProjects = filteredProjects.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
@@ -108,13 +189,17 @@ export default function DashboardPage() {
               WebkitBackgroundClip: 'text',
               WebkitTextFillColor: 'transparent',
             }}>
-              {stats?.completedTasks ?? 0}
+              {todayCompleted}
             </span>{' '}
             tapşırıq tamamlandı.
           </h1>
           <p>
-            {stats?.activeProjects ?? 0} aktiv layihə üzərində işləyirsiniz.
-            Komandanız bu həftə yaxşı irəliləyiş göstərir.
+            {activeProjectsCount} aktiv layihə · {inProgressCount} tapşırıq icra edilir.
+            {overdueCount > 0
+              ? ` ${overdueCount} tapşırıq gecikib.`
+              : weekCompleted > 0
+                ? ` Bu həftə ${weekCompleted} tapşırıq tamamlandı.`
+                : ''}
           </p>
           <div className="cta-row">
             <Link href="/tasks" className="cta">
@@ -134,16 +219,16 @@ export default function DashboardPage() {
             </div>
             <div>
               <div className="v">{completionRate}%</div>
-              <div className="l">Tamamlanma · bu ay</div>
+              <div className="l">Tamamlanma nisbəti</div>
             </div>
           </div>
           <div className="hero-stat">
             <div className="ico">
-              <span className="material-symbols-rounded" style={{ fontSize: 18 }}>schedule</span>
+              <span className="material-symbols-rounded" style={{ fontSize: 18 }}>warning</span>
             </div>
             <div>
-              <div className="v">{stats?.totalProjects ?? 0}</div>
-              <div className="l">Ümumi layihə</div>
+              <div className="v">{overdueCount}</div>
+              <div className="l">Gecikmiş tapşırıq</div>
             </div>
           </div>
         </div>
@@ -155,40 +240,44 @@ export default function DashboardPage() {
           color="indigo"
           icon="folder"
           label="Aktiv layihələr"
-          value={stats?.activeProjects ?? 0}
-          total={stats?.totalProjects ?? 0}
-          delta="+2"
+          value={activeProjectsCount}
+          total={projects.length}
+          delta={numDelta(activeProjectsCount, projects.filter((p: Project) => p.status !== 'Tamamlandı' && p.status !== 'Dayandırıldı').length - activeProjectsCount + activeProjectsCount)}
           deltaDir="up"
+          points={projectSpark}
           loading={loading}
         />
         <StatCard
           color="pink"
           icon="check_circle"
-          label="Tamamlanan tapşırıqlar"
-          value={stats?.completedTasks ?? 0}
-          total={stats?.totalTasks ?? 0}
-          delta="+18%"
-          deltaDir="up"
+          label="Bu gün tamamlandı"
+          value={todayCompleted}
+          total={tasks.filter((t: Task) => t.status === 'Tamamlandı').length}
+          delta={completedDelta}
+          deltaDir={todayCompleted >= yesterdayCompleted ? 'up' : 'down'}
+          points={completedSpark}
           loading={loading}
         />
         <StatCard
           color="info"
           icon="visibility"
           label="Yoxlanılır"
-          value={0}
-          total={stats?.totalTasks ?? 0}
-          delta="−3"
+          value={inReviewCount}
+          total={tasks.length}
+          delta={String(inReviewCount)}
           deltaDir="up"
+          points={reviewSpark}
           loading={loading}
         />
         <StatCard
           color="warn"
           icon="warning"
           label="Gecikmiş tapşırıqlar"
-          value={stats?.overdueTasks ?? 0}
-          total={stats?.totalTasks ?? 0}
-          delta="−2"
-          deltaDir="up"
+          value={overdueCount}
+          total={tasks.filter((t: Task) => t.status !== 'Tamamlandı').length}
+          delta={overdueDelta}
+          deltaDir={overdueCount <= prevOverdueCount ? 'up' : 'down'}
+          points={overdueSpark}
           loading={loading}
         />
       </div>
@@ -285,7 +374,7 @@ export default function DashboardPage() {
                 const pct = Number(p.progress) || 0
                 const statusColor = STATUS_COLORS[p.status as string] || 'muted'
                 const assignees = Array.from(new Set(
-                  tasks.filter(t => t.projectId === p.id && t.assignee).map(t => t.assignee)
+                  tasks.filter((t: Task) => t.projectId === p.id && t.assignee).map(t => t.assignee)
                 ))
                 const visibleAssignees = assignees.slice(0, 3)
                 const overflow = assignees.length - visibleAssignees.length
@@ -488,10 +577,11 @@ export default function DashboardPage() {
           </div>
 
           <div className="legend">
-            <LegendRow color="#5B5BF5" label="Tamamlandı" value={stats?.completedTasks ?? 0} />
-            <LegendRow color="#FF6A6A" label="Gecikmiş" value={stats?.overdueTasks ?? 0} />
-            <LegendRow color="#4DABF7" label="Aktiv" value={stats?.activeProjects ?? 0} />
-            <LegendRow color="#E7E9F2" label="Ümumi tapşırıq" value={stats?.totalTasks ?? 0} />
+            <LegendRow color="#5B5BF5" label="Tamamlandı"    value={tasks.filter((t: Task) => t.status === 'Tamamlandı').length} />
+            <LegendRow color="#F5A524" label="Davam edir"    value={inProgressCount} />
+            <LegendRow color="#4DABF7" label="Yoxlanılır"    value={inReviewCount} />
+            <LegendRow color="#FF6A6A" label="Gecikmiş"      value={overdueCount} />
+            <LegendRow color="#E7E9F2" label="Ümumi tapşırıq" value={tasks.length} />
           </div>
         </div>
       </div>
@@ -555,17 +645,17 @@ export default function DashboardPage() {
 }
 
 function StatCard({
-  color, icon, label, value, total, delta, deltaDir, loading,
+  color, icon, label, value, total, delta, deltaDir, points: rawPoints, loading,
 }: {
   color: string; icon: string; label: string; value: number; total: number
-  delta: string; deltaDir: string; loading: boolean
+  delta: string; deltaDir: string; points: number[]; loading: boolean
 }) {
   if (loading) {
     return <div className="skeleton" style={{ height: 140, borderRadius: 16 }} />
   }
 
-  const points = [6, 9, 7, 11, 8, 14, 10]
-  const max = Math.max(...points)
+  const points = rawPoints.every(p => p === 0) ? rawPoints.map((_, i) => i) : rawPoints
+  const max = Math.max(...points, 1)
   const path = points.map((p, i) =>
     `${i === 0 ? 'M' : 'L'} ${(i / (points.length - 1)) * 100},${30 - (p / max) * 24}`
   ).join(' ')
