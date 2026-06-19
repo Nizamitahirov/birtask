@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { useProjects, useTeam, useTasks, useTeamNames } from '@/hooks/useSheets'
-import { Project } from '@/lib/types'
+import { Project, User, WorkspacePermission, ProjectMember } from '@/lib/types'
+import { db } from '@/lib/db'
 import { ProjectForm } from '@/components/projects/ProjectForm'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
@@ -15,6 +17,7 @@ import {
   STATUS_COLORS,
 } from '@/lib/design-utils'
 import Link from 'next/link'
+import toast from 'react-hot-toast'
 
 /* ── helpers ─────────────────────────────────────────────── */
 
@@ -27,6 +30,133 @@ function priorityColor(priority: string): string {
 
 function daysLeft(iso: string): number {
   return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000)
+}
+
+/* ── Project Share Modal ─────────────────────────────────── */
+
+const PERM_LABELS: Record<WorkspacePermission, string> = { read: 'Oxu', write: 'Yaz', admin: 'Admin' }
+const PERM_COLORS: Record<WorkspacePermission, string> = {
+  read: 'var(--info)', write: 'var(--primary)', admin: '#8B5CF6',
+}
+
+function ProjectShareModal({ project, onClose }: { project: Project; onClose: () => void }) {
+  const [members, setMembers] = useState<ProjectMember[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [addUserId, setAddUserId] = useState('')
+  const [addPerm, setAddPerm] = useState<WorkspacePermission>('read')
+  const [saving, setSaving] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [mRes, uRes] = await Promise.all([
+      db.projectMembers.getAll(project.id),
+      db.users.getAll(),
+    ])
+    if (mRes.success && mRes.data) setMembers(mRes.data as ProjectMember[])
+    if (uRes.success && uRes.data) setUsers(uRes.data)
+    setLoading(false)
+  }, [project.id])
+
+  useEffect(() => { load() }, [load])
+
+  const existingUserIds = members.map(m => m.userId)
+  const availableUsers = users.filter(u => !existingUserIds.includes(u.id))
+
+  const handleAdd = async () => {
+    if (!addUserId) return
+    const user = users.find(u => u.id === addUserId)
+    if (!user) return
+    setSaving(true)
+    const res = await db.projectMembers.create({
+      projectId: project.id, userId: addUserId,
+      userDisplayName: user.displayName || user.username,
+      userRole: user.role, permission: addPerm,
+    })
+    if (res.success) { setAddUserId(''); await load() }
+    else toast.error(res.error || 'Xəta')
+    setSaving(false)
+  }
+
+  const handleChangePerm = async (id: string, perm: WorkspacePermission) => {
+    await db.projectMembers.update(id, perm)
+    await load()
+  }
+
+  const handleRemove = async (id: string) => {
+    await db.projectMembers.delete(id)
+    await load()
+  }
+
+  return createPortal(
+    <div
+      style={{ position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(10,10,30,0.5)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+      onClick={onClose}
+    >
+      <div onClick={e => e.stopPropagation()} style={{ width: 480, maxHeight: '80vh', borderRadius: 18, background: 'var(--surface)', border: '1px solid var(--border)', boxShadow: '0 32px 80px rgba(0,0,0,0.2)', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--ink)' }}>Layihəni paylaş</div>
+            <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>{project.name}</div>
+          </div>
+          <button onClick={onClose} style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--surface-2)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--muted)' }}>
+            <Icon name="close" size={14} />
+          </button>
+        </div>
+        <div style={{ padding: '16px 24px', overflowY: 'auto', flex: 1 }}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+            <select value={addUserId} onChange={e => setAddUserId(e.target.value)} className="inputM" style={{ flex: 1 }}>
+              <option value="">İstifadəçi seçin...</option>
+              {availableUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.displayName || u.username}</option>
+              ))}
+            </select>
+            <select value={addPerm} onChange={e => setAddPerm(e.target.value as WorkspacePermission)} className="inputM" style={{ width: 90 }}>
+              <option value="read">Oxu</option>
+              <option value="write">Yaz</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button onClick={handleAdd} disabled={!addUserId || saving} className="btn-primaryM" style={{ padding: '0 14px', opacity: !addUserId || saving ? 0.5 : 1 }}>
+              {saving ? <Icon name="hourglass_empty" size={13} /> : <Icon name="add" size={14} />}
+            </button>
+          </div>
+
+          {loading ? (
+            <div style={{ padding: 20, textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Yüklənir...</div>
+          ) : members.length === 0 ? (
+            <div style={{ padding: '20px 0', textAlign: 'center', color: 'var(--muted)', fontSize: 13 }}>Hələ heç kim əlavə edilməyib</div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {members.map(m => (
+                <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px', borderRadius: 10, background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+                  <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg, var(--primary), #B57BFF)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                    {(m.userDisplayName || '?').charAt(0).toUpperCase()}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{m.userDisplayName}</div>
+                    <div style={{ fontSize: 10, color: 'var(--muted)' }}>{m.userRole}</div>
+                  </div>
+                  <select
+                    value={m.permission}
+                    onChange={e => handleChangePerm(m.id, e.target.value as WorkspacePermission)}
+                    style={{ padding: '4px 8px', borderRadius: 7, border: '1px solid var(--border)', background: 'var(--surface)', color: PERM_COLORS[m.permission], fontSize: 11, fontWeight: 700, cursor: 'pointer' }}
+                  >
+                    <option value="read">Oxu</option>
+                    <option value="write">Yaz</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <button onClick={() => handleRemove(m.id)} style={{ width: 26, height: 26, borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#EF4444' }}>
+                    <Icon name="close" size={12} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
 }
 
 /* ── Overview tile ───────────────────────────────────────── */
@@ -89,9 +219,10 @@ interface ProjectCardProps {
   animate: boolean
   onEdit: (p: Project) => void
   onDelete: (p: Project) => void
+  onShare: (p: Project) => void
 }
 
-function ProjectCard({ p, animate, onEdit, onDelete }: ProjectCardProps) {
+function ProjectCard({ p, animate, onEdit, onDelete, onShare }: ProjectCardProps) {
   const [pc1, pc2] = paletteFor(p.id)
   const [ac1, ac2] = avatarPaletteFor(p.id)
   const days = daysLeft(p.endDate)
@@ -110,6 +241,13 @@ function ProjectCard({ p, animate, onEdit, onDelete }: ProjectCardProps) {
             {p.priority}
           </span>
           <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              className="icon-btn proj-more"
+              onClick={() => onShare(p)}
+              title="Paylaş"
+            >
+              <Icon name="group_add" size={13} />
+            </button>
             <button
               className="icon-btn proj-more"
               onClick={() => onEdit(p)}
@@ -213,9 +351,10 @@ interface ProjectsTableProps {
   animate: boolean
   onEdit: (p: Project) => void
   onDelete: (p: Project) => void
+  onShare: (p: Project) => void
 }
 
-function ProjectsTable({ items, animate, onEdit, onDelete }: ProjectsTableProps) {
+function ProjectsTable({ items, animate, onEdit, onDelete, onShare }: ProjectsTableProps) {
   return (
     <div className="proj-table cardM" style={{ padding: 0, overflow: 'hidden' }}>
       <div className="proj-thead">
@@ -294,6 +433,14 @@ function ProjectsTable({ items, animate, onEdit, onDelete }: ProjectsTableProps)
               <button
                 className="icon-btn"
                 style={{ width: 30, height: 30 }}
+                title="Paylaş"
+                onClick={() => onShare(p)}
+              >
+                <Icon name="group_add" size={13} />
+              </button>
+              <button
+                className="icon-btn"
+                style={{ width: 30, height: 30 }}
                 title="Düzəlt"
                 onClick={() => onEdit(p)}
               >
@@ -321,9 +468,10 @@ interface KanbanCardProps {
   p: Project & { totalTasks: number; completedTasks: number }
   onEdit: (p: Project) => void
   onDelete: (p: Project) => void
+  onShare: (p: Project) => void
 }
 
-function KanbanCard({ p, onEdit, onDelete }: KanbanCardProps) {
+function KanbanCard({ p, onEdit, onDelete, onShare }: KanbanCardProps) {
   const [ac1, ac2] = avatarPaletteFor(p.id)
   const days = daysLeft(p.endDate)
   const late = days < 0 && p.status !== 'Tamamlandı'
@@ -343,6 +491,14 @@ function KanbanCard({ p, onEdit, onDelete }: KanbanCardProps) {
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <span className={`pill ${pc}`} style={{ fontSize: 10, padding: '2px 7px' }}>{p.priority}</span>
+          <button
+            className="icon-btn"
+            style={{ width: 22, height: 22, border: 0 }}
+            title="Paylaş"
+            onClick={() => onShare(p)}
+          >
+            <Icon name="group_add" size={11} />
+          </button>
           <button
             className="icon-btn"
             style={{ width: 22, height: 22, border: 0 }}
@@ -392,10 +548,11 @@ interface ProjectsKanbanProps {
   projects: Array<Project & { totalTasks: number; completedTasks: number }>
   onEdit: (p: Project) => void
   onDelete: (p: Project) => void
+  onShare: (p: Project) => void
   onNew: () => void
 }
 
-function ProjectsKanban({ projects, onEdit, onDelete, onNew }: ProjectsKanbanProps) {
+function ProjectsKanban({ projects, onEdit, onDelete, onShare, onNew }: ProjectsKanbanProps) {
   const COLUMNS: Array<Project['status']> = [
     'Planlaşdırılır', 'Davam edir', 'Tamamlandı', 'Dayandırıldı',
   ]
@@ -422,7 +579,7 @@ function ProjectsKanban({ projects, onEdit, onDelete, onNew }: ProjectsKanbanPro
             </div>
             <div className="proj-kcol-body">
               {items.map(p => (
-                <KanbanCard key={p.id} p={p} onEdit={onEdit} onDelete={onDelete} />
+                <KanbanCard key={p.id} p={p} onEdit={onEdit} onDelete={onDelete} onShare={onShare} />
               ))}
               {items.length === 0 && (
                 <div style={{
@@ -462,6 +619,7 @@ export default function ProjectsPage() {
   const [modal, setModal] = useState<'create' | 'edit' | null>(null)
   const [selected, setSelected] = useState<Project | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Project | null>(null)
+  const [shareProject, setShareProject] = useState<Project | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -569,6 +727,7 @@ export default function ProjectsPage() {
 
   const openEdit = (p: Project) => { setSelected(p); setModal('edit') }
   const openDelete = (p: Project) => setConfirmDelete(p)
+  const openShare = (p: Project) => setShareProject(p)
 
   return (
     <div className="pageM fade-in">
@@ -719,13 +878,13 @@ export default function ProjectsPage() {
       {!loading && view === 'grid' && (
         <div className="proj-grid">
           {filtered.map(p => (
-            <ProjectCard key={p.id} p={p} animate={animate} onEdit={openEdit} onDelete={openDelete} />
+            <ProjectCard key={p.id} p={p} animate={animate} onEdit={openEdit} onDelete={openDelete} onShare={openShare} />
           ))}
         </div>
       )}
 
       {!loading && view === 'list' && (
-        <ProjectsTable items={filtered} animate={animate} onEdit={openEdit} onDelete={openDelete} />
+        <ProjectsTable items={filtered} animate={animate} onEdit={openEdit} onDelete={openDelete} onShare={openShare} />
       )}
 
       {!loading && view === 'kanban' && (
@@ -733,6 +892,7 @@ export default function ProjectsPage() {
           projects={filtered}
           onEdit={openEdit}
           onDelete={openDelete}
+          onShare={openShare}
           onNew={() => setModal('create')}
         />
       )}
@@ -790,6 +950,14 @@ export default function ProjectsPage() {
         message={`"${confirmDelete?.name}" layihəsini silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz.`}
         loading={deleting}
       />
+
+      {/* Share Modal */}
+      {shareProject && (
+        <ProjectShareModal
+          project={shareProject}
+          onClose={() => setShareProject(null)}
+        />
+      )}
     </div>
   )
 }
