@@ -10,6 +10,8 @@ import {
   TimeEntry,
   RecurringTask,
   Workspace,
+  WorkspaceMember,
+  WorkspacePermission,
   WorkflowRule,
   WorkflowRun,
   Role,
@@ -162,6 +164,15 @@ export const db = {
     getAll: (workflowId: string) => callApi<WorkflowRun[]>('/workflow-runs', 'GET', { workflowId }),
     getById: (id: string) => callApi<WorkflowRun>(`/workflow-runs/${id}`),
     retry: (id: string) => callApi<WorkflowRun>(`/workflow-runs/${id}/retry`, 'POST'),
+  },
+  workspaceMembers: {
+    getAll: (workspaceId: string) =>
+      callApi<WorkspaceMember[]>('/workspace-members', 'GET', { workspaceId }),
+    create: (data: { workspaceId: string; userId: string; userDisplayName: string; userRole: string; permission: WorkspacePermission }) =>
+      callApi<WorkspaceMember>('/workspace-members', 'POST', data),
+    update: (id: string, permission: WorkspacePermission) =>
+      callApi<WorkspaceMember>(`/workspace-members/${id}`, 'PUT', { permission }),
+    delete: (id: string) => callApi<void>(`/workspace-members/${id}`, 'DELETE'),
   },
   priorityMatrix: {
     get: (workspaceId: string) =>

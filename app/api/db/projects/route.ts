@@ -1,6 +1,9 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import jwt from 'jsonwebtoken'
+
+const JWT_SECRET = process.env.JWT_SECRET || 'birtask-jwt-secret-2026-super-secure-key'
 
 export async function GET(req: NextRequest) {
   try {
@@ -11,13 +14,51 @@ export async function GET(req: NextRequest) {
     if (workspaceId) query = query.where('workspaceId', '==', workspaceId)
 
     const snapshot = await query.get()
-    const projects = snapshot.docs
+    let projects = snapshot.docs
       .map(doc => ({ ...doc.data(), id: doc.id }))
       .sort((a, b) => {
         const at = (a as { createdAt?: string }).createdAt || ''
         const bt = (b as { createdAt?: string }).createdAt || ''
         return bt.localeCompare(at)
       })
+
+    // Per-user filtering for member/viewer roles
+    const token = req.cookies.get('birtask_token')?.value
+    if (token) {
+      try {
+        const payload = jwt.verify(token, JWT_SECRET) as { userId: string; role: string }
+        if (['member', 'viewer'].includes(payload.role)) {
+          const userDoc = await adminDb.collection('users').doc(payload.userId).get()
+          const userData = userDoc.data()
+          const allowedIds = new Set<string>(userData?.projectIds || [])
+          const memberId: string | undefined = userData?.memberId
+
+          // Auto-discover projects via team member task assignments
+          if (memberId) {
+            const memberDoc = await adminDb.collection('team').doc(memberId).get()
+            const memberName = memberDoc.data()?.name as string | undefined
+            if (memberName && workspaceId) {
+              const tasksSnap = await adminDb.collection('tasks')
+                .where('workspaceId', '==', workspaceId)
+                .where('assignee', '==', memberName)
+                .get()
+              tasksSnap.docs.forEach(d => {
+                const pid = (d.data() as { projectId?: string }).projectId
+                if (pid) allowedIds.add(pid)
+              })
+            }
+          }
+
+          // Only filter if restrictions are configured
+          if (userData?.projectIds !== undefined || memberId !== undefined) {
+            projects = projects.filter((p: { id?: string }) => allowedIds.has(p.id || ''))
+          }
+        }
+      } catch {
+        // Invalid or missing token — no filtering
+      }
+    }
+
     return NextResponse.json({ success: true, data: projects })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'

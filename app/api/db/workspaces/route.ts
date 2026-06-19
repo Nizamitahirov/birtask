@@ -1,17 +1,39 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import jwt from 'jsonwebtoken'
 
-export async function GET() {
+const JWT_SECRET = process.env.JWT_SECRET || 'birtask-jwt-secret-2026-super-secure-key'
+
+export async function GET(req: NextRequest) {
   try {
     const snapshot = await adminDb.collection('workspaces').get()
-    const workspaces = snapshot.docs
+    let workspaces = snapshot.docs
       .map(doc => ({ ...doc.data(), id: doc.id }))
       .sort((a, b) => {
         const at = (a as { createdAt?: string }).createdAt || ''
         const bt = (b as { createdAt?: string }).createdAt || ''
         return at.localeCompare(bt)
       })
+
+    // Per-user workspace filtering for member/viewer roles
+    const token = req.cookies.get('birtask_token')?.value
+    if (token) {
+      try {
+        const payload = jwt.verify(token, JWT_SECRET) as { userId: string; role: string }
+        if (['member', 'viewer'].includes(payload.role)) {
+          const userDoc = await adminDb.collection('users').doc(payload.userId).get()
+          const userData = userDoc.data()
+          const workspaceIds: string[] = userData?.workspaceIds || []
+          if (workspaceIds.length > 0) {
+            workspaces = workspaces.filter((ws: { id?: string }) => workspaceIds.includes(ws.id || ''))
+          }
+        }
+      } catch {
+        // Invalid or missing token — no filtering
+      }
+    }
+
     return NextResponse.json({ success: true, data: workspaces })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'

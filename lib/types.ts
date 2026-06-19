@@ -128,6 +128,21 @@ export interface User {
   createdAt: string
   updatedAt: string
   lastLoginAt?: string
+  memberId?: string        // linked TeamMember.id
+  workspaceIds?: string[]  // workspaces this user can access
+  projectIds?: string[]    // explicit project access list (member/viewer)
+}
+
+export type WorkspacePermission = 'read' | 'write' | 'admin'
+
+export interface WorkspaceMember {
+  id: string
+  workspaceId: string
+  userId: string
+  userDisplayName: string
+  userRole: UserRole
+  permission: WorkspacePermission
+  addedAt: string
 }
 
 export interface Comment {

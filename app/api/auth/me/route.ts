@@ -61,6 +61,9 @@ export async function GET(req: NextRequest) {
           email: userData.email,
           mustChangePassword: userData.mustChangePassword ?? false,
           lastLoginAt: userData.lastLoginAt,
+          memberId: userData.memberId,
+          workspaceIds: userData.workspaceIds,
+          projectIds: userData.projectIds,
         },
       },
     })
