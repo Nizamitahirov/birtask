@@ -75,8 +75,7 @@ function buildLayout(members: TeamMember[], collapsed: Set<string>, dir: Dir): L
     if (collapsed.has(id)){wCache.set(id,CW);return CW}
     const ch=childMap.get(id)||[]
     if(!ch.length){wCache.set(id,CW);return CW}
-    const rows:string[][]=[]
-    for(let i=0;i<ch.length;i+=MAX_COLS) rows.push(ch.slice(i,i+MAX_COLS))
+    const rows:string[][]=[];for(let i=0;i<ch.length;i+=MAX_COLS) rows.push(ch.slice(i,i+MAX_COLS))
     const rowWidths=rows.map(row=>row.reduce((s,c,i)=>s+subW(c,vis)+(i?HG:0),0))
     const w=Math.max(CW,...rowWidths)
     wCache.set(id,w);return w
@@ -88,8 +87,7 @@ function buildLayout(members: TeamMember[], collapsed: Set<string>, dir: Dir): L
     if(collapsed.has(id)){treeHCache.set(id,CH);return CH}
     const ch=childMap.get(id)||[]
     if(!ch.length){treeHCache.set(id,CH);return CH}
-    const rows:string[][]=[]
-    for(let i=0;i<ch.length;i+=MAX_COLS) rows.push(ch.slice(i,i+MAX_COLS))
+    const rows:string[][]=[];for(let i=0;i<ch.length;i+=MAX_COLS) rows.push(ch.slice(i,i+MAX_COLS))
     let h=CH+VG
     rows.forEach((row,ri)=>{
       h+=Math.max(...row.map(c=>subTreeH(c,vis)))
@@ -97,10 +95,7 @@ function buildLayout(members: TeamMember[], collapsed: Set<string>, dir: Dir): L
     })
     treeHCache.set(id,h);return h
   }
-  // Pre-compute all widths & heights so place() can read from cache safely
   roots.forEach(r=>{ subW(r); subTreeH(r) })
-  // place() uses leftEdge (left boundary of the full subtree span).
-  // Node box is centered within that span → no child can overflow left or overlap siblings.
   const place = (id:string,leftEdge:number,y:number,vis=new Set<string>()) => {
     if(vis.has(id))return; vis=new Set(vis); vis.add(id)
     const span=wCache.get(id)??CW
@@ -108,8 +103,7 @@ function buildLayout(members: TeamMember[], collapsed: Set<string>, dir: Dir): L
     positions.set(id,{x:centerX-CW/2,y})
     if(collapsed.has(id))return
     const ch=childMap.get(id)||[]; if(!ch.length)return
-    const rows:string[][]=[]
-    for(let i=0;i<ch.length;i+=MAX_COLS) rows.push(ch.slice(i,i+MAX_COLS))
+    const rows:string[][]=[];for(let i=0;i<ch.length;i+=MAX_COLS) rows.push(ch.slice(i,i+MAX_COLS))
     rowGroupsMap.set(id,rows)
     let rowY=y+CH+VG
     rows.forEach(row=>{
@@ -170,10 +164,8 @@ function OrgLines({ positions, childMap, collapsed, members, dir, rowGroupsMap }
       const pp = positions.get(parentId); if(!pp) return
       const pCX = pp.x+cw/2, pBottom = pp.y+ch
 
-      // Use row groups if available, otherwise treat all children as one row
       const rows = rowGroupsMap.get(parentId) || [children]
 
-      // Compute midY for each row (halfway between this row's children top and the gap above)
       const rowMidYs: number[] = rows.map(row => {
         const firstPos = positions.get(row[0])
         if (!firstPos) return pBottom + vg/2
@@ -182,10 +174,8 @@ function OrgLines({ positions, childMap, collapsed, members, dir, rowGroupsMap }
 
       const lastMidY = rowMidYs[rowMidYs.length - 1]
 
-      // Vertical trunk from parent bottom down to last row's midY
       paths.push({d:`M${pCX},${pBottom} L${pCX},${lastMidY}`, dashed:false})
 
-      // For each row: horizontal span + drops
       rows.forEach((row, ri) => {
         const midY = rowMidYs[ri]
         const valid = row.filter(c => positions.has(c))
@@ -199,7 +189,6 @@ function OrgLines({ positions, childMap, collapsed, members, dir, rowGroupsMap }
         })
       })
     })
-    // functional manager dashed lines
     members.forEach(m=>{
       if(!m.functionalManagerId||m.functionalManagerId===m.id) return
       const fp=positions.get(m.functionalManagerId), mp=positions.get(m.id)
@@ -210,7 +199,6 @@ function OrgLines({ positions, childMap, collapsed, members, dir, rowGroupsMap }
     })
 
   } else {
-    // horizontal
     childMap.forEach((children,parentId)=>{
       if(collapsed.has(parentId)) return
       const pp=positions.get(parentId); if(!pp) return
@@ -302,9 +290,7 @@ function NodeCard({ member, level, childCount, isCollapsed, isOver, isDragging, 
       }}
     >
       <div style={{borderRadius:10, overflow:'hidden'}}>
-        {/* Top section */}
         <div style={{padding:'12px 12px 8px', display:'flex', gap:10, alignItems:'flex-start'}}>
-          {/* Avatar */}
           <div style={{position:'relative', flexShrink:0}}>
             <div style={{
               width:38, height:38, borderRadius:'50%',
@@ -313,7 +299,6 @@ function NodeCard({ member, level, childCount, isCollapsed, isOver, isDragging, 
               color:'#fff', fontSize:13, fontWeight:800,
               boxShadow:`0 3px 8px ${c1}40`,
             }}>{initials(member.name)}</div>
-            {/* Status dot */}
             <div style={{
               position:'absolute', bottom:1, right:1,
               width:9, height:9, borderRadius:'50%',
@@ -321,7 +306,6 @@ function NodeCard({ member, level, childCount, isCollapsed, isOver, isDragging, 
             }}/>
           </div>
 
-          {/* Name + role */}
           <div style={{flex:1, minWidth:0}}>
             <div style={{fontSize:13, fontWeight:800, color:'var(--ink)', lineHeight:1.25,
               overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
@@ -333,7 +317,6 @@ function NodeCard({ member, level, childCount, isCollapsed, isOver, isDragging, 
             </div>
           </div>
 
-          {/* Level + up arrow */}
           <div style={{display:'flex', flexDirection:'column', alignItems:'flex-end', gap:4, flexShrink:0}}>
             <span style={{
               padding:'2px 6px', borderRadius:5,
@@ -355,7 +338,6 @@ function NodeCard({ member, level, childCount, isCollapsed, isOver, isDragging, 
           </div>
         </div>
 
-        {/* Company / func tags */}
         {(member.company || member.department || hasFM) && (
           <div style={{padding:'0 12px 8px', display:'flex', gap:5, flexWrap:'wrap'}}>
             {(member.company || member.department) && (
@@ -384,7 +366,6 @@ function NodeCard({ member, level, childCount, isCollapsed, isOver, isDragging, 
           </div>
         )}
 
-        {/* Direct reports footer */}
         {childCount > 0 && (
           <div style={{
             padding:'6px 12px',
@@ -400,7 +381,6 @@ function NodeCard({ member, level, childCount, isCollapsed, isOver, isDragging, 
         )}
       </div>
 
-      {/* Collapse button */}
       {childCount>0 && (
         <button
           onClick={e=>{e.stopPropagation();onToggle()}}
@@ -426,7 +406,7 @@ function NodeCard({ member, level, childCount, isCollapsed, isOver, isDragging, 
 
 // ─── Member Modal ─────────────────────────────────────────────────────────────
 
-function MemberModal({member, members, onClose}:{member:TeamMember;members:TeamMember[];onClose:()=>void}) {
+function MemberModal({member, members, onClose, onNavigate}:{member:TeamMember;members:TeamMember[];onClose:()=>void;onNavigate:(m:TeamMember)=>void}) {
   const [c1,c2]=pal(member.id)
   const dc=deptCol(member.department||'x')
   const mgr=members.find(m=>m.id===member.managerId)
@@ -483,20 +463,27 @@ function MemberModal({member, members, onClose}:{member:TeamMember;members:TeamM
           }}><span className="material-symbols-rounded" style={{fontSize:16}}>close</span></button>
         </div>
         <div style={{padding:'16px 24px 24px', display:'flex', flexDirection:'column', gap:8}}>
-          {[
-            {icon:'mail',label:'E-poçt',val:member.email,color:'var(--primary)'},
-            {icon:'call',label:'Telefon',val:member.phone,color:'#10B981'},
-            {icon:'apartment',label:'Departament',val:member.department,color:'var(--muted)'},
-            {icon:'hub',label:'Funksional sahə',val:member.division,color:'var(--muted)'},
-            {icon:'category',label:'Bölmə',val:member.section,color:'var(--muted)'},
-            {icon:'account_tree',label:'Birbaşa rəhbər',val:mgr?.name,sub:mgr?.position||mgr?.role,color:'#4F6AF5'},
-            {icon:'hub',label:'Funksional rəhbər',val:fmgr?.name,sub:fmgr?.position||fmgr?.role,color:'#8B5CF6',dashed:true},
-          ].filter(r=>r.val).map(r=>(
-            <div key={r.label} style={{
-              display:'flex', alignItems:'center', gap:12,
-              padding:'10px 14px', borderRadius:12,
-              background:'var(--surface-2)', border:`1px solid ${r.dashed?'rgba(139,92,246,0.2)':'var(--border)'}`,
-            }}>
+          {([
+            {icon:'mail',label:'E-poçt',val:member.email,color:'var(--primary)',navigate:undefined as TeamMember|undefined},
+            {icon:'call',label:'Telefon',val:member.phone,color:'#10B981',navigate:undefined as TeamMember|undefined},
+            {icon:'apartment',label:'Departament',val:member.department,color:'var(--muted)',navigate:undefined as TeamMember|undefined},
+            {icon:'hub',label:'Funksional sahə',val:member.division,color:'var(--muted)',navigate:undefined as TeamMember|undefined},
+            {icon:'category',label:'Bölmə',val:member.section,color:'var(--muted)',navigate:undefined as TeamMember|undefined},
+            {icon:'account_tree',label:'Birbaşa rəhbər',val:mgr?.name,sub:mgr?.position||mgr?.role,color:'#4F6AF5',navigate:mgr,dashed:false},
+            {icon:'hub',label:'Funksional rəhbər',val:fmgr?.name,sub:fmgr?.position||fmgr?.role,color:'#8B5CF6',dashed:true,navigate:fmgr},
+          ] as {icon:string;label:string;val?:string;sub?:string;color:string;dashed?:boolean;navigate?:TeamMember}[]).filter(r=>r.val).map(r=>(
+            <div key={r.label}
+              onClick={r.navigate ? () => onNavigate(r.navigate!) : undefined}
+              style={{
+                display:'flex', alignItems:'center', gap:12,
+                padding:'10px 14px', borderRadius:12,
+                background:'var(--surface-2)', border:`1px solid ${r.dashed?'rgba(139,92,246,0.2)':'var(--border)'}`,
+                cursor: r.navigate ? 'pointer' : 'default',
+                transition: r.navigate ? 'background .1s' : undefined,
+              }}
+              onMouseEnter={r.navigate ? e => { (e.currentTarget as HTMLElement).style.background = 'var(--primary-soft)' } : undefined}
+              onMouseLeave={r.navigate ? e => { (e.currentTarget as HTMLElement).style.background = 'var(--surface-2)' } : undefined}
+            >
               <span className="material-symbols-rounded" style={{fontSize:16, color:r.color, flexShrink:0}}>{r.icon}</span>
               <div style={{flex:1, minWidth:0}}>
                 <div style={{fontSize:9.5, color:'var(--muted)', fontWeight:700, textTransform:'uppercase', letterSpacing:'0.07em'}}>{r.label}</div>
@@ -504,6 +491,9 @@ function MemberModal({member, members, onClose}:{member:TeamMember;members:TeamM
                   {r.val}{r.sub&&<span style={{color:'var(--muted)', fontWeight:500}}> · {r.sub}</span>}
                 </div>
               </div>
+              {r.navigate && (
+                <span className="material-symbols-rounded" style={{fontSize:14, color:'var(--primary)', flexShrink:0}}>chevron_right</span>
+              )}
             </div>
           ))}
           {reports.length>0&&(
@@ -513,10 +503,11 @@ function MemberModal({member, members, onClose}:{member:TeamMember;members:TeamM
               </div>
               <div style={{display:'flex', flexWrap:'wrap', gap:6}}>
                 {reports.map(r=>{const[rc1,rc2]=pal(r.id);return(
-                  <div key={r.id} style={{
+                  <div key={r.id} onClick={()=>onNavigate(r)} style={{
                     display:'flex', alignItems:'center', gap:7,
                     padding:'5px 10px', borderRadius:999,
                     background:'var(--surface-3)', border:'1px solid var(--border)',
+                    cursor:'pointer',
                     fontSize:11, fontWeight:600, color:'var(--ink)',
                   }}>
                     <div style={{width:20, height:20, borderRadius:'50%', flexShrink:0,
@@ -553,8 +544,16 @@ function VisualChart({ members, onUpdateManager }:{
   const [dragOverId, setDragOverId] = useState<string|null>(null)
   const [selectedMember, setSelectedMember] = useState<TeamMember|null>(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
+  const [search, setSearch] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const searchRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
   const outerRef = useRef<HTMLDivElement>(null)
+
+  const searchResults = search.trim().length > 0
+    ? members.filter(m => m.name.toLowerCase().includes(search.toLowerCase()) ||
+        (m.position||m.role||'').toLowerCase().includes(search.toLowerCase()))
+    : []
 
   useEffect(() => {
     const handler = () => setIsFullscreen(!!document.fullscreenElement)
@@ -616,6 +615,81 @@ function VisualChart({ members, onUpdateManager }:{
       backgroundImage:'radial-gradient(circle, var(--border) 1px, transparent 1px)',
       backgroundSize:'22px 22px',
     }}>
+      {/* Search overlay */}
+      <div style={{position:'absolute', top:16, left:60, zIndex:20, width:260}}>
+        <div style={{position:'relative'}}>
+          <span className="material-symbols-rounded" style={{
+            position:'absolute', left:10, top:'50%', transform:'translateY(-50%)',
+            fontSize:15, color:'var(--muted)', pointerEvents:'none',
+          }}>search</span>
+          <input
+            ref={searchRef}
+            value={search}
+            onChange={e=>{setSearch(e.target.value);setSearchOpen(true)}}
+            onFocus={()=>setSearchOpen(true)}
+            onBlur={()=>setTimeout(()=>setSearchOpen(false),150)}
+            placeholder="Ad axtar..."
+            style={{
+              width:'100%', padding:'8px 30px 8px 32px',
+              borderRadius:10, border:'1px solid var(--border)',
+              background:'var(--surface)', color:'var(--ink)',
+              fontSize:12, fontWeight:500, outline:'none',
+              boxShadow:'0 2px 8px rgba(0,0,0,0.08)',
+            }}
+          />
+          {search && (
+            <button onClick={()=>{setSearch('');searchRef.current?.focus()}} style={{
+              position:'absolute', right:8, top:'50%', transform:'translateY(-50%)',
+              background:'none', border:'none', cursor:'pointer', padding:2,
+              color:'var(--muted)',
+            }}>
+              <span className="material-symbols-rounded" style={{fontSize:14}}>close</span>
+            </button>
+          )}
+        </div>
+        {searchOpen && searchResults.length > 0 && (
+          <div style={{
+            position:'absolute', top:'calc(100% + 4px)', left:0, right:0,
+            background:'var(--surface)', border:'1px solid var(--border)',
+            borderRadius:10, boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
+            overflow:'hidden', maxHeight:240, overflowY:'auto',
+          }}>
+            {searchResults.map(m=>{
+              const [sc1,sc2]=pal(m.id)
+              return (
+                <button key={m.id} onMouseDown={()=>{
+                  setSelectedMember(m); scrollToNode(m.id); setSearch(''); setSearchOpen(false)
+                }} style={{
+                  display:'flex', alignItems:'center', gap:10,
+                  width:'100%', padding:'9px 12px',
+                  background:'transparent', border:'none', cursor:'pointer', textAlign:'left',
+                }}>
+                  <div style={{
+                    width:30, height:30, borderRadius:8, flexShrink:0,
+                    background:`linear-gradient(135deg,${sc1},${sc2})`,
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    color:'#fff', fontSize:10, fontWeight:800,
+                  }}>{initials(m.name)}</div>
+                  <div style={{minWidth:0}}>
+                    <div style={{fontSize:12, fontWeight:700, color:'var(--ink)', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis'}}>{m.name}</div>
+                    <div style={{fontSize:10, color:'var(--muted)'}}>{m.position||m.role||m.department}</div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+        {searchOpen && search.trim() && searchResults.length === 0 && (
+          <div style={{
+            position:'absolute', top:'calc(100% + 4px)', left:0, right:0,
+            background:'var(--surface)', border:'1px solid var(--border)',
+            borderRadius:10, padding:'12px', fontSize:12,
+            color:'var(--muted)', textAlign:'center',
+            boxShadow:'0 8px 24px rgba(0,0,0,0.12)',
+          }}>Nəticə tapılmadı</div>
+        )}
+      </div>
+
       {/* Top-right controls */}
       <div style={{position:'absolute', top:16, right:16, zIndex:10, display:'flex', gap:6}}>
         {([['V','Şaquli'],['H','Üfüqi']] as [Dir,string][]).map(([d,label])=>(
@@ -758,7 +832,7 @@ function VisualChart({ members, onUpdateManager }:{
         </div>
       </div>
 
-      {selectedMember&&<MemberModal member={selectedMember} members={members} onClose={()=>setSelectedMember(null)}/>}
+      {selectedMember&&<MemberModal member={selectedMember} members={members} onClose={()=>setSelectedMember(null)} onNavigate={(m)=>{setSelectedMember(m);scrollToNode(m.id)}}/>}
     </div>
   )
 }
