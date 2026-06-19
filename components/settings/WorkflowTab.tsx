@@ -505,7 +505,8 @@ function StepCard({ badge, badgeColor, icon, color, title, subtitle, isExpanded,
         <div style={{ padding: '4px 16px 16px', borderTop: '1px solid var(--border)' }}>
           <div style={{ paddingTop: 14 }}>
             {children}
-          </div></div>
+          </div>
+        </div>
       )}
     </div>
   )
@@ -575,7 +576,7 @@ function FlowCanvas({ form, setF, webhookUrl, saving, onSave, isNew }: FlowCanva
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['trigger']))
   const [dragIdx, setDragIdx] = useState<number | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
-  const [pickerAfter, setPickerAfter] = useState<number | null>(null) // -1 = before first, N = after index N
+  const [pickerAfter, setPickerAfter] = useState<number | null>(null)
 
   const toggle = (key: string) =>
     setExpanded(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n })
