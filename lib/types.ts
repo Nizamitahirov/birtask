@@ -145,6 +145,16 @@ export interface WorkspaceMember {
   addedAt: string
 }
 
+export interface ProjectMember {
+  id: string
+  projectId: string
+  userId: string
+  userDisplayName: string
+  userRole: UserRole
+  permission: WorkspacePermission
+  addedAt: string
+}
+
 export interface Comment {
   id: string
   entityType: 'project' | 'task'

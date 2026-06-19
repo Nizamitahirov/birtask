@@ -11,6 +11,7 @@ import {
   RecurringTask,
   Workspace,
   WorkspaceMember,
+  ProjectMember,
   WorkspacePermission,
   WorkflowRule,
   WorkflowRun,
@@ -173,6 +174,15 @@ export const db = {
     update: (id: string, permission: WorkspacePermission) =>
       callApi<WorkspaceMember>(`/workspace-members/${id}`, 'PUT', { permission }),
     delete: (id: string) => callApi<void>(`/workspace-members/${id}`, 'DELETE'),
+  },
+  projectMembers: {
+    getAll: (projectId: string) =>
+      callApi<ProjectMember[]>('/project-members', 'GET', { projectId }),
+    create: (data: { projectId: string; userId: string; userDisplayName: string; userRole: string; permission: WorkspacePermission }) =>
+      callApi<ProjectMember>('/project-members', 'POST', data),
+    update: (id: string, permission: WorkspacePermission) =>
+      callApi<ProjectMember>(`/project-members/${id}`, 'PUT', { permission }),
+    delete: (id: string) => callApi<void>(`/project-members/${id}`, 'DELETE'),
   },
   priorityMatrix: {
     get: (workspaceId: string) =>
