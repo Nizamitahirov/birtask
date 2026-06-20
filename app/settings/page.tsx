@@ -1,8 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { db } from '@/lib/db'
-import { User, UserRole, Workspace } from '@/lib/types'
+import { User, UserRole, Workspace, TeamMember, Project, WorkspaceMember, WorkspacePermission } from '@/lib/types'
+import { PERMISSION_GROUPS, DEFAULT_ROLE_PERMISSIONS } from '@/lib/permissions'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import {
@@ -41,6 +43,45 @@ function RoleBadge({ role }: { role: UserRole }) {
   )
 }
 
+// ── Permission preview panel ──────────────────────────────────────────────────
+
+function RolePermissionPreview({ role }: { role: UserRole }) {
+  const perms = new Set(DEFAULT_ROLE_PERMISSIONS[role] || [])
+  return (
+    <div className="rounded-xl border border-[var(--border)] overflow-hidden">
+      <div className="px-3 py-2 bg-[var(--surface-2)] border-b border-[var(--border)] flex items-center gap-2">
+        <span className="material-symbols-rounded text-[14px]" style={{ color: role === 'admin' ? '#8B5CF6' : role === 'manager' ? '#3B82F6' : role === 'member' ? '#10B981' : '#64748B' }}>
+          {role === 'admin' ? 'shield' : role === 'manager' ? 'manage_accounts' : role === 'member' ? 'person' : 'visibility'}
+        </span>
+        <span className="text-xs font-semibold text-text-primary">
+          {role === 'admin' ? 'Admin' : role === 'manager' ? 'Menecer' : role === 'member' ? 'Üzv' : 'İzləyici'} icazələri
+        </span>
+      </div>
+      <div className="p-3 grid grid-cols-2 gap-2">
+        {PERMISSION_GROUPS.map(group => (
+          <div key={group.key}>
+            <div className="flex items-center gap-1.5 mb-1">
+              <span className="material-symbols-rounded text-[12px]" style={{ color: group.color }}>{group.icon}</span>
+              <span className="text-[10px] font-bold text-text-secondary uppercase tracking-wide">{group.label}</span>
+            </div>
+            <div className="space-y-0.5 pl-4">
+              {group.permissions.map(p => {
+                const has = perms.has(p.key)
+                return (
+                  <div key={p.key} className={cn('flex items-center gap-1 text-[11px]', has ? 'text-text-primary' : 'text-text-muted line-through opacity-50')}>
+                    <span className="material-symbols-rounded text-[10px]" style={{ color: has ? '#10B981' : '#94a3b8' }}>{has ? 'check_circle' : 'cancel'}</span>
+                    {p.label}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 // ── User form (create / edit) ─────────────────────────────────────────────────
 
 interface UserFormProps {
@@ -62,17 +103,50 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
     password:    '',
   })
   const [showPw, setShowPw] = useState(false)
+  const [memberId, setMemberId] = useState(initial?.memberId || '')
+  const [workspaceIds, setWorkspaceIds] = useState<string[]>(initial?.workspaceIds || [])
+  const [projectIds, setProjectIds] = useState<string[]>(initial?.projectIds || [])
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [allWorkspaces, setAllWorkspaces] = useState<Workspace[]>([])
+  const [allProjects, setAllProjects] = useState<Project[]>([])
+  const [showPermPreview, setShowPermPreview] = useState(false)
+
+  useEffect(() => {
+    Promise.all([
+      db.team.getAll(),
+      db.workspaces.getAll(),
+      db.projects.getAll(),
+    ]).then(([t, w, p]) => {
+      if (t.success && t.data) setTeamMembers(t.data)
+      if (w.success && w.data) setAllWorkspaces(w.data)
+      if (p.success && p.data) setAllProjects(p.data)
+    })
+  }, [])
 
   const set = (k: string, v: string | boolean) => setForm(f => ({ ...f, [k]: v }))
+  const needsProjectList = form.role === 'member' || form.role === 'viewer'
+
+  const toggleWorkspace = (id: string) =>
+    setWorkspaceIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+
+  const toggleProject = (id: string) =>
+    setProjectIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (mode === 'create' && workspaceIds.length === 0) {
+      toast.error('Ən azı bir iş sahəsi seçin')
+      return
+    }
     const payload: Partial<User> & { password?: string; mustChangePassword?: boolean } = {
-      displayName: form.displayName,
-      email:       form.email,
-      role:        form.role,
-      department:  form.department,
-      isActive:    form.isActive,
+      displayName:  form.displayName,
+      email:        form.email,
+      role:         form.role,
+      department:   form.department,
+      isActive:     form.isActive,
+      memberId:     memberId || undefined,
+      workspaceIds: workspaceIds.length > 0 ? workspaceIds : undefined,
+      projectIds:   needsProjectList && projectIds.length > 0 ? projectIds : undefined,
     }
     if (mode === 'create') {
       payload.username         = form.username
@@ -126,7 +200,7 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
           <label className="block text-text-secondary text-xs mb-1.5">Rol *</label>
           <select
             value={form.role}
-            onChange={e => set('role', e.target.value)}
+            onChange={e => { set('role', e.target.value); setShowPermPreview(true) }}
             className="inputM w-full"
           >
             <option value="admin">Admin</option>
@@ -145,6 +219,94 @@ function UserForm({ initial, mode, onSubmit, onCancel, loading }: UserFormProps)
           />
         </div>
       </div>
+
+      {/* Permission preview toggle */}
+      <div>
+        <button
+          type="button"
+          onClick={() => setShowPermPreview(v => !v)}
+          className="flex items-center gap-2 text-xs text-text-secondary hover:text-text-primary transition-colors"
+        >
+          <span className="material-symbols-rounded text-[14px]">{showPermPreview ? 'expand_less' : 'expand_more'}</span>
+          {showPermPreview ? 'İcazə önizləməsini gizlət' : 'Bu rol ilə nə edə bilər? (icazə önizləməsi)'}
+        </button>
+        {showPermPreview && (
+          <div className="mt-2">
+            <RolePermissionPreview role={form.role} />
+          </div>
+        )}
+      </div>
+
+      {/* Komanda üzvü ilə əlaqələndir */}
+      <div>
+        <label className="block text-text-secondary text-xs mb-1.5">Komanda üzvü ilə əlaqələndir</label>
+        <select
+          value={memberId}
+          onChange={e => setMemberId(e.target.value)}
+          className="inputM w-full"
+        >
+          <option value="">— Seçilməyib —</option>
+          {teamMembers.map(m => (
+            <option key={m.id} value={m.id}>{m.name}{m.position ? ` · ${m.position}` : ''}</option>
+          ))}
+        </select>
+        <p className="text-text-muted text-[11px] mt-1">İstifadəçini mövcud komanda üzvü profili ilə əlaqələndirir.</p>
+      </div>
+
+      {/* Workspace selection — mandatory on create */}
+      <div>
+        <label className="block text-text-secondary text-xs mb-1.5">
+          İş Sahəsi {mode === 'create' && <span className="text-accent-red">*</span>}
+        </label>
+        {allWorkspaces.length === 0 ? (
+          <div className="flex items-center gap-2 text-xs text-text-muted"><Loader2 size={12} className="animate-spin" /> Yüklənir...</div>
+        ) : (
+          <div className="space-y-1.5 max-h-32 overflow-y-auto rounded-xl border border-[var(--border)] p-2">
+            {allWorkspaces.map(ws => (
+              <label key={ws.id} className="flex items-center gap-2.5 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-[var(--surface-2)] transition-colors">
+                <input
+                  type="checkbox"
+                  checked={workspaceIds.includes(ws.id)}
+                  onChange={() => toggleWorkspace(ws.id)}
+                  className="rounded"
+                />
+                <span className="w-4 h-4 rounded flex-shrink-0" style={{ background: ws.color || '#5B5BF5' }} />
+                <span className="text-sm text-text-primary">{ws.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+        {mode === 'create' && workspaceIds.length === 0 && (
+          <p className="text-accent-red text-[11px] mt-1">Ən azı bir iş sahəsi seçin.</p>
+        )}
+      </div>
+
+      {/* Project list for member / viewer */}
+      {needsProjectList && (
+        <div>
+          <label className="block text-text-secondary text-xs mb-1.5">
+            Layihə girişi <span className="text-text-muted font-normal">(seçilmədikdə bütün layihələrə görə bilər)</span>
+          </label>
+          {allProjects.length === 0 ? (
+            <div className="flex items-center gap-2 text-xs text-text-muted"><Loader2 size={12} className="animate-spin" /> Yüklənir...</div>
+          ) : (
+            <div className="space-y-1.5 max-h-40 overflow-y-auto rounded-xl border border-[var(--border)] p-2">
+              {allProjects.map(proj => (
+                <label key={proj.id} className="flex items-center gap-2.5 cursor-pointer rounded-lg px-2 py-1.5 hover:bg-[var(--surface-2)] transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={projectIds.includes(proj.id)}
+                    onChange={() => toggleProject(proj.id)}
+                    className="rounded"
+                  />
+                  <span className="text-sm text-text-primary">{proj.name}</span>
+                  {proj.status && <span className="text-[10px] text-text-muted ml-auto">{proj.status}</span>}
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {mode === 'create' && (
         <div>
@@ -579,6 +741,202 @@ function UsersTab() {
   )
 }
 
+// ── Workspace Share Modal ─────────────────────────────────────────────────────
+
+function WorkspaceShareModal({ workspace, onClose }: { workspace: Workspace; onClose: () => void }) {
+  const [members, setMembers] = useState<WorkspaceMember[]>([])
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [addUserId, setAddUserId] = useState('')
+  const [addPerm, setAddPerm] = useState<WorkspacePermission>('read')
+  const [adding, setAdding] = useState(false)
+  const [updatingId, setUpdatingId] = useState<string | null>(null)
+  const [removingId, setRemovingId] = useState<string | null>(null)
+
+  const permLabel: Record<WorkspacePermission, string> = { read: 'Oxuma', write: 'Yazma', admin: 'Admin' }
+  const permColor: Record<WorkspacePermission, string> = { read: '#64748B', write: '#3B82F6', admin: '#8B5CF6' }
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    const [mRes, uRes] = await Promise.all([
+      db.workspaceMembers.getAll(workspace.id),
+      db.users.getAll(),
+    ])
+    if (mRes.success && mRes.data) setMembers(mRes.data)
+    if (uRes.success && uRes.data) setUsers(uRes.data)
+    setLoading(false)
+  }, [workspace.id])
+
+  useEffect(() => { load() }, [load])
+
+  const existingIds = new Set(members.map(m => m.userId))
+  const availableUsers = users.filter(u => !existingIds.has(u.id))
+
+  const handleAdd = async () => {
+    if (!addUserId) return
+    setAdding(true)
+    const user = users.find(u => u.id === addUserId)
+    if (!user) { setAdding(false); return }
+    const res = await db.workspaceMembers.create({
+      workspaceId: workspace.id,
+      userId: user.id,
+      userDisplayName: user.displayName,
+      userRole: user.role,
+      permission: addPerm,
+    })
+    if (res.success) {
+      toast.success(`${user.displayName} əlavə edildi`)
+      setAddUserId('')
+      setAddPerm('read')
+      await load()
+    } else {
+      toast.error(res.error || 'Xəta baş verdi')
+    }
+    setAdding(false)
+  }
+
+  const handleUpdatePerm = async (id: string, perm: WorkspacePermission) => {
+    setUpdatingId(id)
+    const res = await db.workspaceMembers.update(id, perm)
+    if (res.success) {
+      await load()
+    } else {
+      toast.error(res.error || 'Xəta')
+    }
+    setUpdatingId(null)
+  }
+
+  const handleRemove = async (id: string, name: string) => {
+    setRemovingId(id)
+    const res = await db.workspaceMembers.delete(id)
+    if (res.success) {
+      toast.success(`${name} çıxarıldı`)
+      await load()
+    } else {
+      toast.error(res.error || 'Xəta')
+    }
+    setRemovingId(null)
+  }
+
+  return createPortal(
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div className="cardM w-full max-w-md max-h-[90vh] flex flex-col" style={{ padding: 0 }}>
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center text-white text-xs font-bold" style={{ background: workspace.color || '#5B5BF5' }}>
+              {workspace.name.slice(0, 2).toUpperCase()}
+            </div>
+            <div>
+              <div className="text-text-primary font-semibold text-sm">{workspace.name}</div>
+              <div className="text-text-muted text-xs">İş sahəsini paylaş</div>
+            </div>
+          </div>
+          <button onClick={onClose} className="icon-btn"><X size={16} /></button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Add user row */}
+          <div className="flex gap-2">
+            <select
+              value={addUserId}
+              onChange={e => setAddUserId(e.target.value)}
+              className="inputM flex-1 text-sm"
+            >
+              <option value="">İstifadəçi seçin...</option>
+              {availableUsers.map(u => (
+                <option key={u.id} value={u.id}>{u.displayName} (@{u.username})</option>
+              ))}
+            </select>
+            <select
+              value={addPerm}
+              onChange={e => setAddPerm(e.target.value as WorkspacePermission)}
+              className="inputM w-28 text-sm"
+            >
+              <option value="read">Oxuma</option>
+              <option value="write">Yazma</option>
+              <option value="admin">Admin</option>
+            </select>
+            <button
+              onClick={handleAdd}
+              disabled={!addUserId || adding}
+              className="btn-primaryM px-3 disabled:opacity-50"
+            >
+              {adding ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
+            </button>
+          </div>
+
+          {/* Member list */}
+          {loading ? (
+            <div className="space-y-2">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-12 rounded-xl bg-[var(--surface-2)] animate-pulse" />
+              ))}
+            </div>
+          ) : members.length === 0 ? (
+            <div className="text-center py-6 text-text-muted text-sm">
+              <span className="material-symbols-rounded text-[32px] block mb-2 opacity-30">group_add</span>
+              Heç bir üzv yoxdur
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {members.map(m => (
+                <div key={m.id} className="flex items-center gap-3 p-3 rounded-xl border border-[var(--border)] bg-[var(--surface-2)]">
+                  <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-accent-blue to-accent-purple flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                    {m.userDisplayName.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-text-primary truncate">{m.userDisplayName}</div>
+                    <div className="text-xs text-text-muted">{m.userRole}</div>
+                  </div>
+                  <select
+                    value={m.permission}
+                    onChange={e => handleUpdatePerm(m.id, e.target.value as WorkspacePermission)}
+                    disabled={updatingId === m.id}
+                    className="text-xs px-2 py-1 rounded-lg border border-[var(--border)] bg-[var(--surface)] cursor-pointer"
+                    style={{ color: permColor[m.permission as WorkspacePermission] }}
+                  >
+                    <option value="read">Oxuma</option>
+                    <option value="write">Yazma</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <button
+                    onClick={() => handleRemove(m.id, m.userDisplayName)}
+                    disabled={removingId === m.id}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-text-muted hover:text-accent-red hover:bg-accent-red/10 transition-all disabled:opacity-40"
+                  >
+                    {removingId === m.id ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Permission legend */}
+          <div className="rounded-xl bg-[var(--surface-2)] border border-[var(--border)] p-3 space-y-1.5">
+            <div className="text-[10px] font-bold text-text-muted uppercase tracking-wide mb-2">İcazə növləri</div>
+            {(['read', 'write', 'admin'] as WorkspacePermission[]).map(p => (
+              <div key={p} className="flex items-center gap-2 text-xs">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: permColor[p] }} />
+                <span className="font-medium" style={{ color: permColor[p] }}>{permLabel[p]}</span>
+                <span className="text-text-muted">—</span>
+                <span className="text-text-secondary">
+                  {p === 'read' ? 'Yalnız baxış' : p === 'write' ? 'Redaktə edə bilər' : 'Tam idarəetmə'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // ── Workspace Tab ─────────────────────────────────────────────────────────────
 
 const WS_COLORS = ['#5B5BF5','#E85C7A','#0EA5E9','#10B981','#F59E0B','#8B5CF6','#EF4444','#F97316']
@@ -593,6 +951,7 @@ function WorkspaceTab() {
   const [creating, setCreating] = useState(false)
   const [newForm, setNewForm] = useState({ name: '', description: '', color: '#5B5BF5' })
   const [newSaving, setNewSaving] = useState(false)
+  const [shareWs, setShareWs] = useState<Workspace | null>(null)
 
   const startEdit = (ws: Workspace) => {
     setEditId(ws.id)
@@ -723,6 +1082,14 @@ function WorkspaceTab() {
                     {currentWorkspace?.id !== ws.id && (
                       <button onClick={() => setCurrentWorkspace(ws)} className="btn-ghostM" style={{ padding: '5px 12px', fontSize: 12 }}>Keç</button>
                     )}
+                    <button
+                      onClick={() => setShareWs(ws)}
+                      className="btn-ghostM"
+                      style={{ padding: '5px 10px', fontSize: 12 }}
+                      title="Paylaş"
+                    >
+                      <Users size={13} />
+                    </button>
                     <button onClick={() => startEdit(ws)} className="btn-ghostM" style={{ padding: '5px 10px', fontSize: 12 }}>
                       <Edit2 size={13} />
                     </button>
@@ -751,6 +1118,9 @@ function WorkspaceTab() {
         message="Bu iş sahəsini silmək istədiyinizə əminsiniz? Bu əməliyyat geri qaytarıla bilməz."
         loading={deleting}
       />
+
+      {/* Share modal */}
+      {shareWs && <WorkspaceShareModal workspace={shareWs} onClose={() => setShareWs(null)} />}
     </div>
   )
 }
