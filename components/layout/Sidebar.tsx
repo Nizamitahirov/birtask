@@ -6,26 +6,9 @@ import { usePathname } from 'next/navigation'
 import { useTheme } from '@/hooks/useTheme'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { usePermissions } from '@/contexts/PermissionsContext'
+import { NAV_MAIN, NAV_ADMIN } from '@/lib/access'
 import { Workspace } from '@/lib/types'
-
-const NAV_MAIN = [
-  { href: '/',                label: 'İdarə Paneli',     icon: 'space_dashboard' },
-  { href: '/projects',        label: 'Layihələr',        icon: 'folder' },
-  { href: '/tasks',           label: 'Tapşırıqlar',      icon: 'check_box' },
-  { href: '/calendar',        label: 'Təqvim',           icon: 'calendar_month' },
-  { href: '/roadmap',         label: 'Yol Xəritəsi',     icon: 'route' },
-  { href: '/recurring',       label: 'Təkrarlanan',      icon: 'autorenew' },
-  { href: '/analytics',       label: 'Analitika',        icon: 'analytics' },
-  { href: '/priority-matrix', label: 'Prioritet Matrisi', icon: 'grid_view' },
-  { href: '/orgchart', label: 'Org Chart',  icon: 'account_tree' },
-  { href: '/adhoc',    label: 'Ad hoc',     icon: 'co_present' },
-]
-
-const NAV_ADMIN = [
-  { href: '/team',       label: 'Komanda',      icon: 'groups' },
-  { href: '/activity',   label: 'Aktivlik',     icon: 'bolt' },
-  { href: '/settings',   label: 'Parametrlər',  icon: 'settings' },
-]
 
 function initials(name: string) {
   return name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
@@ -49,6 +32,8 @@ function wsColor(ws: Workspace): string {
 
 function WorkspaceSwitcher() {
   const { workspaces, currentWorkspace, setCurrentWorkspace, createWorkspace, loading } = useWorkspace()
+  const { can } = usePermissions()
+  const canCreateWorkspace = can('settings.workspace')
   const [open, setOpen] = useState(false)
   const [creating, setCreating] = useState(false)
   const [newName, setNewName] = useState('')
@@ -150,9 +135,9 @@ function WorkspaceSwitcher() {
             </button>
           ))}
 
-          <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0' }} />
+          {canCreateWorkspace && <div style={{ borderTop: '1px solid var(--border)', margin: '6px 0' }} />}
 
-          {creating ? (
+          {canCreateWorkspace && (creating ? (
             <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 8 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
                 Yeni İş Sahəsi
@@ -207,7 +192,7 @@ function WorkspaceSwitcher() {
               <span className="material-symbols-rounded" style={{ fontSize: 18 }}>add</span>
               Yeni iş sahəsi
             </button>
-          )}
+          ))}
         </div>
       )}
     </div>
@@ -218,9 +203,13 @@ export function Sidebar() {
   const pathname = usePathname()
   const { theme, toggle } = useTheme()
   const { user, logout } = useAuth()
+  const { can } = usePermissions()
 
   const displayName = user?.displayName || user?.username || 'İstifadəçi'
   const roleLabel = user?.role ? ROLE_LABELS[user.role] || user.role : ''
+
+  const mainItems = NAV_MAIN.filter(i => can(i.perm))
+  const adminItems = NAV_ADMIN.filter(i => can(i.perm))
 
   return (
     <aside className="sideM">
@@ -239,7 +228,7 @@ export function Sidebar() {
       <div className="sec-lbl">Menyu</div>
 
       <nav className="navM">
-        {NAV_MAIN.map(({ href, label, icon }) => {
+        {mainItems.map(({ href, label, icon }) => {
           const active = href === '/' ? pathname === '/' : pathname.startsWith(href)
           return (
             <Link
@@ -255,9 +244,9 @@ export function Sidebar() {
           )
         })}
 
-        <div className="sec-lbl">İdarəetmə</div>
+        {adminItems.length > 0 && <div className="sec-lbl">İdarəetmə</div>}
 
-        {NAV_ADMIN.map(({ href, label, icon }) => {
+        {adminItems.map(({ href, label, icon }) => {
           const active = pathname.startsWith(href)
           return (
             <Link

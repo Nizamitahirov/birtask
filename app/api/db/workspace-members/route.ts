@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { requirePermission } from '@/lib/auth-server'
 
 export async function GET(req: NextRequest) {
   try {
@@ -21,6 +22,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
+    const gate = await requirePermission(req, 'settings.workspace', { workspaceId: data.workspaceId })
+    if (gate.error) return gate.error
     const now = new Date().toISOString()
     const docRef = await adminDb.collection('workspaceMembers').add({
       workspaceId: data.workspaceId,

@@ -3,13 +3,15 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { db } from '@/lib/db'
-import { User, UserRole, Workspace, TeamMember, Project, WorkspaceMember, WorkspacePermission } from '@/lib/types'
+import { User, UserRole, Workspace, TeamMember, Project, WorkspaceMember, WorkspacePermission, PermissionKey } from '@/lib/types'
 import { PERMISSION_GROUPS, DEFAULT_ROLE_PERMISSIONS } from '@/lib/permissions'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { usePermissions } from '@/contexts/PermissionsContext'
+import { AccessDenied } from '@/components/ui/AccessDenied'
 import {
   Settings, Database, CheckCircle, AlertCircle, RefreshCw,
-  Users, Plus, Edit2, Trash2, KeyRound, Search, ShieldCheck,
+  Users, Plus, Edit2, Trash2, KeyRound, Search,
   UserCheck, Eye, EyeOff, Loader2, X, Shield, UserCog,
   Download, Upload, FileText, FileJson, Package, Layers, Zap,
 } from 'lucide-react'
@@ -1645,18 +1647,32 @@ function ExportImportTab() {
 
 type Tab = 'workspace' | 'connection' | 'users' | 'roles' | 'export' | 'workflow'
 
-export default function SettingsPage() {
-  const { user } = useAuth()
-  const [tab, setTab] = useState<Tab>('workspace')
+interface TabDef {
+  id: Tab
+  label: string
+  icon: typeof Settings
+  perm: PermissionKey
+}
 
-  const tabs: { id: Tab; label: string; icon: typeof Settings }[] = [
-    { id: 'workspace',  label: 'İş Sahələri',   icon: Layers },
-    { id: 'connection', label: 'Əlaqə',         icon: Database },
-    { id: 'users',      label: 'İstifadəçilər', icon: Users },
-    { id: 'roles',      label: 'Rollər & İcazələr', icon: Shield },
-    { id: 'export',     label: 'Export / Import', icon: Download },
-    { id: 'workflow',   label: 'Workflow',       icon: Zap },
-  ]
+const ALL_TABS: TabDef[] = [
+  { id: 'workspace',  label: 'İş Sahələri',       icon: Layers,   perm: 'settings.workspace' },
+  { id: 'connection', label: 'Əlaqə',             icon: Database,  perm: 'settings.workspace' },
+  { id: 'users',      label: 'İstifadəçilər',     icon: Users,     perm: 'settings.users' },
+  { id: 'roles',      label: 'Rollər & İcazələr', icon: Shield,    perm: 'settings.roles' },
+  { id: 'export',     label: 'Export / Import',   icon: Download,  perm: 'settings.workspace' },
+  { id: 'workflow',   label: 'Workflow',          icon: Zap,       perm: 'workflows.manage' },
+]
+
+export default function SettingsPage() {
+  const { can } = usePermissions()
+  const tabs = ALL_TABS.filter(t => can(t.perm))
+  const [tab, setTab] = useState<Tab | null>(null)
+
+  // Default to the first tab the user is allowed to see.
+  useEffect(() => {
+    if (tabs.length === 0) return
+    if (!tab || !tabs.some(t => t.id === tab)) setTab(tabs[0].id)
+  }, [tabs, tab])
 
   return (
     <div className="pageM fade-in">
@@ -1667,38 +1683,45 @@ export default function SettingsPage() {
         </div>
       </div>
 
-      {/* Tab nav */}
-      <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', overflowX: 'auto' }}>
-        {tabs.map(({ id, label, icon: Icon }) => (
-          <button
-            key={id}
-            onClick={() => setTab(id)}
-            style={{
-              display: 'inline-flex', alignItems: 'center', gap: 8,
-              padding: '10px 16px', fontSize: 13, fontWeight: 600,
-              borderBottom: tab === id ? '2px solid var(--primary)' : '2px solid transparent',
-              color: tab === id ? 'var(--primary)' : 'var(--muted)',
-              background: 'transparent', border: 'none',
-              cursor: 'pointer', whiteSpace: 'nowrap', marginBottom: -1,
-              transition: 'color .12s',
-            }}
-          >
-            <Icon size={15} />
-            {label}
-            {id === 'users' && user?.role === 'admin' && (
-              <ShieldCheck size={12} style={{ color: '#8B5CF6', opacity: 0.7 }} />
-            )}
-          </button>
-        ))}
-      </div>
+      {tabs.length === 0 ? (
+        <AccessDenied
+          compact
+          title="İdarəetmə bölməsi yoxdur"
+          message="Parametrlərdə idarə edə biləcəyiniz heç bir bölmə yoxdur. Əlavə icazə üçün iş sahəsi adminizə müraciət edin."
+        />
+      ) : (
+        <>
+          {/* Tab nav */}
+          <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid var(--border)', overflowX: 'auto' }}>
+            {tabs.map(({ id, label, icon: Icon }) => (
+              <button
+                key={id}
+                onClick={() => setTab(id)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '10px 16px', fontSize: 13, fontWeight: 600,
+                  borderBottom: tab === id ? '2px solid var(--primary)' : '2px solid transparent',
+                  color: tab === id ? 'var(--primary)' : 'var(--muted)',
+                  background: 'transparent', border: 'none',
+                  cursor: 'pointer', whiteSpace: 'nowrap', marginBottom: -1,
+                  transition: 'color .12s',
+                }}
+              >
+                <Icon size={15} />
+                {label}
+              </button>
+            ))}
+          </div>
 
-      {/* Tab content */}
-      {tab === 'workspace'  && <WorkspaceTab />}
-      {tab === 'connection' && <ConnectionTab />}
-      {tab === 'users'      && <UsersTab />}
-      {tab === 'roles'      && <RolesTab />}
-      {tab === 'export'     && <ExportImportTab />}
-      {tab === 'workflow'   && <WorkflowTab />}
+          {/* Tab content */}
+          {tab === 'workspace'  && <WorkspaceTab />}
+          {tab === 'connection' && <ConnectionTab />}
+          {tab === 'users'      && <UsersTab />}
+          {tab === 'roles'      && <RolesTab />}
+          {tab === 'export'     && <ExportImportTab />}
+          {tab === 'workflow'   && <WorkflowTab />}
+        </>
+      )}
     </div>
   )
 }

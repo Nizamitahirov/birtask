@@ -4,9 +4,12 @@ import { useState, useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
+import { usePermissions } from '@/contexts/PermissionsContext'
 import { Sidebar } from '@/components/layout/Sidebar'
 import { TopBar } from '@/components/layout/TopBar'
 import { GlobalSearch } from '@/components/ui/GlobalSearch'
+import { AccessDenied } from '@/components/ui/AccessDenied'
+import { requiredPermissionForPath } from '@/lib/access'
 import { Eye, EyeOff, Lock, ShieldCheck, CheckCircle2, AlertCircle, Loader2, KeyRound, LogOut } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -522,33 +525,36 @@ function ForceChangePasswordModal() {
 
 // ── Authenticated layout ──────────────────────────────────────────────────────
 
+function Spinner() {
+  return (
+    <div style={{
+      minHeight: '100vh',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'var(--bg)',
+    }}>
+      <div style={{
+        width: 40, height: 40, borderRadius: '50%',
+        border: '3px solid var(--primary-soft)',
+        borderTopColor: 'var(--primary)',
+        animation: 'spin 0.8s linear infinite',
+      }} />
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  )
+}
+
 export function AuthenticatedLayout({ children }: { children: React.ReactNode }) {
   const { user, loading: authLoading } = useAuth()
   const { loading: wsLoading, needsSetup } = useWorkspace()
+  const { ready: permReady, can } = usePermissions()
   const pathname = usePathname()
   const isLoginPage = pathname === '/login'
 
   const loading = authLoading || (!!user && !isLoginPage && wsLoading)
 
-  if (loading) {
-    return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'var(--bg)',
-      }}>
-        <div style={{
-          width: 40, height: 40, borderRadius: '50%',
-          border: '3px solid var(--primary-soft)',
-          borderTopColor: 'var(--primary)',
-          animation: 'spin 0.8s linear infinite',
-        }} />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-      </div>
-    )
-  }
+  if (loading) return <Spinner />
 
   if (isLoginPage) return <>{children}</>
 
@@ -559,12 +565,19 @@ export function AuthenticatedLayout({ children }: { children: React.ReactNode })
 
   if (needsSetup) return <WorkspaceSetup />
 
+  // Wait for role/permission data before rendering gated content to avoid
+  // briefly flashing pages the user is not allowed to see.
+  if (!permReady) return <Spinner />
+
+  const requiredPerm = requiredPermissionForPath(pathname)
+  const blocked = requiredPerm !== null && !can(requiredPerm)
+
   return (
     <div className="appM">
       <Sidebar />
       <main className="mainM">
         <TopBar />
-        {children}
+        {blocked ? <AccessDenied /> : children}
       </main>
       <GlobalSearch />
 

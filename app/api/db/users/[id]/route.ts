@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { requirePermission } from '@/lib/auth-server'
 import bcrypt from 'bcryptjs'
 
 function omitPassword(data: Record<string, unknown>) {
@@ -32,6 +33,8 @@ export async function PUT(
 ) {
   try {
     const data = await req.json()
+    const gate = await requirePermission(req, 'settings.users', { workspaceId: data.workspaceIds?.[0] })
+    if (gate.error) return gate.error
     const now = new Date().toISOString()
     const ref = adminDb.collection('users').doc(params.id)
 
@@ -58,10 +61,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const gate = await requirePermission(req, 'settings.users')
+    if (gate.error) return gate.error
     const ref = adminDb.collection('users').doc(params.id)
     const doc = await ref.get()
     if (!doc.exists) {

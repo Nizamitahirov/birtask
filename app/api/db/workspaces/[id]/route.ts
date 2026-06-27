@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { requirePermission } from '@/lib/auth-server'
 
 export async function GET(
   _req: NextRequest,
@@ -23,6 +24,8 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const gate = await requirePermission(req, 'settings.workspace', { workspaceId: params.id })
+    if (gate.error) return gate.error
     const data = await req.json()
     const now = new Date().toISOString()
     const ref = adminDb.collection('workspaces').doc(params.id)
@@ -36,10 +39,12 @@ export async function PUT(
 }
 
 export async function DELETE(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
+    const gate = await requirePermission(req, 'settings.workspace', { workspaceId: params.id })
+    if (gate.error) return gate.error
     await adminDb.collection('workspaces').doc(params.id).delete()
     return NextResponse.json({ success: true })
   } catch (err: unknown) {

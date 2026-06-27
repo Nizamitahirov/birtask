@@ -1,12 +1,15 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { requirePermission } from '@/lib/auth-server'
 import { ALL_PERMISSIONS } from '@/lib/permissions'
 import type { PermissionKey } from '@/lib/types'
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
   try {
     const data = await req.json()
+    const gate = await requirePermission(req, 'settings.roles', { workspaceId: data.workspaceId })
+    if (gate.error) return gate.error
     const ref = adminDb.collection('roles').doc(params.id)
     const snap = await ref.get()
     if (!snap.exists) {
@@ -41,8 +44,10 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
   try {
+    const gate = await requirePermission(req, 'settings.roles')
+    if (gate.error) return gate.error
     const ref = adminDb.collection('roles').doc(params.id)
     const snap = await ref.get()
     if (!snap.exists) {

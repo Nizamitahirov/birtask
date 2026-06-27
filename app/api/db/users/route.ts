@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { adminDb } from '@/lib/firebase-admin'
+import { requirePermission } from '@/lib/auth-server'
 import bcrypt from 'bcryptjs'
 
 function omitPassword(data: Record<string, unknown>) {
@@ -30,6 +31,8 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   try {
     const data = await req.json()
+    const gate = await requirePermission(req, 'settings.users', { workspaceId: data.workspaceIds?.[0] })
+    if (gate.error) return gate.error
     const now = new Date().toISOString()
 
     let passwordHash = data.passwordHash

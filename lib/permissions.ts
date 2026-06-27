@@ -125,6 +125,27 @@ export function getImpliedBy(active: Set<PermissionKey>): Map<PermissionKey, Per
   return result
 }
 
+/**
+ * Resolve the effective permission set for a role.
+ *
+ * - `admin` always receives every permission (hard safety guarantee).
+ * - If a Firestore role document exists, its `permissions` array is the source
+ *   of truth (even an explicitly empty array is respected — an admin may revoke).
+ * - Otherwise we fall back to the built-in defaults for that role key.
+ *
+ * The result is always expanded to include implied permissions.
+ */
+export function effectivePermissions(
+  roleKey: string,
+  roleDoc?: { permissions?: PermissionKey[] } | null
+): PermissionKey[] {
+  if (roleKey === 'admin') return [...ALL_PERMISSIONS]
+  const base = roleDoc
+    ? (roleDoc.permissions || [])
+    : (DEFAULT_ROLE_PERMISSIONS[roleKey] || [])
+  return resolveImplied(base)
+}
+
 export const DEFAULT_ROLE_PERMISSIONS: Record<string, PermissionKey[]> = {
   admin: ALL_PERMISSIONS,
   manager: resolveImplied([
