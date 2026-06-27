@@ -7,6 +7,8 @@ import { useTeam } from '@/hooks/useSheets'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { db } from '@/lib/db'
 import { Icon } from '@/components/ui/Icon'
+import { ExplainButton } from '@/components/ai/ExplainButton'
+import { aiGenerate } from '@/lib/ai'
 import { avatarPaletteFor, initialsM, STATUS_COLORS } from '@/lib/design-utils'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -614,6 +616,18 @@ export default function AnalyticsPage() {
             <button className="cta ghost" style={{ fontSize: 12, padding: '8px 12px', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
               <Icon name="file_download" size={12} /> İxrac
             </button>
+            <ExplainButton
+              className="cta ghost"
+              label="AI izah"
+              title="AI · Analitika izahı"
+              showLanguage
+              fetcher={(language) =>
+                aiGenerate('analytics', {
+                  stats,
+                  context: { projects: projects.length, tasks: tasks.length, rangeLabel },
+                }, { language })
+              }
+            />
           </div>
         </div>
         <div className="hero-side">

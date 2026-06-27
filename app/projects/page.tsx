@@ -9,6 +9,8 @@ import { ProjectForm } from '@/components/projects/ProjectForm'
 import { Modal } from '@/components/ui/Modal'
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog'
 import { Icon } from '@/components/ui/Icon'
+import { AIExplainModal } from '@/components/ai/AIExplainModal'
+import { aiGenerate } from '@/lib/ai'
 import {
   paletteFor,
   avatarPaletteFor,
@@ -220,9 +222,10 @@ interface ProjectCardProps {
   onEdit: (p: Project) => void
   onDelete: (p: Project) => void
   onShare: (p: Project) => void
+  onExplain: (p: Project) => void
 }
 
-function ProjectCard({ p, animate, onEdit, onDelete, onShare }: ProjectCardProps) {
+function ProjectCard({ p, animate, onEdit, onDelete, onShare, onExplain }: ProjectCardProps) {
   const [pc1, pc2] = paletteFor(p.id)
   const [ac1, ac2] = avatarPaletteFor(p.id)
   const days = daysLeft(p.endDate)
@@ -241,6 +244,13 @@ function ProjectCard({ p, animate, onEdit, onDelete, onShare }: ProjectCardProps
             {p.priority}
           </span>
           <div style={{ display: 'flex', gap: 4 }}>
+            <button
+              className="icon-btn proj-more"
+              onClick={() => onExplain(p)}
+              title="AI Analiz"
+            >
+              <Icon name="auto_awesome" size={13} />
+            </button>
             <button
               className="icon-btn proj-more"
               onClick={() => onShare(p)}
@@ -352,9 +362,10 @@ interface ProjectsTableProps {
   onEdit: (p: Project) => void
   onDelete: (p: Project) => void
   onShare: (p: Project) => void
+  onExplain: (p: Project) => void
 }
 
-function ProjectsTable({ items, animate, onEdit, onDelete, onShare }: ProjectsTableProps) {
+function ProjectsTable({ items, animate, onEdit, onDelete, onShare, onExplain }: ProjectsTableProps) {
   return (
     <div className="proj-table cardM" style={{ padding: 0, overflow: 'hidden' }}>
       <div className="proj-thead">
@@ -433,6 +444,14 @@ function ProjectsTable({ items, animate, onEdit, onDelete, onShare }: ProjectsTa
               <button
                 className="icon-btn"
                 style={{ width: 30, height: 30 }}
+                title="AI Analiz"
+                onClick={() => onExplain(p)}
+              >
+                <Icon name="auto_awesome" size={13} />
+              </button>
+              <button
+                className="icon-btn"
+                style={{ width: 30, height: 30 }}
                 title="Paylaş"
                 onClick={() => onShare(p)}
               >
@@ -469,9 +488,10 @@ interface KanbanCardProps {
   onEdit: (p: Project) => void
   onDelete: (p: Project) => void
   onShare: (p: Project) => void
+  onExplain: (p: Project) => void
 }
 
-function KanbanCard({ p, onEdit, onDelete, onShare }: KanbanCardProps) {
+function KanbanCard({ p, onEdit, onDelete, onShare, onExplain }: KanbanCardProps) {
   const [ac1, ac2] = avatarPaletteFor(p.id)
   const days = daysLeft(p.endDate)
   const late = days < 0 && p.status !== 'Tamamlandı'
@@ -491,6 +511,14 @@ function KanbanCard({ p, onEdit, onDelete, onShare }: KanbanCardProps) {
         </div>
         <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           <span className={`pill ${pc}`} style={{ fontSize: 10, padding: '2px 7px' }}>{p.priority}</span>
+          <button
+            className="icon-btn"
+            style={{ width: 22, height: 22, border: 0 }}
+            title="AI Analiz"
+            onClick={() => onExplain(p)}
+          >
+            <Icon name="auto_awesome" size={11} />
+          </button>
           <button
             className="icon-btn"
             style={{ width: 22, height: 22, border: 0 }}
@@ -549,10 +577,11 @@ interface ProjectsKanbanProps {
   onEdit: (p: Project) => void
   onDelete: (p: Project) => void
   onShare: (p: Project) => void
+  onExplain: (p: Project) => void
   onNew: () => void
 }
 
-function ProjectsKanban({ projects, onEdit, onDelete, onShare, onNew }: ProjectsKanbanProps) {
+function ProjectsKanban({ projects, onEdit, onDelete, onShare, onExplain, onNew }: ProjectsKanbanProps) {
   const COLUMNS: Array<Project['status']> = [
     'Planlaşdırılır', 'Davam edir', 'Tamamlandı', 'Dayandırıldı',
   ]
@@ -579,7 +608,7 @@ function ProjectsKanban({ projects, onEdit, onDelete, onShare, onNew }: Projects
             </div>
             <div className="proj-kcol-body">
               {items.map(p => (
-                <KanbanCard key={p.id} p={p} onEdit={onEdit} onDelete={onDelete} onShare={onShare} />
+                <KanbanCard key={p.id} p={p} onEdit={onEdit} onDelete={onDelete} onShare={onShare} onExplain={onExplain} />
               ))}
               {items.length === 0 && (
                 <div style={{
@@ -620,6 +649,7 @@ export default function ProjectsPage() {
   const [selected, setSelected] = useState<Project | null>(null)
   const [confirmDelete, setConfirmDelete] = useState<Project | null>(null)
   const [shareProject, setShareProject] = useState<Project | null>(null)
+  const [explainProject, setExplainProject] = useState<Project | null>(null)
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -728,6 +758,7 @@ export default function ProjectsPage() {
   const openEdit = (p: Project) => { setSelected(p); setModal('edit') }
   const openDelete = (p: Project) => setConfirmDelete(p)
   const openShare = (p: Project) => setShareProject(p)
+  const openExplain = (p: Project) => setExplainProject(p)
 
   return (
     <div className="pageM fade-in">
@@ -878,13 +909,13 @@ export default function ProjectsPage() {
       {!loading && view === 'grid' && (
         <div className="proj-grid">
           {filtered.map(p => (
-            <ProjectCard key={p.id} p={p} animate={animate} onEdit={openEdit} onDelete={openDelete} onShare={openShare} />
+            <ProjectCard key={p.id} p={p} animate={animate} onEdit={openEdit} onDelete={openDelete} onShare={openShare} onExplain={openExplain} />
           ))}
         </div>
       )}
 
       {!loading && view === 'list' && (
-        <ProjectsTable items={filtered} animate={animate} onEdit={openEdit} onDelete={openDelete} onShare={openShare} />
+        <ProjectsTable items={filtered} animate={animate} onEdit={openEdit} onDelete={openDelete} onShare={openShare} onExplain={openExplain} />
       )}
 
       {!loading && view === 'kanban' && (
@@ -893,6 +924,7 @@ export default function ProjectsPage() {
           onEdit={openEdit}
           onDelete={openDelete}
           onShare={openShare}
+          onExplain={openExplain}
           onNew={() => setModal('create')}
         />
       )}
@@ -958,6 +990,24 @@ export default function ProjectsPage() {
           onClose={() => setShareProject(null)}
         />
       )}
+
+      {/* AI Project Analysis */}
+      <AIExplainModal
+        open={!!explainProject}
+        onClose={() => setExplainProject(null)}
+        title={explainProject ? `AI Analiz · ${explainProject.name}` : 'AI Analiz'}
+        showLanguage
+        fetcher={(language) =>
+          aiGenerate(
+            'project',
+            {
+              project: explainProject,
+              tasks: tasks.filter(t => t.projectId === explainProject?.id),
+            },
+            { language }
+          )
+        }
+      />
     </div>
   )
 }

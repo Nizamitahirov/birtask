@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Task, Priority, TaskStatus, Project } from '@/lib/types'
 import { MultiSelect } from '@/components/ui/MultiSelect'
+import { AIWriteButton } from '@/components/ai/AIWriteButton'
 
 interface TaskFormProps {
   initial?: Partial<Task>
@@ -58,7 +59,20 @@ export function TaskForm({ initial, projects = [], teamNames = [], onSubmit, onC
       </div>
 
       <div>
-        <label className="block text-text-secondary text-xs mb-1.5">Təsvir</label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="block text-text-secondary text-xs">Təsvir</label>
+          <AIWriteButton
+            disabled={!form.title.trim()}
+            getContext={() => ({
+              type: 'task',
+              title: form.title,
+              projectName: form.projectName,
+              status: form.status,
+              priority: form.priority,
+            })}
+            onResult={text => set('description', text)}
+          />
+        </div>
         <textarea
           value={form.description}
           onChange={e => set('description', e.target.value)}

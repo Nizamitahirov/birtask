@@ -5,6 +5,8 @@ import { useDashboard, useProjects, useTasks } from '@/hooks/useSheets'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { db } from '@/lib/db'
 import { Task, Project } from '@/lib/types'
+import { ExplainButton } from '@/components/ai/ExplainButton'
+import { aiGenerate } from '@/lib/ai'
 import Link from 'next/link'
 
 const VIBRANT_PALETTES = [
@@ -50,7 +52,7 @@ export default function DashboardPage() {
   const { stats, activities, loading } = useDashboard()
   const { projects } = useProjects()
   const { tasks } = useTasks()
-  const { currentWorkspaceId } = useWorkspace()
+  const { currentWorkspaceId, currentWorkspace } = useWorkspace()
   const [animate, setAnimate] = useState(false)
   const [tab, setTab] = useState('all')
   const [page, setPage] = useState(0)
@@ -210,6 +212,32 @@ export default function DashboardPage() {
               <span className="material-symbols-rounded" style={{ fontSize: 14 }}>calendar_today</span>
               Cədvəlim
             </Link>
+            <ExplainButton
+              className="cta ghost"
+              label="AI izah"
+              title="AI · Panel izahı"
+              fetcher={(language) => aiGenerate('dashboard', { stats, projects, tasks }, { language })}
+              showLanguage
+            />
+            <ExplainButton
+              className="cta ghost"
+              label="Workspace xülasəsi"
+              title={`AI · ${currentWorkspace?.name || 'İş sahəsi'} xülasəsi`}
+              showLanguage
+              fetcher={async (language) => {
+                const teamRes = currentWorkspaceId ? await db.team.getAll(currentWorkspaceId) : null
+                return aiGenerate(
+                  'workspace',
+                  {
+                    workspace: currentWorkspace || {},
+                    projects,
+                    tasks,
+                    team: teamRes?.success && teamRes.data ? teamRes.data : [],
+                  },
+                  { language }
+                )
+              }}
+            />
           </div>
         </div>
         <div className="hero-side">

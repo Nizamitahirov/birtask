@@ -14,6 +14,7 @@ import { TaskCard } from '@/components/tasks/TaskCard'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton, CardSkeleton } from '@/components/ui/Skeleton'
 import { MarkdownRenderer } from '@/components/ui/MarkdownRenderer'
+import { aiGenerate } from '@/lib/ai'
 import {
   ArrowLeft, Calendar, User, DollarSign, CheckSquare,
   Plus, RefreshCw, Zap, Columns, List, Edit2, Trash2,
@@ -116,44 +117,10 @@ export default function ProjectDetailPage() {
     setSummaryLoading(true)
     setSummary('')
     try {
-      const _k = 'gD5xVZJ_SP5RFegkcnwy-J-Os-i-Hv0HDySazIA'
-      const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY || _k.split('').reverse().join('')
-
-      const totalTasks = tasks.length
-      const doneTasks = tasks.filter(t => t.status === 'Tamamlandı').length
-      const inProgressTasks = tasks.filter(t => t.status === 'Davam edir').length
-      const waitingTasks = tasks.filter(t => t.status === 'Gözləyir').length
-      const overdueTasks = tasks.filter(t => {
-        if (!t.dueDate || t.status === 'Tamamlandı') return false
-        return new Date(t.dueDate) < new Date()
-      }).length
-      const taskTitles = tasks.slice(0, 5).map(t => `- ${t.title} [${t.status}]`).join('\n') || 'Yoxdur'
-
-      const prompt = `Layihə haqqında Azərbaycan dilində qısa xülasə yaz (## başlıq, **qalın**, - siyahı).
-
-Layihə: ${project.name} | ${project.status} | ${project.priority} | ${project.progress}%
-Tarix: ${project.startDate || '?'} → ${project.endDate || '?'}
-Tapşırıqlar: ${totalTasks} ümumi, ${doneTasks} tamamlandı, ${inProgressTasks} davam edir, ${waitingTasks} gözləyir, ${overdueTasks} gecikmiş
-Nümunələr: ${taskTitles}
-
-3 abzas: ümumi vəziyyət, problemlər, tövsiyə.`
-
-      const res = await fetch(
-        'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-goog-api-key': apiKey },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
-          }),
-        }
-      )
-      const data = await res.json()
-      if (res.ok) setSummary(data.candidates?.[0]?.content?.parts?.[0]?.text || '')
-      else setSummary(`❌ Xəta: ${data.error?.message || JSON.stringify(data.error)}`)
+      const text = await aiGenerate('project', { project, tasks })
+      setSummary(text)
     } catch (err) {
-      setSummary(`❌ Şəbəkə xətası: ${err instanceof Error ? err.message : 'Bilinməyən xəta'}`)
+      setSummary(`❌ ${err instanceof Error ? err.message : 'Bilinməyən xəta'}`)
     }
     setSummaryLoading(false)
   }
@@ -504,7 +471,7 @@ Nümunələr: ${taskTitles}
                 </div>
                 <div>
                   <div className="text-text-primary text-sm font-semibold">AI Layihə Xülasəsi</div>
-                  <div className="text-text-muted text-xs">Google · Gemini 2.5 Flash</div>
+                  <div className="text-text-muted text-xs">Groq · Llama 3.3</div>
                 </div>
               </div>
               <div className="flex items-center gap-1">
@@ -557,7 +524,7 @@ Nümunələr: ${taskTitles}
             {/* Footer */}
             {summary && !summaryLoading && (
               <div className="px-6 py-3 border-t flex items-center justify-between" style={{ borderColor: 'var(--border)' }}>
-                <span className="text-text-muted text-xs">Google Gemini tərəfindən yaradılmışdır</span>
+                <span className="text-text-muted text-xs">Groq Llama 3.3 tərəfindən yaradılmışdır</span>
                 <button
                   onClick={handleSummary}
                   className="text-xs text-accent-purple hover:underline flex items-center gap-1"

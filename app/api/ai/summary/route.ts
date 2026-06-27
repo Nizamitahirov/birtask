@@ -1,13 +1,8 @@
 export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
-import Groq from 'groq-sdk'
+import { groqComplete } from '@/lib/groq'
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.GROQ_API_KEY
-  if (!apiKey) {
-    return NextResponse.json({ error: 'GROQ_API_KEY mühit dəyişəni təyin edilməyib.' }, { status: 500 })
-  }
-
   const { project, tasks } = await req.json()
   if (!project) {
     return NextResponse.json({ error: 'Layihə məlumatları çatışmır.' }, { status: 400 })
@@ -56,14 +51,7 @@ ${taskTitles}
 Xülasəni peşəkar, analitik və Azərbaycan dilinin rəsmi üslubunda yaz.`
 
   try {
-    const groq = new Groq({ apiKey })
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.3-70b-versatile',
-      messages: [{ role: 'user', content: prompt }],
-      temperature: 0.7,
-      max_tokens: 1024,
-    })
-    const summary = completion.choices[0]?.message?.content || ''
+    const summary = await groqComplete({ prompt, temperature: 0.7, maxTokens: 1024 })
     return NextResponse.json({ summary })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Bilinməyən xəta'

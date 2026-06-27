@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Project, Priority, ProjectStatus } from '@/lib/types'
 import { PROJECT_COLORS, cn } from '@/lib/utils'
 import { MultiSelect } from '@/components/ui/MultiSelect'
+import { AIWriteButton } from '@/components/ai/AIWriteButton'
 
 interface ProjectFormProps {
   initial?: Partial<Project>
@@ -48,7 +49,19 @@ export function ProjectForm({ initial, teamNames = [], onSubmit, onCancel, loadi
       </div>
 
       <div>
-        <label className="block text-text-secondary text-xs mb-1.5">Təsvir</label>
+        <div className="flex items-center justify-between mb-1.5">
+          <label className="block text-text-secondary text-xs">Təsvir</label>
+          <AIWriteButton
+            disabled={!form.name.trim()}
+            getContext={() => ({
+              type: 'project',
+              name: form.name,
+              status: form.status,
+              priority: form.priority,
+            })}
+            onResult={text => set('description', text)}
+          />
+        </div>
         <textarea value={form.description} onChange={e => set('description', e.target.value)} className="input resize-none" rows={2} placeholder="Layihə haqqında qısa məlumat" />
       </div>
 
