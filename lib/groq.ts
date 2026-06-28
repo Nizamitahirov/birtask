@@ -1,6 +1,7 @@
 import Groq from 'groq-sdk'
 
-export const GROQ_MODEL = 'llama-3.3-70b-versatile'
+// Configurable via the GROQ_MODEL env var (falls back to a sensible default).
+export const GROQ_MODEL = process.env.GROQ_MODEL?.trim() || 'llama-3.3-70b-versatile'
 
 export function getGroq(): Groq {
   // Trim to tolerate stray spaces / newlines pasted into the env var value.
