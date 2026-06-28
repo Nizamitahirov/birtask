@@ -3,7 +3,8 @@ import Groq from 'groq-sdk'
 export const GROQ_MODEL = 'llama-3.3-70b-versatile'
 
 export function getGroq(): Groq {
-  const apiKey = process.env.GROQ_API_KEY
+  // Trim to tolerate stray spaces / newlines pasted into the env var value.
+  const apiKey = process.env.GROQ_API_KEY?.trim()
   if (!apiKey) {
     throw new Error('GROQ_API_KEY mühit dəyişəni təyin edilməyib')
   }
